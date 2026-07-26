@@ -1,0 +1,619 @@
+<title>집안일 플래너</title>
+<style>
+  :root {
+    --bg: #F2F2F7;
+    --surface: #FFFFFF;
+    --label: #1C1C1E;
+    --label-2: #8A8A8E;
+    --label-3: #C6C6C8;
+    --accent: #007AFF;
+    --red: #FF3B30;
+    --orange: #FF9500;
+    --green: #34C759;
+    --tile-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 5px 12px -6px rgba(0,0,0,0.16);
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #000000;
+    --surface: #1C1C1E;
+    --label: #FFFFFF;
+    --label-2: #98989D;
+    --label-3: #48484A;
+    --accent: #0A84FF;
+    --red: #FF453A;
+    --orange: #FF9F0A;
+    --green: #30D158;
+    --tile-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 6px 14px -6px rgba(0,0,0,0.55);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #000000;
+      --surface: #1C1C1E;
+      --label: #FFFFFF;
+      --label-2: #98989D;
+      --label-3: #48484A;
+      --accent: #0A84FF;
+      --red: #FF453A;
+      --orange: #FF9F0A;
+      --green: #30D158;
+      --tile-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 6px 14px -6px rgba(0,0,0,0.55);
+    }
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--label);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", "Pretendard Variable", Pretendard, "Malgun Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    justify-content: center;
+  }
+
+  .phone { width: 100%; max-width: 460px; min-height: 100vh; padding: 0 0 60px; }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 4px;
+  }
+
+  .greeting { font-size: 13px; font-weight: 600; color: var(--label-2); }
+
+  .theme-toggle {
+    border: none;
+    background: var(--surface);
+    color: var(--label);
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    box-shadow: var(--tile-shadow);
+  }
+
+  .status-line { padding: 0 20px 16px; }
+  .status-line h1 {
+    font-size: 24px;
+    font-weight: 750;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .status-line p { margin: 4px 0 0; font-size: 13.5px; color: var(--label-2); }
+  .status-line .n-due { color: var(--red); font-weight: 700; }
+  .status-line .n-ok { color: var(--green); font-weight: 700; }
+
+  .edit-bar { display: flex; justify-content: flex-end; padding: 0 20px 8px; }
+  .edit-bar button {
+    border: none;
+    background: var(--surface);
+    box-shadow: var(--tile-shadow);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px 10px;
+    padding: 4px 18px 10px;
+  }
+
+  .tile-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    position: relative;
+  }
+
+  .tile {
+    position: relative;
+    width: 100%;
+    max-width: 64px;
+    aspect-ratio: 1;
+    border-radius: 21%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    box-shadow: var(--tile-shadow);
+    transition: transform 0.12s ease;
+    padding: 20%;
+    overflow: hidden;
+    color: var(--tc);
+  }
+
+  .tile svg { width: 100%; height: 100%; overflow: visible; }
+
+  .tile:active { transform: scale(0.88); }
+
+  .tile-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--label);
+    text-align: center;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .caption { font-size: 10px; font-weight: 700; margin-top: -2px; }
+  .caption.soon { color: var(--orange); }
+
+  .badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: var(--red);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg);
+    font-variant-numeric: tabular-nums;
+    animation: badgein 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 2;
+  }
+
+  @keyframes badgein { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .check-flash {
+    position: absolute;
+    inset: 0;
+    border-radius: 21%;
+    background: var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .check-flash svg { width: 42%; height: 42%; color: #fff; }
+  .check-flash.play { animation: flash 0.7s ease forwards; }
+  @keyframes flash {
+    0% { opacity: 0; transform: scale(0.7); }
+    25% { opacity: 1; transform: scale(1.08); }
+    70% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1); }
+  }
+
+  .minus-badge {
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--label-2);
+    color: var(--surface);
+    border: none;
+    font-size: 13px;
+    line-height: 1;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 4;
+  }
+  .edit-mode .minus-badge { display: flex; }
+
+  .edit-mode .tile-wrap { animation: jiggle 0.28s ease-in-out infinite alternate; }
+  .edit-mode .tile-wrap:nth-child(even) { animation-delay: -0.14s; }
+  @keyframes jiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
+  .edit-mode .tile { cursor: default; }
+
+  .add-tile {
+    background: transparent;
+    border: 1.4px dashed var(--label-3);
+    color: var(--label-2);
+    font-size: 20px;
+    font-weight: 300;
+    box-shadow: none;
+  }
+
+  .sheet-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 20;
+  }
+  .sheet-overlay.open { display: flex; animation: overlayin 0.2s ease; }
+  @keyframes overlayin { from { opacity: 0; } to { opacity: 1; } }
+
+  .sheet {
+    width: 100%;
+    max-width: 460px;
+    background: var(--bg);
+    border-radius: 20px 20px 0 0;
+    padding-bottom: 24px;
+    animation: sheetup 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 86vh;
+    overflow-y: auto;
+  }
+  @keyframes sheetup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  .sheet-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px 10px;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 1;
+  }
+  .sheet-nav button { border: none; background: none; font-size: 16px; font-family: inherit; cursor: pointer; padding: 4px; }
+  .sheet-nav .cancel-btn { color: var(--label-2); }
+  .sheet-nav .title { font-size: 16px; font-weight: 700; }
+  .sheet-nav .save-btn { color: var(--accent); font-weight: 700; }
+  .sheet-nav .save-btn:disabled { color: var(--label-3); cursor: not-allowed; }
+
+  .field-card {
+    background: var(--surface);
+    border-radius: 14px;
+    margin: 8px 18px;
+    box-shadow: var(--tile-shadow);
+    overflow: hidden;
+  }
+
+  .form-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 13px 16px;
+    position: relative;
+  }
+  .form-row:not(:first-child)::before {
+    content: "";
+    position: absolute; top: 0; left: 16px; right: 0; height: 0.5px; background: var(--label-3);
+    opacity: 0.4;
+  }
+  .form-row label { font-size: 15px; color: var(--label); flex: none; }
+  .form-row input[type="text"], .form-row input[type="date"] {
+    border: none; background: transparent; color: var(--label);
+    font-size: 15px; text-align: right; flex: 1; min-width: 0;
+    font-family: inherit; outline: none;
+  }
+  .form-row input::placeholder { color: var(--label-3); }
+
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    padding: 14px 18px 4px;
+  }
+  .icon-choice {
+    aspect-ratio: 1;
+    border-radius: 21%;
+    border: 2px solid transparent;
+    background: var(--surface);
+    box-shadow: var(--tile-shadow);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    padding: 18%;
+  }
+  .icon-choice svg { width: 100%; height: 100%; overflow: visible; }
+  .icon-choice.selected { border-color: var(--accent); }
+
+  .stepper { display: flex; align-items: center; gap: 10px; }
+  .stepper button {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: none; background: var(--bg); color: var(--accent);
+    font-size: 16px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .stepper .val { min-width: 66px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .unit-seg { display: flex; gap: 5px; margin-left: 4px; }
+  .unit-seg button {
+    border: none; background: var(--bg); color: var(--label-2);
+    font-size: 12px; font-weight: 600; padding: 5px 8px; border-radius: 7px; cursor: pointer;
+    font-family: inherit;
+  }
+  .unit-seg button.active { background: var(--accent); color: #fff; }
+
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="phone">
+  <div class="topbar">
+    <span class="greeting" id="dateLabel">7월 27일 월요일</span>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="테마 전환">🌗</button>
+  </div>
+
+  <div class="status-line">
+    <h1 id="statusTitle">집안일</h1>
+    <p id="statusSub"></p>
+  </div>
+
+  <div class="edit-bar">
+    <button id="editToggle" type="button">편집</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="sheet-overlay" id="sheetOverlay">
+  <div class="sheet">
+    <div class="sheet-nav">
+      <button class="cancel-btn" id="cancelSheet" type="button">취소</button>
+      <span class="title" id="sheetTitle">새로운 집안일</span>
+      <button class="save-btn" id="confirmSheet" type="button" disabled>추가</button>
+    </div>
+
+    <div class="field-card">
+      <div class="form-row">
+        <label for="choreName">이름</label>
+        <input id="choreName" type="text" placeholder="예: 화장실 청소" />
+      </div>
+      <div class="form-row">
+        <label>주기</label>
+        <div class="stepper">
+          <button type="button" data-step="-1">−</button>
+          <span class="val" id="stepValLabel">1주마다</span>
+          <button type="button" data-step="1">+</button>
+          <div class="unit-seg" id="unitSeg">
+            <button type="button" data-unit="day">일</button>
+            <button type="button" data-unit="week" class="active">주</button>
+            <button type="button" data-unit="month">개월</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-row" id="lastDoneRow" style="display:none;">
+        <label for="lastDoneInput">마지막으로 한 날</label>
+        <input type="date" id="lastDoneInput" />
+      </div>
+    </div>
+
+    <div class="icon-grid" id="iconGrid"></div>
+  </div>
+</div>
+
+<script>
+  // 24x24 line-icon set, hand-drawn per chore keyword (currentColor stroke)
+  const ICON_LIB = {
+    laundry: { label: "빨래/세탁기", color: "#3A8DFA", body: '<rect x="4" y="3" width="16" height="18" rx="2.5"/><circle cx="6.5" cy="5.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="8.5" cy="5.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="5"/><circle cx="12" cy="14" r="2.3"/>' },
+    toilet: { label: "화장실 청소", color: "#26C2B6", body: '<rect x="7.5" y="3" width="7" height="3" rx="0.8"/><path d="M5.5 8.3h11"/><path d="M6.2 8.3v1.7a4.8 4.8 0 0 0 9.6 0V8.3"/><path d="M9 16.5h4a1 1 0 0 1 1 1v1a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 8 18.5v-1a1 1 0 0 1 1-1z"/>' },
+    dishes: { label: "설거지", color: "#FF9F45", body: '<circle cx="8" cy="14" r="6"/><circle cx="8" cy="14" r="3.2"/><path d="M17 3v5M15.7 3v3.3M18.3 3v3.3M17 8v13"/>' },
+    fridge: { label: "냉장고", color: "#4FC1E9", body: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M5 8h14"/><path d="M8 4.4v2.2"/><path d="M8 10.4v3.2"/>' },
+    aircon: { label: "에어컨 필터", color: "#8A6BF0", body: '<rect x="3" y="6" width="18" height="5" rx="2"/><path d="M7 8.3h2M11 8.3h2M15 8.3h2"/><path d="M6.5 14c1 2 1 3.2 0 5.2M12 14c1 2 1 3.2 0 5.2M17.5 14c1 2 1 3.2 0 5.2"/>' },
+    window: { label: "창틀 청소", color: "#5AA9FF", body: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M12 3v18M4 12h16"/>' },
+    mattress: { label: "매트리스", color: "#B08BF5", body: '<rect x="2.5" y="8" width="19" height="8" rx="2.5"/><path d="M4 16v2.5M20 16v2.5"/><path d="M6 8v8M10 8v8M14 8v8M18 8v8"/>' },
+    vacuum: { label: "청소기", color: "#3ECF7E", body: '<circle cx="8.5" cy="15" r="4"/><path d="M8.5 11V5.5c0-1.4 1.2-2.3 2.6-1.9l2.9.9"/><path d="M13 20h6l-2-3.5h-3.5"/>' },
+    trash: { label: "분리수거", color: "#6BBF6B", body: '<path d="M6 8h12l-1 12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 8z"/><path d="M4 8h16"/><path d="M9 8V5.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V8"/><path d="M10 11.5v6M14 11.5v6"/>' },
+    microwave: { label: "전자레인지", color: "#FF8A65", body: '<rect x="3" y="6" width="18" height="12" rx="1.5"/><rect x="5.5" y="8.5" width="9" height="7" rx="1"/><circle cx="18" cy="10.5" r="0.7" fill="currentColor" stroke="none"/><path d="M16.5 14.5h3"/>' },
+    humidifier: { label: "가습기", color: "#4FA8FF", body: '<path d="M9.5 21h5a1 1 0 0 0 1-1v-3.2a5 5 0 0 0-1-3l-.8-1V5.2a1.7 1.7 0 0 0-3.4 0V12.8l-.8 1a5 5 0 0 0-1 3V20a1 1 0 0 0 1 1z"/><path d="M9 17h6"/>' },
+    induction: { label: "인덕션", color: "#FF6B6B", body: '<rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="3"/><circle cx="16" cy="11" r="2"/><path d="M6 19h3M15 19h3"/>' },
+    dishwasher: { label: "식기세척기", color: "#2FB0A3", body: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 8h16"/><circle cx="12" cy="15" r="4"/><circle cx="7" cy="5.5" r="0.6" fill="currentColor" stroke="none"/><circle cx="9.5" cy="5.5" r="0.6" fill="currentColor" stroke="none"/>' },
+    air_fryer: { label: "에어프라이어", color: "#5BC98A", body: '<rect x="5" y="5" width="14" height="4" rx="2"/><path d="M6 9h12v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9z"/><path d="M9 13h6M9 16h6"/>' },
+    robot_vacuum: { label: "로봇청소기", color: "#9AA0A6", body: '<circle cx="12" cy="13" r="7"/><circle cx="12" cy="13" r="2.3"/><path d="M3.3 13H5M19 13h1.7"/><circle cx="12" cy="7.3" r="0.7" fill="currentColor" stroke="none"/>' },
+    dehumidifier: { label: "제습기", color: "#4EA1FF", body: '<path d="M7 21V7a5 5 0 0 1 10 0v14"/><path d="M6 21h12"/><path d="M9 5.5h6M9 9.5h6"/><path d="M17.5 12c.9 1.1.9 2-.1 2.8-.9-.8-.9-1.7.1-2.8z"/>' },
+    curtain: { label: "커튼/블라인드", color: "#F0716A", body: '<path d="M3 4h18"/><path d="M6 4c1.2 4.5-1 9 0 16"/><path d="M9 4c-.6 4.5.6 9 0 16"/><path d="M15 4c.6 4.5-.6 9 0 16"/><path d="M18 4c-1.2 4.5 1 9 0 16"/>' },
+    wardrobe: { label: "옷장 정리", color: "#C08A5C", body: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M12 3v18"/><path d="M10 12v1.6M14 12v1.6"/>' },
+    bedding: { label: "이불/베갯잇", color: "#8BB8F0", body: '<path d="M4 20v-3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3"/><rect x="6.5" y="11" width="5" height="3.6" rx="1"/><path d="M3 20h18"/>' },
+  };
+
+  function iconSvg(key, size) {
+    const icon = ICON_LIB[key] || Object.values(ICON_LIB)[0];
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="${icon.color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon.body}</svg>`;
+  }
+
+  const unitLabel = { day: "일", week: "주", month: "개월" };
+  const unitDays = { day: 1, week: 7, month: 30 };
+
+  let chores = [
+    { id: 1, name: "빨래", icon: "laundry", value: 1, unit: "week", daysSince: 10 },
+    { id: 2, name: "화장실 청소", icon: "toilet", value: 2, unit: "week", daysSince: 23 },
+    { id: 3, name: "설거지", icon: "dishes", value: 1, unit: "day", daysSince: 0 },
+    { id: 4, name: "에어컨 필터 청소", icon: "aircon", value: 3, unit: "month", daysSince: 72 },
+    { id: 5, name: "냉장고 청소", icon: "fridge", value: 1, unit: "month", daysSince: 24 },
+    { id: 6, name: "창틀 청소", icon: "window", value: 2, unit: "month", daysSince: 40 },
+    { id: 7, name: "분리수거", icon: "trash", value: 1, unit: "week", daysSince: 2 },
+    { id: 8, name: "매트리스 청소", icon: "mattress", value: 6, unit: "month", daysSince: 210 },
+  ];
+
+  let editMode = false;
+  let editingId = null;
+  let pickedIcon = Object.keys(ICON_LIB)[0];
+  let stepValue = 1, stepUnit = "week";
+
+  function overdueDays(c) {
+    return c.daysSince - c.value * unitDays[c.unit];
+  }
+
+  function render() {
+    const grid = document.getElementById("grid");
+    grid.className = "grid" + (editMode ? " edit-mode" : "");
+    grid.innerHTML = "";
+
+    const dueCount = chores.filter(c => overdueDays(c) >= 0).length;
+    document.getElementById("statusTitle").textContent = "집안일";
+    document.getElementById("statusSub").innerHTML = dueCount
+      ? `<span class="n-due">${dueCount}개</span> 항목이 기다리고 있어요`
+      : `<span class="n-ok">전부</span> 완료했어요`;
+
+    chores.forEach(c => {
+      const over = overdueDays(c);
+
+      const wrap = document.createElement("div");
+      wrap.className = "tile-wrap";
+
+      const badge = over >= 0 ? `<span class="badge">${over === 0 ? "!" : over}</span>` : "";
+      const caption = (over < 0 && over >= -3) ? `<span class="caption soon">D${over}</span>` : "";
+      const minus = `<span class="minus-badge" role="button" tabindex="0" aria-label="${c.name} 삭제">−</span>`;
+
+      wrap.innerHTML = `
+        <button class="tile" type="button" aria-label="${c.name} 완료 처리">
+          ${minus}
+          ${iconSvg(c.icon)}
+          <span class="check-flash"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          ${badge}
+        </button>
+        <span class="tile-label">${c.name}</span>
+        ${caption}
+      `;
+
+      const tileBtn = wrap.querySelector(".tile");
+      tileBtn.addEventListener("click", (e) => {
+        if (e.target.closest(".minus-badge")) return;
+        if (editMode) { openEditSheet(c); return; }
+        const flash = wrap.querySelector(".check-flash");
+        flash.classList.add("play");
+        setTimeout(() => { c.daysSince = 0; render(); }, 420);
+      });
+      wrap.querySelector(".minus-badge")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        chores = chores.filter(x => x.id !== c.id);
+        render();
+      });
+
+      grid.appendChild(wrap);
+    });
+
+    const addWrap = document.createElement("div");
+    addWrap.className = "tile-wrap";
+    addWrap.innerHTML = `
+      <button class="tile add-tile" type="button" aria-label="새로운 집안일 추가">+</button>
+      <span class="tile-label">추가</span>
+    `;
+    addWrap.querySelector(".tile").addEventListener("click", openAddSheet);
+    if (!editMode) grid.appendChild(addWrap);
+  }
+
+  const overlay = document.getElementById("sheetOverlay");
+  const sheetTitle = document.getElementById("sheetTitle");
+  const confirmBtn = document.getElementById("confirmSheet");
+  const nameInput = document.getElementById("choreName");
+  const lastDoneRow = document.getElementById("lastDoneRow");
+  const lastDoneInput = document.getElementById("lastDoneInput");
+
+  function buildIconGrid() {
+    const gridEl = document.getElementById("iconGrid");
+    gridEl.innerHTML = "";
+    Object.keys(ICON_LIB).forEach(key => {
+      const icon = ICON_LIB[key];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "icon-choice" + (key === pickedIcon ? " selected" : "");
+      btn.title = icon.label;
+      btn.innerHTML = iconSvg(key);
+      btn.addEventListener("click", () => { pickedIcon = key; buildIconGrid(); });
+      gridEl.appendChild(btn);
+    });
+  }
+
+  function updateStepLabel() {
+    document.getElementById("stepValLabel").textContent = `${stepValue}${unitLabel[stepUnit]}마다`;
+  }
+
+  function openAddSheet() {
+    editingId = null;
+    sheetTitle.textContent = "새로운 집안일";
+    confirmBtn.textContent = "추가";
+    nameInput.value = "";
+    pickedIcon = Object.keys(ICON_LIB)[0];
+    stepValue = 1; stepUnit = "week";
+    lastDoneRow.style.display = "none";
+    confirmBtn.disabled = true;
+    updateStepLabel();
+    buildIconGrid();
+    overlay.classList.add("open");
+    setTimeout(() => nameInput.focus(), 50);
+  }
+
+  function openEditSheet(c) {
+    editingId = c.id;
+    sheetTitle.textContent = "항목 수정";
+    confirmBtn.textContent = "저장";
+    nameInput.value = c.name;
+    pickedIcon = c.icon;
+    stepValue = c.value; stepUnit = c.unit;
+    lastDoneRow.style.display = "flex";
+    const d = new Date(); d.setDate(d.getDate() - c.daysSince);
+    lastDoneInput.value = d.toISOString().slice(0, 10);
+    confirmBtn.disabled = false;
+    updateStepLabel();
+    buildIconGrid();
+    overlay.classList.add("open");
+  }
+
+  document.getElementById("cancelSheet").addEventListener("click", () => overlay.classList.remove("open"));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.remove("open"); });
+
+  nameInput.addEventListener("input", () => { confirmBtn.disabled = !nameInput.value.trim(); });
+
+  document.querySelectorAll('.stepper [data-step]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      stepValue = Math.max(1, stepValue + parseInt(btn.dataset.step, 10));
+      updateStepLabel();
+    });
+  });
+  document.querySelectorAll('#unitSeg button').forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll('#unitSeg button').forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      stepUnit = btn.dataset.unit;
+      updateStepLabel();
+    });
+  });
+
+  confirmBtn.addEventListener("click", () => {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    if (editingId) {
+      const c = chores.find(x => x.id === editingId);
+      c.name = name; c.icon = pickedIcon; c.value = stepValue; c.unit = stepUnit;
+      if (lastDoneInput.value) {
+        c.daysSince = Math.round((Date.now() - new Date(lastDoneInput.value).getTime()) / 86400000);
+      }
+    } else {
+      chores.push({ id: Date.now(), name, icon: pickedIcon, value: stepValue, unit: stepUnit, daysSince: 0 });
+    }
+    overlay.classList.remove("open");
+    render();
+  });
+
+  document.getElementById("editToggle").addEventListener("click", (e) => {
+    editMode = !editMode;
+    e.target.textContent = editMode ? "완료" : "편집";
+    render();
+  });
+
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const root = document.documentElement;
+    const current = root.getAttribute("data-theme");
+    root.setAttribute("data-theme", current === "dark" ? "light" : "dark");
+  });
+
+  render();
+</script>
