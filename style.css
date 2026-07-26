@@ -1,0 +1,207 @@
+:root {
+  --color-bathroom: #4a90d9;
+  --color-kitchen: #4caf7d;
+  --color-bedroom: #e05a7e;
+  --color-personal: #9b6bd9;
+  --color-appliance: #2bb3a3;
+  --card-bg: #ffffff;
+  --page-bg: #f4f6f8;
+  --text-main: #222222;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  background: var(--page-bg);
+  color: var(--text-main);
+}
+
+.page-header {
+  text-align: center;
+  padding: 24px 16px 8px;
+}
+
+.page-header h1 {
+  font-size: 1.4rem;
+  margin: 0 0 4px;
+}
+
+.page-subtitle {
+  margin: 0;
+  color: #666666;
+  font-size: 0.9rem;
+}
+
+.board {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  align-items: flex-start;
+}
+
+.column {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.column-header {
+  color: #ffffff;
+  text-align: center;
+  font-weight: 700;
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 1rem;
+}
+
+.column[data-category="bathroom"] .column-header { background: var(--color-bathroom); }
+.column[data-category="kitchen"] .column-header { background: var(--color-kitchen); }
+.column[data-category="bedroom"] .column-header { background: var(--color-bedroom); }
+.column[data-category="personal"] .column-header { background: var(--color-personal); }
+.column[data-category="appliance"] .column-header { background: var(--color-appliance); }
+
+.card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+  padding: 10px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 14px 6px 10px;
+  border: 1px solid #eeeeee;
+  border-radius: 8px;
+  background: #fafafa;
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+  width: 100%;
+}
+
+.card:hover {
+  border-color: #cccccc;
+}
+
+.card-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.card-name {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.card-progress {
+  display: block;
+  width: 80%;
+  height: 5px;
+  background: #e2e2e2;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.card-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.card-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #e03131;
+  color: #ffffff;
+  border-radius: 999px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: #222222;
+  color: #ffffff;
+  padding: 14px 18px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 260px;
+  z-index: 10;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+.toast-date-label {
+  font-size: 0.8rem;
+  color: #cccccc;
+}
+
+.toast-date {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.toast-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.toast-actions button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+#toast-confirm {
+  background: #2bb3a3;
+  color: #ffffff;
+}
+
+#toast-cancel {
+  background: #444444;
+  color: #ffffff;
+}
+
+@media (max-width: 720px) {
+  .board {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .column {
+    flex: 0 1 auto;
+  }
+}

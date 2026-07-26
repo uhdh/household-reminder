@@ -1,0 +1,8 @@
+{
+  "name": "household-reminder",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>생활용품 교체주기 리마인더</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>생활용품 30가지 교체 및 관리 주기 총정리</h1>
+    <p class="page-subtitle">항목을 클릭하면 교체/관리 완료 날짜를 지정해 기록할 수 있습니다.</p>
+  </header>
+  <main id="board" class="board"></main>
+  <div id="toast" class="toast" hidden>
+    <p id="toast-message"></p>
+    <label class="toast-date-label" for="toast-date">완료한 날짜</label>
+    <input id="toast-date" class="toast-date" type="date" />
+    <div class="toast-actions">
+      <button id="toast-confirm" type="button">완료로 표시</button>
+      <button id="toast-cancel" type="button">취소</button>
+    </div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
