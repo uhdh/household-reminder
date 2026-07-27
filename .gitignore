@@ -42,3 +42,6 @@ next-env.d.ts
 
 # brainstorming visual companion (superpowers skill)
 .superpowers/
+
+# git worktrees
+.worktrees/
