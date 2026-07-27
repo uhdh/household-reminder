@@ -33,11 +33,11 @@
 - Produces: `export type Section = { id: string; name: string; icon: string; href: string; getStatus: () => SectionStatus }`
 - Produces: `export const SECTIONS: Section[]` — exactly 4 entries, ids in order `"cleaning"`, `"supplies"`, `"emotion-cards"`, `"portfolio"`, hrefs `/cleaning`, `/supplies`, `/emotion-cards`, `/portfolio`, every entry's `getStatus()` currently returning `{ ready: false }`.
 
-- [ ] **Step 1: Install test dependencies**
+- [x] **Step 1: Install test dependencies**
 
 Run: `npm install -D vitest @vitejs/plugin-react jsdom @testing-library/react @testing-library/dom vite-tsconfig-paths`
 
-- [ ] **Step 2: Add Vitest config**
+- [x] **Step 2: Add Vitest config**
 
 ```ts
 // vitest.config.mts
@@ -53,7 +53,7 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 3: Add the `test` script to `package.json`**
+- [x] **Step 3: Add the `test` script to `package.json`**
 
 In the `"scripts"` block, add (non-watch mode, so it exits instead of hanging in an agentic/CI shell):
 
@@ -61,7 +61,7 @@ In the `"scripts"` block, add (non-watch mode, so it exits instead of hanging in
 "test": "vitest run"
 ```
 
-- [ ] **Step 4: Write the failing test**
+- [x] **Step 4: Write the failing test**
 
 ```ts
 // lib/sections.test.ts
@@ -92,12 +92,12 @@ describe("SECTIONS", () => {
 });
 ```
 
-- [ ] **Step 5: Run test to verify it fails**
+- [x] **Step 5: Run test to verify it fails**
 
 Run: `npx vitest run lib/sections.test.ts`
 Expected: FAIL — `Cannot find module './sections'` (or similar), since `lib/sections.ts` doesn't exist yet.
 
-- [ ] **Step 6: Write the implementation**
+- [x] **Step 6: Write the implementation**
 
 ```ts
 // lib/sections.ts
@@ -143,12 +143,12 @@ export const SECTIONS: Section[] = [
 ];
 ```
 
-- [ ] **Step 7: Run test to verify it passes**
+- [x] **Step 7: Run test to verify it passes**
 
 Run: `npx vitest run lib/sections.test.ts`
 Expected: PASS (2 tests)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add package.json package-lock.json vitest.config.mts lib/sections.ts lib/sections.test.ts
@@ -168,7 +168,7 @@ git commit -m "test: add vitest setup and section status config"
 - Consumes: `SECTIONS`, `Section`, `SectionStatus` from `lib/sections.ts` (Task 1)
 - Produces: `export function HomeView({ sections = SECTIONS }: { sections?: Section[] })` — a plain (non-async) component so Vitest can render it directly, per `node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md`'s "does not support async Server Components" note.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 // app/home-view.test.tsx
@@ -218,12 +218,12 @@ describe("HomeView", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run app/home-view.test.tsx`
 Expected: FAIL — `Cannot find module './home-view'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```tsx
 // app/home-view.tsx
@@ -299,12 +299,12 @@ export function HomeView({
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run app/home-view.test.tsx`
 Expected: PASS (3 tests)
 
-- [ ] **Step 5: Wire `HomeView` into the actual home route**
+- [x] **Step 5: Wire `HomeView` into the actual home route**
 
 Replace the entire contents of `app/page.tsx` (currently the `create-next-app` boilerplate with the Next.js/Vercel logos) with:
 
@@ -312,17 +312,27 @@ Replace the entire contents of `app/page.tsx` (currently the `create-next-app` b
 // app/page.tsx
 import { HomeView } from "./home-view";
 
+// The greeting date comes from new Date() at render time; without this the page
+// is statically rendered once at build and the date freezes. NOTE: `revalidate`
+// is the pre-Cache-Components API — if `cacheComponents` is ever enabled in
+// next.config.ts, this stops working and the date must be made dynamic instead.
+export const revalidate = 3600;
+
 export default function Page() {
   return <HomeView />;
 }
 ```
 
-- [ ] **Step 6: Run the full test suite**
+(The `revalidate` line above was added in a later fix round, after this step was
+originally implemented without it — this snippet has been updated to match the
+`app/page.tsx` that actually shipped.)
+
+- [x] **Step 6: Run the full test suite**
 
 Run: `npm run test`
 Expected: PASS (5 tests total — 2 from Task 1, 3 from this task)
 
-- [ ] **Step 7: Run lint and build to catch type/convention errors**
+- [x] **Step 7: Run lint and build to catch type/convention errors**
 
 Run: `npm run lint`
 Expected: no errors.
@@ -330,7 +340,16 @@ Expected: no errors.
 Run: `npm run build`
 Expected: build succeeds (this also runs Next.js's type generation, confirming `app/page.tsx`'s zero-arg default export and `HomeView`'s typed props are both valid).
 
-- [ ] **Step 8: Commit**
+**Note (added after the fact):** `npm run build` currently fails in this
+environment while prerendering `/_not-found`
+(`TypeError: Cannot read properties of null (reading 'useContext')`). This is a
+pre-existing, unrelated Next.js/React/Node bug — it reproduces identically on
+plain `master`'s untouched `create-next-app` scaffold, before any of this
+plan's changes. `npx tsc --noEmit` was used instead as the substitute
+verification for type-correctness (it passes cleanly), alongside `npm run
+lint` and `npm run test`.
+
+- [x] **Step 8: Commit**
 
 ```bash
 git add app/page.tsx app/home-view.tsx app/home-view.test.tsx

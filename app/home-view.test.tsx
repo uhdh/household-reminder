@@ -1,9 +1,7 @@
-import { afterEach, describe, expect, test } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { describe, expect, test } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { HomeView } from "./home-view";
 import type { Section } from "@/lib/sections";
-
-afterEach(cleanup);
 
 const mockSections: Section[] = [
   {
@@ -42,5 +40,11 @@ describe("HomeView", () => {
     render(<HomeView sections={mockSections} />);
     expect(screen.getByText("준비중")).toBeDefined();
     expect(screen.queryByRole("link", { name: /감정카드/ })).toBeNull();
+  });
+
+  test("renders the real default SECTIONS when no sections prop is given", () => {
+    render(<HomeView />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getByText("우리집 👋")).toBeDefined();
   });
 });

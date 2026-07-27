@@ -64,9 +64,15 @@ type Section = {
   name: string;
   icon: string;       // 이모지 또는 아이콘 키
   href: string;
-  getStatus: () => SectionStatus | Promise<SectionStatus>;
+  getStatus: () => SectionStatus;
 };
 ```
+
+`getStatus`는 현재 동기(sync-only) 계약이다 — 아직 어떤 섹션도 상태 계산에 비동기
+데이터 조회가 필요하지 않고, Vitest가 async Server Component를 렌더링하지 못하기
+때문이다. 향후 이식되는 섹션이 상태를 비동기로 읽어야 한다면, 이 계약을 의도적으로
+변경해야 하고(그리고 `HomeView`도 async로 만들어야 할 가능성이 높다 — 테스트 영향에
+대해서는 plan 문서의 Vitest 한계 노트 참고), 지금 조용히 어긋난 채로 두지 않는다.
 
 - 홈 화면은 섹션 설정 배열(`SECTIONS: Section[]`)을 순회하며 각 행을 렌더링한다.
 - 처음에는 4개 섹션 모두 `getStatus`가 `{ ready: false }`를 반환하도록 설정 →
