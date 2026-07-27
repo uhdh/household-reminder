@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ITEMS, CATEGORIES } from "../data.js";
 
-test("has exactly 30 items", () => {
-  assert.equal(ITEMS.length, 30);
+test("has exactly 21 items", () => {
+  assert.equal(ITEMS.length, 21);
 });
 
 test("every item has required fields", () => {
@@ -28,11 +28,9 @@ test("ids are unique", () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("only curling-iron and candle have null cycleDays", () => {
-  const nullItems = ITEMS.filter((i) => i.cycleDays === null)
-    .map((i) => i.id)
-    .sort();
-  assert.deepEqual(nullItems, ["candle", "curling-iron"]);
+test("no items have null cycleDays", () => {
+  const nullItems = ITEMS.filter((i) => i.cycleDays === null).map((i) => i.id);
+  assert.deepEqual(nullItems, []);
 });
 
 test("has exactly 5 categories matching the image columns", () => {
