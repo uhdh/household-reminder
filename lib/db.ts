@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { IntervalUnit } from "./chores";
 
@@ -41,6 +42,7 @@ export function initSchema(database: DatabaseSync): void {
 export function getDb(): DatabaseSync {
   if (testOverride) return testOverride;
   if (!dbInstance) {
+    mkdirSync(path.dirname(DB_PATH), { recursive: true });
     dbInstance = new DatabaseSync(DB_PATH);
     initSchema(dbInstance);
   }

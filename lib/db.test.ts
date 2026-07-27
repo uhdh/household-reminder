@@ -1,5 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
-import { beforeEach, describe, expect, test } from "vitest";
+import { rmSync, existsSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, test } from "vitest";
 import {
   initSchema,
   getAllChores,
@@ -7,6 +9,8 @@ import {
   updateChoreRow,
   completeChoreRow,
   deleteChoreRow,
+  getDb,
+  setDbForTesting,
 } from "./db";
 
 function freshDb(): DatabaseSync {
@@ -61,5 +65,34 @@ describe("lib/db chore CRUD", () => {
     const created = insertChore(db, { name: "빨래", icon: "🧺", intervalValue: 1, intervalUnit: "week" });
     deleteChoreRow(db, created.id);
     expect(getAllChores(db)).toHaveLength(0);
+  });
+});
+
+describe("lib/db file-backed database", () => {
+  test("getDb() creates data directory and file-backed database without throwing", () => {
+    const dataDir = path.join(process.cwd(), "data");
+    const dbFile = path.join(dataDir, "db.sqlite");
+
+    // Ensure clean state by removing data directory if it exists
+    if (existsSync(dataDir)) {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+
+    // Reset test override to allow the real getDb() to work
+    setDbForTesting(null);
+
+    // Call the real getDb() - should create directory and open database
+    const db = getDb();
+    expect(db).toBeDefined();
+
+    // Verify it works
+    const rows = getAllChores(db);
+    expect(rows).toHaveLength(0);
+
+    // Verify the file was created
+    expect(existsSync(dbFile)).toBe(true);
+
+    // Note: We don't clean up the data/ directory here since it's gitignored
+    // and the database file is still open. It will be cleaned up on next test run.
   });
 });
