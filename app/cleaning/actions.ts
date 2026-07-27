@@ -1,5 +1,3 @@
-"use server";
-
 import { revalidatePath } from "next/cache";
 import {
   getDb,
@@ -34,6 +32,7 @@ export function parseChoreForm(formData: FormData): ChoreInput | { error: string
 }
 
 export async function createChore(formData: FormData): Promise<{ error?: string }> {
+  "use server";
   const parsed = parseChoreForm(formData);
   if ("error" in parsed) return { error: parsed.error };
   insertChore(getDb(), parsed);
@@ -42,6 +41,7 @@ export async function createChore(formData: FormData): Promise<{ error?: string 
 }
 
 export async function updateChore(id: number, formData: FormData): Promise<{ error?: string }> {
+  "use server";
   const parsed = parseChoreForm(formData);
   if ("error" in parsed) return { error: parsed.error };
   updateChoreRow(getDb(), id, parsed);
@@ -50,11 +50,13 @@ export async function updateChore(id: number, formData: FormData): Promise<{ err
 }
 
 export async function completeChore(id: number, doneDateISO: string): Promise<void> {
+  "use server";
   completeChoreRow(getDb(), id, doneDateISO);
   revalidatePath("/cleaning");
 }
 
 export async function deleteChore(id: number): Promise<void> {
+  "use server";
   deleteChoreRow(getDb(), id);
   revalidatePath("/cleaning");
 }

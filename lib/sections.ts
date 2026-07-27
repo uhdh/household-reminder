@@ -1,3 +1,6 @@
+import { getDb, getAllChores } from "./db";
+import { computeChoreStatus, todayISO } from "./chores";
+
 export type SectionStatus = { ready: false } | { ready: true; label: string };
 
 export type Section = {
@@ -14,7 +17,15 @@ export const SECTIONS: Section[] = [
     name: "청소 관리",
     icon: "🧹",
     href: "/cleaning",
-    getStatus: () => ({ ready: false }),
+    getStatus: () => {
+      const today = todayISO();
+      const overdueCount = getAllChores(getDb()).filter(
+        (row) => computeChoreStatus(row.last_done_at, row.interval_value, row.interval_unit, today).overdue
+      ).length;
+      return overdueCount > 0
+        ? { ready: true, label: `밀린 항목 ${overdueCount}개` }
+        : { ready: true, label: "전부 완료" };
+    },
   },
   {
     id: "supplies",
