@@ -62,6 +62,14 @@ function renderCard(item, today) {
   card.appendChild(name);
 
   if (status.percent !== null) {
+    const row = document.createElement("span");
+    row.className = "card-progress-row";
+
+    const dayLabel = document.createElement("span");
+    dayLabel.className = "card-day-label";
+    dayLabel.textContent =
+      status.daysRemaining >= 0 ? `D-${status.daysRemaining}` : `D+${-status.daysRemaining}`;
+
     const track = document.createElement("span");
     track.className = "card-progress";
 
@@ -71,7 +79,9 @@ function renderCard(item, today) {
     fill.style.background = progressColor(status.percent, status.overdue);
 
     track.appendChild(fill);
-    card.appendChild(track);
+    row.appendChild(dayLabel);
+    row.appendChild(track);
+    card.appendChild(row);
   }
 
   if (status.overdue) {

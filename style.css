@@ -105,9 +105,25 @@ body {
   font-size: 0.8rem;
 }
 
+.card-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.card-day-label {
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  color: #777777;
+  white-space: nowrap;
+}
+
 .card-progress {
   display: block;
-  width: 80%;
+  flex: 1 1 auto;
+  min-width: 0;
   height: 5px;
   background: #e2e2e2;
   border-radius: 999px;
