@@ -33,9 +33,9 @@ test("no items have null cycleDays", () => {
   assert.deepEqual(nullItems, []);
 });
 
-test("has exactly 5 categories matching the image columns", () => {
+test("has exactly 4 categories matching the image columns", () => {
   assert.deepEqual(
     CATEGORIES.map((c) => c.id),
-    ["bathroom", "kitchen", "bedroom", "personal", "appliance"]
+    ["bathroom", "kitchen", "bedroom", "appliance"]
   );
 });
