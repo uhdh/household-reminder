@@ -48,3 +48,6 @@ next-env.d.ts
 
 # local sqlite db
 data/
+
+# playwright MCP session logs (manual verification scratch)
+.playwright-mcp/
