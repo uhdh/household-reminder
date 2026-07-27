@@ -90,3 +90,59 @@ describe("ChoreGrid complete flow", () => {
     expect(screen.queryByText("빨래 완료로 표시할까요?")).toBeNull();
   });
 });
+
+describe("ChoreGrid add flow", () => {
+  test("the + tile opens a create form; submitting valid input calls createAction", async () => {
+    const user = userEvent.setup();
+    const createAction = vi.fn().mockResolvedValue({});
+    render(
+      <ChoreGrid chores={[]} completeAction={vi.fn()} createAction={createAction} updateAction={noop} deleteAction={vi.fn()} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "새로운 집안일 추가" }));
+    await user.type(screen.getByLabelText("이름"), "빨래");
+    await user.type(screen.getByLabelText("이모지"), "🧺");
+    await user.clear(screen.getByLabelText("주기 값"));
+    await user.type(screen.getByLabelText("주기 값"), "1");
+    await user.click(screen.getByRole("button", { name: "저장" }));
+
+    expect(createAction).toHaveBeenCalledTimes(1);
+    const submittedFormData = createAction.mock.calls[0][0] as FormData;
+    expect(submittedFormData.get("name")).toBe("빨래");
+    expect(submittedFormData.get("icon")).toBe("🧺");
+  });
+
+  test("shows an empty-state message when there are no chores", () => {
+    render(<ChoreGrid chores={[]} completeAction={vi.fn()} createAction={noop} updateAction={noop} deleteAction={vi.fn()} />);
+    expect(screen.getByText("아직 등록된 집안일이 없어요")).toBeDefined();
+  });
+});
+
+describe("ChoreGrid edit/delete flow", () => {
+  test("the edit button opens a pre-filled form; submitting calls updateAction with the chore's id", async () => {
+    const user = userEvent.setup();
+    const updateAction = vi.fn().mockResolvedValue({});
+    render(
+      <ChoreGrid chores={baseChores} completeAction={vi.fn()} createAction={noop} updateAction={updateAction} deleteAction={vi.fn()} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "빨래 수정" }));
+    expect(screen.getByLabelText("이름")).toHaveProperty("value", "빨래");
+
+    await user.click(screen.getByRole("button", { name: "저장" }));
+    expect(updateAction).toHaveBeenCalledTimes(1);
+    expect(updateAction.mock.calls[0][0]).toBe(1);
+  });
+
+  test("the delete button in the edit form calls deleteAction with the chore's id", async () => {
+    const user = userEvent.setup();
+    const deleteAction = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ChoreGrid chores={baseChores} completeAction={vi.fn()} createAction={noop} updateAction={noop} deleteAction={deleteAction} />
+    );
+
+    await user.click(screen.getByRole("button", { name: "빨래 수정" }));
+    await user.click(screen.getByRole("button", { name: "삭제" }));
+    expect(deleteAction).toHaveBeenCalledWith(1);
+  });
+});
