@@ -37,6 +37,7 @@ export async function createChore(formData: FormData): Promise<{ error?: string 
   if ("error" in parsed) return { error: parsed.error };
   insertChore(getDb(), parsed);
   revalidatePath("/cleaning");
+  revalidatePath("/");
   return {};
 }
 
@@ -46,6 +47,7 @@ export async function updateChore(id: number, formData: FormData): Promise<{ err
   if ("error" in parsed) return { error: parsed.error };
   updateChoreRow(getDb(), id, parsed);
   revalidatePath("/cleaning");
+  revalidatePath("/");
   return {};
 }
 
@@ -53,10 +55,12 @@ export async function completeChore(id: number, doneDateISO: string): Promise<vo
   "use server";
   completeChoreRow(getDb(), id, doneDateISO);
   revalidatePath("/cleaning");
+  revalidatePath("/");
 }
 
 export async function deleteChore(id: number): Promise<void> {
   "use server";
   deleteChoreRow(getDb(), id);
   revalidatePath("/cleaning");
+  revalidatePath("/");
 }

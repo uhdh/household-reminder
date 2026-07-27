@@ -27,6 +27,9 @@ describe("computeChoreStatus", () => {
   test("month unit: calendar-accurate, clamps to shorter month", () => {
     const status = computeChoreStatus("2026-01-31", 1, "month", "2026-02-01");
     expect(status.dueDate).toBe("2026-02-28");
+    // total interval is 28 calendar days (2026-01-31 -> 2026-02-28), and
+    // 1 day has elapsed by 2026-02-01: round(1 / 28 * 100) = 4
+    expect(status.percent).toBe(4);
   });
 
   test("null last-done date is always immediately overdue", () => {

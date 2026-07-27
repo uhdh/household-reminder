@@ -1,7 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
 import { rmSync, existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, afterEach } from "vitest";
 import {
   initSchema,
   getAllChores,
@@ -69,20 +70,38 @@ describe("lib/db chore CRUD", () => {
 });
 
 describe("lib/db file-backed database", () => {
-  test("getDb() creates data directory and file-backed database without throwing", () => {
-    const dataDir = path.join(process.cwd(), "data");
-    const dbFile = path.join(dataDir, "db.sqlite");
+  let tempDir: string | null = null;
+  let openedDb: DatabaseSync | null = null;
 
-    // Ensure clean state by removing data directory if it exists
-    if (existsSync(dataDir)) {
-      rmSync(dataDir, { recursive: true, force: true });
+  afterEach(() => {
+    // Always restore clean state, even if an assertion above failed.
+    // Close the sqlite connection first — on Windows the file handle stays
+    // locked until closed, which would make rmSync below fail with EPERM.
+    if (openedDb) {
+      openedDb.close();
+      openedDb = null;
     }
+    delete process.env.CHORE_DB_PATH;
+    setDbForTesting(null);
+    if (tempDir && existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+    tempDir = null;
+  });
+
+  test("getDb() creates data directory and file-backed database without throwing", () => {
+    // Point at a throwaway temp directory — never the project's real data/
+    // directory, which holds the actual persistent db.sqlite.
+    tempDir = path.join(os.tmpdir(), `cleaning-db-test-${Date.now()}`);
+    const dbFile = path.join(tempDir, "db.sqlite");
+    process.env.CHORE_DB_PATH = dbFile;
 
     // Reset test override to allow the real getDb() to work
     setDbForTesting(null);
 
     // Call the real getDb() - should create directory and open database
     const db = getDb();
+    openedDb = db;
     expect(db).toBeDefined();
 
     // Verify it works
@@ -91,8 +110,5 @@ describe("lib/db file-backed database", () => {
 
     // Verify the file was created
     expect(existsSync(dbFile)).toBe(true);
-
-    // Note: We don't clean up the data/ directory here since it's gitignored
-    // and the database file is still open. It will be cleaned up on next test run.
   });
 });

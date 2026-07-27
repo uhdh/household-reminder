@@ -36,24 +36,38 @@ function dayLabel(daysRemaining: number): string {
 export function ChoreGrid({ chores, completeAction, createAction, updateAction, deleteAction }: Props) {
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [doneDate, setDoneDate] = useState("");
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
   const [formState, setFormState] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const completingChore = chores.find((c) => c.id === completingId) ?? null;
 
   function openCompleteToast(chore: ChoreViewModel) {
     setCompletingId(chore.id);
     setDoneDate(todayISO());
+    setCompleteError(null);
   }
 
   function closeToast() {
     setCompletingId(null);
+    setCompleteError(null);
   }
 
   async function confirmComplete() {
-    if (completingId === null) return;
-    await completeAction(completingId, doneDate);
-    setCompletingId(null);
+    if (completingId === null || isCompleting) return;
+    setIsCompleting(true);
+    try {
+      await completeAction(completingId, doneDate);
+      setCompletingId(null);
+      setCompleteError(null);
+    } catch {
+      setCompleteError("완료 처리에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setIsCompleting(false);
+    }
   }
 
   function openCreateForm() {
@@ -72,26 +86,41 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
   }
 
   async function submitForm(formData: FormData) {
-    if (!formState) return;
-    const result =
-      formState.mode === "create" ? await createAction(formData) : await updateAction(formState.chore.id, formData);
-    if (result.error) {
-      setFormError(result.error);
-      return;
+    if (!formState || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const result =
+        formState.mode === "create" ? await createAction(formData) : await updateAction(formState.chore.id, formData);
+      if (result.error) {
+        setFormError(result.error);
+        return;
+      }
+      setFormState(null);
+      setFormError(null);
+    } catch {
+      setFormError("저장에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setIsSubmitting(false);
     }
-    setFormState(null);
-    setFormError(null);
   }
 
   async function handleDelete() {
-    if (!formState || formState.mode !== "edit") return;
-    await deleteAction(formState.chore.id);
-    setFormState(null);
+    if (!formState || formState.mode !== "edit" || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteAction(formState.chore.id);
+      setFormState(null);
+      setFormError(null);
+    } catch {
+      setFormError("삭제에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   return (
     <div>
-      {chores.length === 0 && <p>아직 등록된 집안일이 없어요</p>}
+      {chores.length === 0 && <p>아직 등록된 집안일이 없어요 — + 버튼으로 추가해보세요</p>}
 
       <ul className="grid grid-cols-3 gap-4 sm:grid-cols-4">
         {chores.map((chore) => (
@@ -148,6 +177,7 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
       {completingChore && (
         <div className="fixed inset-x-0 bottom-6 mx-auto flex w-full max-w-xs flex-col gap-2 rounded-xl bg-zinc-900 p-4 text-white shadow-lg">
           <p>{completingChore.name} 완료로 표시할까요?</p>
+          {completeError && <p className="text-sm text-red-400">{completeError}</p>}
           <label>
             완료한 날짜
             <input
@@ -158,10 +188,15 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
             />
           </label>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={closeToast}>
+            <button type="button" onClick={closeToast} disabled={isCompleting}>
               취소
             </button>
-            <button type="button" onClick={confirmComplete} className="font-semibold text-blue-400">
+            <button
+              type="button"
+              onClick={confirmComplete}
+              disabled={isCompleting}
+              className="font-semibold text-blue-400 disabled:opacity-50"
+            >
               완료로 표시
             </button>
           </div>
@@ -183,6 +218,7 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
               <input
                 name="name"
                 type="text"
+                required
                 defaultValue={formState.mode === "edit" ? formState.chore.name : ""}
                 className="flex-1 rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-800"
               />
@@ -192,6 +228,7 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
               <input
                 name="icon"
                 type="text"
+                required
                 defaultValue={formState.mode === "edit" ? formState.chore.icon : ""}
                 className="w-16 rounded border border-zinc-300 px-2 py-1 text-center dark:border-zinc-700 dark:bg-zinc-800"
               />
@@ -222,16 +259,25 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
             <div className="flex justify-between">
               <div>
                 {formState.mode === "edit" && (
-                  <button type="button" onClick={handleDelete} className="text-red-600">
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={isSubmitting || isDeleting}
+                    className="text-red-600 disabled:opacity-50"
+                  >
                     삭제
                   </button>
                 )}
               </div>
               <div className="flex gap-3">
-                <button type="button" onClick={closeForm}>
+                <button type="button" onClick={closeForm} disabled={isSubmitting || isDeleting}>
                   취소
                 </button>
-                <button type="submit" className="font-semibold text-blue-600">
+                <button
+                  type="submit"
+                  disabled={isSubmitting || isDeleting}
+                  className="font-semibold text-blue-600 disabled:opacity-50"
+                >
                   저장
                 </button>
               </div>

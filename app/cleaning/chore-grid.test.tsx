@@ -110,11 +110,13 @@ describe("ChoreGrid add flow", () => {
     const submittedFormData = createAction.mock.calls[0][0] as FormData;
     expect(submittedFormData.get("name")).toBe("빨래");
     expect(submittedFormData.get("icon")).toBe("🧺");
+    expect(submittedFormData.get("intervalValue")).toBe("1");
+    expect(submittedFormData.get("intervalUnit")).toBe("week");
   });
 
   test("shows an empty-state message when there are no chores", () => {
     render(<ChoreGrid chores={[]} completeAction={vi.fn()} createAction={noop} updateAction={noop} deleteAction={vi.fn()} />);
-    expect(screen.getByText("아직 등록된 집안일이 없어요")).toBeDefined();
+    expect(screen.getByText("아직 등록된 집안일이 없어요 — + 버튼으로 추가해보세요")).toBeDefined();
   });
 });
 

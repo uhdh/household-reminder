@@ -20,7 +20,9 @@ export type ChoreInput = {
   intervalUnit: IntervalUnit;
 };
 
-const DB_PATH = path.join(process.cwd(), "data", "db.sqlite");
+function resolveDbPath(): string {
+  return process.env.CHORE_DB_PATH ?? path.join(process.cwd(), "data", "db.sqlite");
+}
 
 let dbInstance: DatabaseSync | null = null;
 let testOverride: DatabaseSync | null = null;
@@ -32,7 +34,7 @@ export function initSchema(database: DatabaseSync): void {
       name TEXT NOT NULL,
       icon TEXT NOT NULL,
       interval_value INTEGER NOT NULL,
-      interval_unit TEXT NOT NULL,
+      interval_unit TEXT NOT NULL CHECK (interval_unit IN ('day', 'week', 'month')),
       last_done_at TEXT,
       created_at TEXT NOT NULL
     )
@@ -42,8 +44,9 @@ export function initSchema(database: DatabaseSync): void {
 export function getDb(): DatabaseSync {
   if (testOverride) return testOverride;
   if (!dbInstance) {
-    mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    dbInstance = new DatabaseSync(DB_PATH);
+    const dbPath = resolveDbPath();
+    mkdirSync(path.dirname(dbPath), { recursive: true });
+    dbInstance = new DatabaseSync(dbPath);
     initSchema(dbInstance);
   }
   return dbInstance;
