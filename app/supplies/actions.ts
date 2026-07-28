@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
-import { getDb, completeSupplyRow } from "@/lib/db";
+import { getDb } from "@/lib/db";
+import { completeSupplyRow } from "@/lib/supplies-db";
 
 export async function completeSupply(id: number, doneDateISO: string): Promise<void> {
   "use server";

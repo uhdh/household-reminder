@@ -1,13 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import {
-  setDbForTesting,
-  initSchema,
-  insertChore,
-  getDb,
-  getAllSupplies,
-  completeSupplyRow,
-} from "./db";
+import { setDbForTesting, initSchema, getDb } from "./db";
+import { insertChore } from "./chores-db";
+import { getAllSupplies, completeSupplyRow } from "./supplies-db";
 import { SECTIONS } from "./sections";
 
 describe("SECTIONS", () => {

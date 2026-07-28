@@ -1,4 +1,5 @@
-import { getDb, getAllSupplies } from "@/lib/db";
+import { getDb } from "@/lib/db";
+import { getAllSupplies } from "@/lib/supplies-db";
 import { computeSupplyStatus } from "@/lib/supplies";
 import { todayISO } from "@/lib/chores";
 import { SupplyGrid, type SupplyViewModel } from "./supply-grid";

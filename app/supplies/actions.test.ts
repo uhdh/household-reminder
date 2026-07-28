@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { initSchema, setDbForTesting, getAllSupplies, getDb } from "@/lib/db";
+import { initSchema, setDbForTesting, getDb } from "@/lib/db";
+import { getAllSupplies } from "@/lib/supplies-db";
 import { completeSupply } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));

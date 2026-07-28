@@ -1,4 +1,5 @@
-import { getDb, getAllChores } from "@/lib/db";
+import { getDb } from "@/lib/db";
+import { getAllChores } from "@/lib/chores-db";
 import { computeChoreStatus, todayISO } from "@/lib/chores";
 import { ChoreGrid, type ChoreViewModel } from "./chore-grid";
 import { createChore, updateChore, completeChore, deleteChore } from "./actions";

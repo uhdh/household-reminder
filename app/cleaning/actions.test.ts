@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { initSchema, setDbForTesting, getAllChores, getDb } from "@/lib/db";
+import { initSchema, setDbForTesting, getDb } from "@/lib/db";
+import { getAllChores } from "@/lib/chores-db";
 import { parseChoreForm, createChore, updateChore, completeChore, deleteChore } from "./actions";
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));

@@ -1,4 +1,6 @@
-import { getDb, getAllChores, getAllSupplies } from "./db";
+import { getDb } from "./db";
+import { getAllChores } from "./chores-db";
+import { getAllSupplies } from "./supplies-db";
 import { computeChoreStatus, todayISO } from "./chores";
 import { computeSupplyStatus } from "./supplies";
 

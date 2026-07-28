@@ -1,12 +1,12 @@
 import { revalidatePath } from "next/cache";
+import { getDb } from "@/lib/db";
 import {
-  getDb,
   insertChore,
   updateChoreRow,
   completeChoreRow,
   deleteChoreRow,
   type ChoreInput,
-} from "@/lib/db";
+} from "@/lib/chores-db";
 import type { IntervalUnit } from "@/lib/chores";
 
 const INTERVAL_UNITS: IntervalUnit[] = ["day", "week", "month"];
