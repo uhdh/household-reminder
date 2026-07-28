@@ -3,6 +3,7 @@ import { getAllChores } from "./chores-db";
 import { getAllSupplies } from "./supplies-db";
 import { computeChoreStatus, todayISO } from "./chores";
 import { computeSupplyStatus } from "./supplies";
+import { getRecord } from "./emotion-cards-db";
 
 export type SectionStatus = { ready: false } | { ready: true; label: string };
 
@@ -50,7 +51,12 @@ export const SECTIONS: Section[] = [
     name: "감정카드",
     icon: "💌",
     href: "/emotion-cards",
-    getStatus: () => ({ ready: false }),
+    getStatus: () => {
+      const hasToday = getRecord(getDb(), todayISO()) !== undefined;
+      return hasToday
+        ? { ready: true, label: "오늘 기록 완료" }
+        : { ready: true, label: "아직 기록 전" };
+    },
   },
   {
     id: "portfolio",
