@@ -1,5 +1,6 @@
-import { getDb, getAllChores } from "./db";
+import { getDb, getAllChores, getAllSupplies } from "./db";
 import { computeChoreStatus, todayISO } from "./chores";
+import { computeSupplyStatus } from "./supplies";
 
 export type SectionStatus = { ready: false } | { ready: true; label: string };
 
@@ -32,7 +33,15 @@ export const SECTIONS: Section[] = [
     name: "생필품 관리",
     icon: "🧴",
     href: "/supplies",
-    getStatus: () => ({ ready: false }),
+    getStatus: () => {
+      const today = todayISO();
+      const overdueCount = getAllSupplies(getDb()).filter(
+        (row) => computeSupplyStatus(row.last_done_at, row.cycle_days, today).overdue
+      ).length;
+      return overdueCount > 0
+        ? { ready: true, label: `밀린 항목 ${overdueCount}개` }
+        : { ready: true, label: "전부 완료" };
+    },
   },
   {
     id: "emotion-cards",
