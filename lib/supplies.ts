@@ -29,6 +29,10 @@ export function computeSupplyStatus(
   cycleDays: number,
   todayISODate: string
 ): SupplyStatus {
+  const lastDone = parseISO(lastDoneISO);
+  if (Number.isNaN(lastDone.getTime()) || cycleDays <= 0) {
+    return { dueDate: todayISODate, daysRemaining: 0, overdue: true, percent: 100 };
+  }
   const dueDate = addDaysISO(lastDoneISO, cycleDays);
   const daysRemaining = daysBetween(todayISODate, dueDate);
   const elapsedDays = cycleDays - daysRemaining;

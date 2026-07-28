@@ -31,4 +31,19 @@ describe("computeSupplyStatus", () => {
     expect(status.overdue).toBe(false);
     expect(status.percent).toBe(0);
   });
+
+  test("invalid/empty lastDoneISO falls back to an immediately-overdue status instead of throwing", () => {
+    const status = computeSupplyStatus("", 90, "2026-07-27");
+    expect(status.dueDate).toBe("2026-07-27");
+    expect(status.daysRemaining).toBe(0);
+    expect(status.overdue).toBe(true);
+    expect(status.percent).toBe(100);
+  });
+
+  test("cycleDays <= 0 falls back to an immediately-overdue status instead of dividing by zero", () => {
+    const status = computeSupplyStatus("2026-07-01", 0, "2026-07-27");
+    expect(status.overdue).toBe(true);
+    expect(status.percent).toBe(100);
+    expect(Number.isNaN(status.percent)).toBe(false);
+  });
 });

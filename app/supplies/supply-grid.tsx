@@ -136,7 +136,7 @@ export function SupplyGrid({ supplies, completeAction }: Props) {
             <button
               type="button"
               onClick={confirmComplete}
-              disabled={isCompleting}
+              disabled={isCompleting || !doneDate}
               className="font-semibold text-blue-400 disabled:opacity-50"
             >
               완료로 표시

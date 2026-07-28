@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SupplyGrid, type SupplyViewModel } from "./supply-grid";
 
@@ -37,6 +37,16 @@ describe("SupplyGrid rendering", () => {
     const cards = screen.getAllByRole("button", { name: /완료 처리/ });
     expect(cards[0].textContent).not.toContain("!");
     expect(cards[1].textContent).toContain("!");
+  });
+
+  test("renders each supply under its own category column, not just anywhere on the page", () => {
+    render(<SupplyGrid supplies={baseSupplies} completeAction={vi.fn()} />);
+    const bathroomSection = screen.getByText("욕실용품").closest("section")!;
+    const kitchenSection = screen.getByText("주방용품").closest("section")!;
+    expect(within(bathroomSection).getByText("칫솔")).toBeDefined();
+    expect(within(kitchenSection).getByText("고무장갑")).toBeDefined();
+    expect(within(bathroomSection).queryByText("고무장갑")).toBeNull();
+    expect(within(kitchenSection).queryByText("칫솔")).toBeNull();
   });
 });
 
