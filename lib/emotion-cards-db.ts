@@ -25,9 +25,10 @@ export function initEmotionCardsSchema(database: DatabaseSync): void {
 }
 
 export function getCustomEmotions(database: DatabaseSync): Emotion[] {
-  return database
+  const rows = database
     .prepare("SELECT name, emoji, color FROM custom_emotions ORDER BY id")
-    .all() as unknown as Emotion[];
+    .all() as unknown as { name: string; emoji: string; color: EmotionColor }[];
+  return rows.map((row) => ({ name: row.name, emoji: row.emoji, color: row.color }));
 }
 
 export function insertCustomEmotion(database: DatabaseSync, name: string, existing: Emotion[]): Emotion {
@@ -45,8 +46,9 @@ export function insertCustomEmotion(database: DatabaseSync, name: string, existi
 export function getRecord(database: DatabaseSync, date: string): Emotion[] | undefined {
   const rows = database
     .prepare("SELECT name, emoji, color FROM emotion_records WHERE date = ? ORDER BY position")
-    .all(date) as unknown as Emotion[];
-  return rows.length === 3 ? rows : undefined;
+    .all(date) as unknown as { name: string; emoji: string; color: EmotionColor }[];
+  if (rows.length !== 3) return undefined;
+  return rows.map((row) => ({ name: row.name, emoji: row.emoji, color: row.color }));
 }
 
 export function saveRecord(database: DatabaseSync, date: string, emotions: Emotion[]): void {
