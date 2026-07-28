@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { initChoresSchema } from "./chores-db";
 import { initSuppliesSchema } from "./supplies-db";
+import { initEmotionCardsSchema } from "./emotion-cards-db";
 
 function resolveDbPath(): string {
   return process.env.APP_DB_PATH ?? path.join(process.cwd(), "data", "db.sqlite");
@@ -14,6 +15,7 @@ let testOverride: DatabaseSync | null = null;
 export function initSchema(database: DatabaseSync): void {
   initChoresSchema(database);
   initSuppliesSchema(database);
+  initEmotionCardsSchema(database);
 }
 
 export function getDb(): DatabaseSync {
