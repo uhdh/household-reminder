@@ -44,7 +44,17 @@ function SectionRow({
     return <div>{card}</div>;
   }
 
-  return <Link href={section.href}>{card}</Link>;
+  const isExternal = section.href.startsWith("http");
+
+  return (
+    <Link
+      href={section.href}
+      target={isExternal ? "_blank" : undefined}
+      rel={isExternal ? "noopener noreferrer" : undefined}
+    >
+      {card}
+    </Link>
+  );
 }
 
 export function HomeView({

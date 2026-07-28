@@ -59,10 +59,10 @@ export const SECTIONS: Section[] = [
     },
   },
   {
-    id: "portfolio",
-    name: "포트폴리오",
-    icon: "💼",
-    href: "/portfolio",
-    getStatus: () => ({ ready: false }),
+    id: "budget",
+    name: "가계부",
+    icon: "💰",
+    href: "https://couple-finance-dusky.vercel.app",
+    getStatus: () => ({ ready: true, label: "바로가기" }),
   },
 ];

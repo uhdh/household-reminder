@@ -42,6 +42,23 @@ describe("HomeView", () => {
     expect(screen.queryByRole("link", { name: /감정카드/ })).toBeNull();
   });
 
+  test("an external (http) href opens in a new tab with rel=noopener noreferrer", () => {
+    const externalSections: Section[] = [
+      {
+        id: "budget",
+        name: "가계부",
+        icon: "💰",
+        href: "https://couple-finance-dusky.vercel.app",
+        getStatus: () => ({ ready: true, label: "바로가기" }),
+      },
+    ];
+    render(<HomeView sections={externalSections} />);
+    const link = screen.getByRole("link", { name: /가계부/ });
+    expect(link.getAttribute("href")).toBe("https://couple-finance-dusky.vercel.app");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
   test("renders the real default SECTIONS when no sections prop is given", () => {
     render(<HomeView />);
     expect(screen.getAllByRole("listitem")).toHaveLength(4);

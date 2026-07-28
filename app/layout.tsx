@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "우리집",
-  description: "우리집 — 청소 관리, 생필품 관리, 감정카드, 포트폴리오를 한 곳에서",
+  description: "우리집 — 청소 관리, 생필품 관리, 감정카드, 가계부를 한 곳에서",
 };
 
 export default function RootLayout({

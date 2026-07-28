@@ -9,13 +9,18 @@ import { SECTIONS } from "./sections";
 
 describe("SECTIONS", () => {
   test("has exactly the 4 expected sections, in order, with matching hrefs", () => {
-    expect(SECTIONS.map((s) => s.id)).toEqual(["cleaning", "supplies", "emotion-cards", "portfolio"]);
-    expect(SECTIONS.map((s) => s.href)).toEqual(["/cleaning", "/supplies", "/emotion-cards", "/portfolio"]);
+    expect(SECTIONS.map((s) => s.id)).toEqual(["cleaning", "supplies", "emotion-cards", "budget"]);
+    expect(SECTIONS.map((s) => s.href)).toEqual([
+      "/cleaning",
+      "/supplies",
+      "/emotion-cards",
+      "https://couple-finance-dusky.vercel.app",
+    ]);
   });
 
-  test("portfolio still defaults to not ready", () => {
-    const portfolio = SECTIONS.find((s) => s.id === "portfolio")!;
-    expect(portfolio.getStatus()).toEqual({ ready: false });
+  test("budget is an always-ready external link", () => {
+    const budget = SECTIONS.find((s) => s.id === "budget")!;
+    expect(budget.getStatus()).toEqual({ ready: true, label: "바로가기" });
   });
 });
 
