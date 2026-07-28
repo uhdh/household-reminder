@@ -21,7 +21,7 @@ export type ChoreInput = {
 };
 
 function resolveDbPath(): string {
-  return process.env.CHORE_DB_PATH ?? path.join(process.cwd(), "data", "db.sqlite");
+  return process.env.APP_DB_PATH ?? path.join(process.cwd(), "data", "db.sqlite");
 }
 
 let dbInstance: DatabaseSync | null = null;

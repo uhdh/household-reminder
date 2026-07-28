@@ -81,7 +81,7 @@ describe("lib/db file-backed database", () => {
       openedDb.close();
       openedDb = null;
     }
-    delete process.env.CHORE_DB_PATH;
+    delete process.env.APP_DB_PATH;
     setDbForTesting(null);
     if (tempDir && existsSync(tempDir)) {
       rmSync(tempDir, { recursive: true, force: true });
@@ -94,7 +94,7 @@ describe("lib/db file-backed database", () => {
     // directory, which holds the actual persistent db.sqlite.
     tempDir = path.join(os.tmpdir(), `cleaning-db-test-${Date.now()}`);
     const dbFile = path.join(tempDir, "db.sqlite");
-    process.env.CHORE_DB_PATH = dbFile;
+    process.env.APP_DB_PATH = dbFile;
 
     // Reset test override to allow the real getDb() to work
     setDbForTesting(null);
