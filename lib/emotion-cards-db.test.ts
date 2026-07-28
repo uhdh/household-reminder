@@ -19,15 +19,15 @@ describe("custom emotions", () => {
   test("insertCustomEmotion adds a new emotion with default emoji/color", () => {
     const db = freshDb();
     const emotion = insertCustomEmotion(db, "허탈함", []);
-    expect(emotion).toEqual({ name: "허탈함", emoji: "💭", color: "purple" });
-    expect(getCustomEmotions(db)).toEqual([emotion]);
+    expect(emotion).toStrictEqual({ name: "허탈함", emoji: "💭", color: "purple" });
+    expect(getCustomEmotions(db)).toStrictEqual([emotion]);
   });
 
   test("insertCustomEmotion returns the existing match instead of duplicating", () => {
     const db = freshDb();
     const existing = [{ name: "행복", emoji: "😊", color: "green" as const }];
     const emotion = insertCustomEmotion(db, "행복", existing);
-    expect(emotion).toEqual(existing[0]);
+    expect(emotion).toStrictEqual(existing[0]);
     expect(getCustomEmotions(db)).toHaveLength(0);
   });
 });
@@ -47,7 +47,7 @@ describe("emotion records", () => {
   test("saveRecord then getRecord round-trips the 3 cards in order", () => {
     const db = freshDb();
     saveRecord(db, "2026-07-28", cards);
-    expect(getRecord(db, "2026-07-28")).toEqual(cards);
+    expect(getRecord(db, "2026-07-28")).toStrictEqual(cards);
   });
 
   test("saveRecord replaces the previous 3 rows for the same date, not append", () => {
@@ -59,7 +59,7 @@ describe("emotion records", () => {
       { name: "놀람", emoji: "😲", color: "purple" as const },
     ];
     saveRecord(db, "2026-07-28", replacement);
-    expect(getRecord(db, "2026-07-28")).toEqual(replacement);
+    expect(getRecord(db, "2026-07-28")).toStrictEqual(replacement);
   });
 
   test("getAllRecordsDesc groups rows by date, most recent first", () => {
@@ -68,6 +68,6 @@ describe("emotion records", () => {
     saveRecord(db, "2026-07-28", cards);
     const records = getAllRecordsDesc(db);
     expect(records.map((r) => r.date)).toEqual(["2026-07-28", "2026-07-01"]);
-    expect(records[0].cards).toEqual(cards);
+    expect(records[0].cards).toStrictEqual(cards);
   });
 });

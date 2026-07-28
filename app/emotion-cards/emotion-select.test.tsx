@@ -109,4 +109,25 @@ describe("EmotionSelect custom emotion flow", () => {
     expect(screen.getByText("1/3")).toBeDefined();
     expect(screen.getByRole("button", { name: /허탈함 선택/ }).getAttribute("aria-pressed")).toBe("true");
   });
+
+  test("typing a name that matches an existing preset does not duplicate it in the grid", async () => {
+    const user = userEvent.setup();
+    const addCustomEmotionAction = vi
+      .fn()
+      .mockResolvedValue({ emotion: { name: "행복", emoji: "😊", color: "green" as const } });
+    render(
+      <EmotionSelect
+        today="2026-07-28"
+        initialSelected={[]}
+        initialCustomEmotions={[]}
+        backHref="/emotion-cards"
+        addCustomEmotionAction={addCustomEmotionAction}
+        saveRecordAction={noopSave}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "새 감정 추가" }));
+    await user.type(screen.getByLabelText("감정 이름"), "행복");
+    await user.click(screen.getByRole("button", { name: "추가" }));
+    expect(screen.getAllByRole("button", { name: /행복 선택/ })).toHaveLength(1);
+  });
 });

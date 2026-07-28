@@ -51,17 +51,21 @@ export function EmotionSelect({
   async function handleAddCustom() {
     const trimmed = sheetName.trim();
     if (!trimmed) return;
-    const result = await addCustomEmotionAction(trimmed);
-    if (result.error || !result.emotion) {
-      setSheetError(result.error ?? "추가에 실패했어요.");
-      return;
+    try {
+      const result = await addCustomEmotionAction(trimmed);
+      if (result.error || !result.emotion) {
+        setSheetError(result.error ?? "추가에 실패했어요.");
+        return;
+      }
+      const emotion = result.emotion;
+      if (!allEmotions.some((e) => e.name === emotion.name)) {
+        setCustomEmotions((prev) => [...prev, emotion]);
+      }
+      closeSheet();
+      toggle(emotion);
+    } catch {
+      setSheetError("추가에 실패했어요. 다시 시도해주세요.");
     }
-    const emotion = result.emotion;
-    if (!customEmotions.some((e) => e.name === emotion.name)) {
-      setCustomEmotions((prev) => [...prev, emotion]);
-    }
-    closeSheet();
-    toggle(emotion);
   }
 
   async function handleComplete() {
@@ -74,6 +78,8 @@ export function EmotionSelect({
         return;
       }
       router.push("/emotion-cards/result");
+    } catch {
+      setSaveError("완료 처리에 실패했어요. 다시 시도해주세요.");
     } finally {
       setIsSaving(false);
     }
