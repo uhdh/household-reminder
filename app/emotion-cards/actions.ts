@@ -14,8 +14,8 @@ export async function addCustomEmotion(name: string): Promise<{ emotion?: Emotio
   const trimmed = name.trim().slice(0, MAX_NAME_LENGTH);
   if (!trimmed) return { error: "이름을 입력해주세요." };
 
-  const existing = [...EMOTIONS, ...getCustomEmotions(getDb())];
-  const emotion = insertCustomEmotion(getDb(), trimmed, existing);
+  const existing = [...EMOTIONS, ...(await getCustomEmotions(getDb()))];
+  const emotion = await insertCustomEmotion(getDb(), trimmed, existing);
   return { emotion };
 }
 
@@ -24,7 +24,7 @@ export async function saveRecord(date: string, emotions: Emotion[]): Promise<{ e
   if (emotions.length !== 3) {
     return { error: "카드를 정확히 3장 선택해주세요." };
   }
-  saveRecordRow(getDb(), date, emotions);
+  await saveRecordRow(getDb(), date, emotions);
   revalidatePath("/emotion-cards");
   revalidatePath("/emotion-cards/history");
   revalidatePath("/");

@@ -7,9 +7,9 @@ import { todayISO } from "@/lib/chores";
 
 export const dynamic = "force-dynamic";
 
-export default function EmotionCardsPage() {
+export default async function EmotionCardsPage() {
   const today = todayISO();
-  const submitted = getRecord(getDb(), today) !== undefined;
+  const submitted = (await getRecord(getDb(), today)) !== undefined;
   const todayLabel = format(parseISO(today), "M월 d일 EEEE", { locale: ko });
 
   return (

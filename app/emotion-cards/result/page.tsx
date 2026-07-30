@@ -7,9 +7,9 @@ import { CardsView } from "../cards-view";
 
 export const dynamic = "force-dynamic";
 
-export default function ResultPage() {
+export default async function ResultPage() {
   const today = todayISO();
-  const cards = getRecord(getDb(), today);
+  const cards = await getRecord(getDb(), today);
 
   if (!cards) {
     redirect("/emotion-cards");

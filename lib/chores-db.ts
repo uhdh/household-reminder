@@ -1,5 +1,26 @@
-import { DatabaseSync } from "node:sqlite";
+import { asc, eq, sql } from "drizzle-orm";
+import { check, integer, pgTable, serial, text } from "drizzle-orm/pg-core";
 import type { IntervalUnit } from "./chores";
+import type { AppDb } from "./db";
+
+export const chores = pgTable(
+  "chores",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    icon: text("icon").notNull(),
+    intervalValue: integer("interval_value").notNull(),
+    intervalUnit: text("interval_unit").notNull(),
+    lastDoneAt: text("last_done_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    check(
+      "chores_interval_unit_check",
+      sql`${table.intervalUnit} IN ('day', 'week', 'month')`,
+    ),
+  ],
+);
 
 export type ChoreRow = {
   id: number;
@@ -18,10 +39,22 @@ export type ChoreInput = {
   intervalUnit: IntervalUnit;
 };
 
-export function initChoresSchema(database: DatabaseSync): void {
-  database.exec(`
+function toRow(row: typeof chores.$inferSelect): ChoreRow {
+  return {
+    id: row.id,
+    name: row.name,
+    icon: row.icon,
+    interval_value: row.intervalValue,
+    interval_unit: row.intervalUnit as IntervalUnit,
+    last_done_at: row.lastDoneAt,
+    created_at: row.createdAt,
+  };
+}
+
+export async function initChoresSchema(database: AppDb): Promise<void> {
+  await database.execute(sql`
     CREATE TABLE IF NOT EXISTS chores (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       icon TEXT NOT NULL,
       interval_value INTEGER NOT NULL,
@@ -32,32 +65,57 @@ export function initChoresSchema(database: DatabaseSync): void {
   `);
 }
 
-export function getAllChores(database: DatabaseSync): ChoreRow[] {
-  return database.prepare("SELECT * FROM chores ORDER BY id").all() as unknown as ChoreRow[];
+export async function getAllChores(database: AppDb): Promise<ChoreRow[]> {
+  const rows = await database.select().from(chores).orderBy(asc(chores.id));
+  return rows.map(toRow);
 }
 
-export function insertChore(database: DatabaseSync, input: ChoreInput): ChoreRow {
-  const createdAt = new Date().toISOString();
-  const info = database
-    .prepare(
-      "INSERT INTO chores (name, icon, interval_value, interval_unit, last_done_at, created_at) VALUES (?, ?, ?, ?, NULL, ?)"
-    )
-    .run(input.name, input.icon, input.intervalValue, input.intervalUnit, createdAt);
-  return database
-    .prepare("SELECT * FROM chores WHERE id = ?")
-    .get(info.lastInsertRowid) as unknown as ChoreRow;
+export async function insertChore(
+  database: AppDb,
+  input: ChoreInput,
+): Promise<ChoreRow> {
+  const [row] = await database
+    .insert(chores)
+    .values({
+      name: input.name,
+      icon: input.icon,
+      intervalValue: input.intervalValue,
+      intervalUnit: input.intervalUnit,
+      lastDoneAt: null,
+      createdAt: new Date().toISOString(),
+    })
+    .returning();
+
+  return toRow(row);
 }
 
-export function updateChoreRow(database: DatabaseSync, id: number, input: ChoreInput): void {
-  database
-    .prepare("UPDATE chores SET name = ?, icon = ?, interval_value = ?, interval_unit = ? WHERE id = ?")
-    .run(input.name, input.icon, input.intervalValue, input.intervalUnit, id);
+export async function updateChoreRow(
+  database: AppDb,
+  id: number,
+  input: ChoreInput,
+): Promise<void> {
+  await database
+    .update(chores)
+    .set({
+      name: input.name,
+      icon: input.icon,
+      intervalValue: input.intervalValue,
+      intervalUnit: input.intervalUnit,
+    })
+    .where(eq(chores.id, id));
 }
 
-export function completeChoreRow(database: DatabaseSync, id: number, doneDateISO: string): void {
-  database.prepare("UPDATE chores SET last_done_at = ? WHERE id = ?").run(doneDateISO, id);
+export async function completeChoreRow(
+  database: AppDb,
+  id: number,
+  doneDateISO: string,
+): Promise<void> {
+  await database
+    .update(chores)
+    .set({ lastDoneAt: doneDateISO })
+    .where(eq(chores.id, id));
 }
 
-export function deleteChoreRow(database: DatabaseSync, id: number): void {
-  database.prepare("DELETE FROM chores WHERE id = ?").run(id);
+export async function deleteChoreRow(database: AppDb, id: number): Promise<void> {
+  await database.delete(chores).where(eq(chores.id, id));
 }

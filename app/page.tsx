@@ -6,6 +6,6 @@ import { HomeView } from "./home-view";
 // next.config.ts, this stops working and the date must be made dynamic instead.
 export const revalidate = 3600;
 
-export default function Page() {
+export default async function Page() {
   return <HomeView />;
 }

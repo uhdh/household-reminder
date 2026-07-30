@@ -57,11 +57,13 @@ function SectionRow({
   );
 }
 
-export function HomeView({
+export async function HomeView({
   sections = SECTIONS,
 }: {
   sections?: Section[];
 }) {
+  const statuses = await Promise.all(sections.map((section) => section.getStatus()));
+
   return (
     <div className="flex flex-1 flex-col items-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex w-full max-w-md flex-1 flex-col px-5 py-10">
@@ -72,9 +74,9 @@ export function HomeView({
           우리집 👋
         </h1>
         <ul className="flex flex-col gap-3">
-          {sections.map((section) => (
+          {sections.map((section, index) => (
             <li key={section.id}>
-              <SectionRow section={section} status={section.getStatus()} />
+              <SectionRow section={section} status={statuses[index]} />
             </li>
           ))}
         </ul>

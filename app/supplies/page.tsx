@@ -10,9 +10,9 @@ import { completeSupply } from "./actions";
 // at build time.
 export const dynamic = "force-dynamic";
 
-export default function SuppliesPage() {
+export default async function SuppliesPage() {
   const today = todayISO();
-  const rows = getAllSupplies(getDb());
+  const rows = await getAllSupplies(getDb());
 
   const supplies: SupplyViewModel[] = rows.map((row) => ({
     id: row.id,

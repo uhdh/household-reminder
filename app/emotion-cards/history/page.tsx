@@ -6,8 +6,8 @@ import { getAllRecordsDesc } from "@/lib/emotion-cards-db";
 
 export const dynamic = "force-dynamic";
 
-export default function HistoryPage() {
-  const records = getAllRecordsDesc(getDb());
+export default async function HistoryPage() {
+  const records = await getAllRecordsDesc(getDb());
 
   return (
     <div className="flex-1 bg-zinc-50 dark:bg-black">

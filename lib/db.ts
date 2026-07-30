@@ -1,34 +1,33 @@
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
+import { neon } from "@neondatabase/serverless";
+import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
+import type { PgDatabase } from "drizzle-orm/pg-core";
 import { initChoresSchema } from "./chores-db";
 import { initSuppliesSchema } from "./supplies-db";
 import { initEmotionCardsSchema } from "./emotion-cards-db";
 
-function resolveDbPath(): string {
-  return process.env.APP_DB_PATH ?? path.join(process.cwd(), "data", "db.sqlite");
-}
+export type AppDb = PgDatabase<any, any, any>;
 
-let dbInstance: DatabaseSync | null = null;
-let testOverride: DatabaseSync | null = null;
+let dbInstance: AppDb | null = null;
+let testOverride: AppDb | null = null;
 
-export function initSchema(database: DatabaseSync): void {
-  initChoresSchema(database);
-  initSuppliesSchema(database);
-  initEmotionCardsSchema(database);
-}
-
-export function getDb(): DatabaseSync {
+export function getDb(): AppDb {
   if (testOverride) return testOverride;
+
   if (!dbInstance) {
-    const dbPath = resolveDbPath();
-    mkdirSync(path.dirname(dbPath), { recursive: true });
-    dbInstance = new DatabaseSync(dbPath);
-    initSchema(dbInstance);
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("DATABASE_URL is not set");
+    dbInstance = drizzleNeon({ client: neon(url) });
   }
+
   return dbInstance;
 }
 
-export function setDbForTesting(database: DatabaseSync | null): void {
+export function setDbForTesting(database: AppDb | null): void {
   testOverride = database;
+}
+
+export async function initSchema(database: AppDb): Promise<void> {
+  await initChoresSchema(database);
+  await initSuppliesSchema(database);
+  await initEmotionCardsSchema(database);
 }

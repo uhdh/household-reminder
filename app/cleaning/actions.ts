@@ -35,7 +35,7 @@ export async function createChore(formData: FormData): Promise<{ error?: string 
   "use server";
   const parsed = parseChoreForm(formData);
   if ("error" in parsed) return { error: parsed.error };
-  insertChore(getDb(), parsed);
+  await insertChore(getDb(), parsed);
   revalidatePath("/cleaning");
   revalidatePath("/");
   return {};
@@ -45,7 +45,7 @@ export async function updateChore(id: number, formData: FormData): Promise<{ err
   "use server";
   const parsed = parseChoreForm(formData);
   if ("error" in parsed) return { error: parsed.error };
-  updateChoreRow(getDb(), id, parsed);
+  await updateChoreRow(getDb(), id, parsed);
   revalidatePath("/cleaning");
   revalidatePath("/");
   return {};
@@ -53,14 +53,14 @@ export async function updateChore(id: number, formData: FormData): Promise<{ err
 
 export async function completeChore(id: number, doneDateISO: string): Promise<void> {
   "use server";
-  completeChoreRow(getDb(), id, doneDateISO);
+  await completeChoreRow(getDb(), id, doneDateISO);
   revalidatePath("/cleaning");
   revalidatePath("/");
 }
 
 export async function deleteChore(id: number): Promise<void> {
   "use server";
-  deleteChoreRow(getDb(), id);
+  await deleteChoreRow(getDb(), id);
   revalidatePath("/cleaning");
   revalidatePath("/");
 }

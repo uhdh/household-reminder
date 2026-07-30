@@ -15,13 +15,13 @@ export default async function SelectPage({
   const { edit } = await searchParams;
   const isEdit = edit === "1";
   const today = todayISO();
-  const existing = getRecord(getDb(), today);
+  const existing = await getRecord(getDb(), today);
 
   if (existing && !isEdit) {
     redirect("/emotion-cards/result");
   }
 
-  const customEmotions = getCustomEmotions(getDb());
+  const customEmotions = await getCustomEmotions(getDb());
 
   return (
     <EmotionSelect

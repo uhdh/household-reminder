@@ -1,6 +1,27 @@
-import { DatabaseSync } from "node:sqlite";
+import { asc, eq, sql } from "drizzle-orm";
+import { check, integer, pgTable, serial, text } from "drizzle-orm/pg-core";
 import type { SupplyCategory } from "./supplies";
 import { todayISO } from "./chores";
+import type { AppDb } from "./db";
+
+export const supplies = pgTable(
+  "supplies",
+  {
+    id: serial("id").primaryKey(),
+    category: text("category").notNull(),
+    name: text("name").notNull(),
+    icon: text("icon").notNull(),
+    cycleDays: integer("cycle_days").notNull(),
+    lastDoneAt: text("last_done_at").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [
+    check(
+      "supplies_category_check",
+      sql`${table.category} IN ('bathroom', 'kitchen', 'bedroom', 'appliance')`,
+    ),
+  ],
+);
 
 export type SupplyRow = {
   id: number;
@@ -43,24 +64,26 @@ const SUPPLY_CATALOG: SupplyCatalogEntry[] = [
   { category: "appliance", name: "세탁기 필터", icon: "💦", cycleDays: 90 },
 ];
 
-function seedSuppliesIfEmpty(database: DatabaseSync): void {
-  const { count } = database.prepare("SELECT COUNT(*) as count FROM supplies").get() as {
-    count: number;
-  };
-  if (count > 0) return;
+async function seedSuppliesIfEmpty(database: AppDb): Promise<void> {
+  const [{ count }] = await database.select({ count: sql<number>`count(*)` }).from(supplies);
+  if (Number(count) > 0) return;
   const today = todayISO();
-  const insert = database.prepare(
-    "INSERT INTO supplies (category, name, icon, cycle_days, last_done_at, sort_order) VALUES (?, ?, ?, ?, ?, ?)"
+  await database.insert(supplies).values(
+    SUPPLY_CATALOG.map((entry, index) => ({
+      category: entry.category,
+      name: entry.name,
+      icon: entry.icon,
+      cycleDays: entry.cycleDays,
+      lastDoneAt: today,
+      sortOrder: index,
+    })),
   );
-  SUPPLY_CATALOG.forEach((entry, index) => {
-    insert.run(entry.category, entry.name, entry.icon, entry.cycleDays, today, index);
-  });
 }
 
-export function initSuppliesSchema(database: DatabaseSync): void {
-  database.exec(`
+export async function initSuppliesSchema(database: AppDb): Promise<void> {
+  await database.execute(sql`
     CREATE TABLE IF NOT EXISTS supplies (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       category TEXT NOT NULL CHECK (category IN ('bathroom', 'kitchen', 'bedroom', 'appliance')),
       name TEXT NOT NULL,
       icon TEXT NOT NULL,
@@ -69,13 +92,22 @@ export function initSuppliesSchema(database: DatabaseSync): void {
       sort_order INTEGER NOT NULL
     )
   `);
-  seedSuppliesIfEmpty(database);
+  await seedSuppliesIfEmpty(database);
 }
 
-export function getAllSupplies(database: DatabaseSync): SupplyRow[] {
-  return database.prepare("SELECT * FROM supplies ORDER BY sort_order").all() as unknown as SupplyRow[];
+export async function getAllSupplies(database: AppDb): Promise<SupplyRow[]> {
+  const rows = await database.select().from(supplies).orderBy(asc(supplies.sortOrder));
+  return rows.map((row) => ({
+    id: row.id,
+    category: row.category as SupplyCategory,
+    name: row.name,
+    icon: row.icon,
+    cycle_days: row.cycleDays,
+    last_done_at: row.lastDoneAt,
+    sort_order: row.sortOrder,
+  }));
 }
 
-export function completeSupplyRow(database: DatabaseSync, id: number, doneDateISO: string): void {
-  database.prepare("UPDATE supplies SET last_done_at = ? WHERE id = ?").run(doneDateISO, id);
+export async function completeSupplyRow(database: AppDb, id: number, doneDateISO: string): Promise<void> {
+  await database.update(supplies).set({ lastDoneAt: doneDateISO }).where(eq(supplies.id, id));
 }

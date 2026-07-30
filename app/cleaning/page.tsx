@@ -10,9 +10,9 @@ import { createChore, updateChore, completeChore, deleteChore } from "./actions"
 // build time.
 export const dynamic = "force-dynamic";
 
-export default function CleaningPage() {
+export default async function CleaningPage() {
   const today = todayISO();
-  const rows = getAllChores(getDb());
+  const rows = await getAllChores(getDb());
 
   const chores: ChoreViewModel[] = rows.map((row) => ({
     id: row.id,

@@ -1,65 +1,78 @@
-import { DatabaseSync } from "node:sqlite";
+import { drizzle } from "drizzle-orm/pglite";
 import { describe, expect, test } from "vitest";
+import type { AppDb } from "./db";
 import {
-  initChoresSchema,
-  getAllChores,
-  insertChore,
-  updateChoreRow,
   completeChoreRow,
   deleteChoreRow,
+  getAllChores,
+  initChoresSchema,
+  insertChore,
+  updateChoreRow,
 } from "./chores-db";
 
-function freshDb(): DatabaseSync {
-  const db = new DatabaseSync(":memory:");
-  initChoresSchema(db);
+async function freshDb(): Promise<AppDb> {
+  const db = drizzle();
+  await initChoresSchema(db);
   return db;
 }
 
+const input = {
+  name: "Laundry",
+  icon: "🧺",
+  intervalValue: 1,
+  intervalUnit: "week" as const,
+};
+
 describe("lib/chores-db CRUD", () => {
-  test("insertChore creates a row with null last_done_at and returns it", () => {
-    const db = freshDb();
-    const row = insertChore(db, { name: "빨래", icon: "🧺", intervalValue: 1, intervalUnit: "week" });
-    expect(row.name).toBe("빨래");
-    expect(row.icon).toBe("🧺");
-    expect(row.interval_value).toBe(1);
-    expect(row.interval_unit).toBe("week");
-    expect(row.last_done_at).toBeNull();
+  test("inserts a row with a null completion date", async () => {
+    const row = await insertChore(await freshDb(), input);
+    expect(row).toMatchObject({
+      name: input.name,
+      icon: input.icon,
+      interval_value: 1,
+      interval_unit: "week",
+      last_done_at: null,
+    });
     expect(typeof row.created_at).toBe("string");
   });
 
-  test("getAllChores returns every inserted row, ordered by id", () => {
-    const db = freshDb();
-    insertChore(db, { name: "빨래", icon: "🧺", intervalValue: 1, intervalUnit: "week" });
-    insertChore(db, { name: "설거지", icon: "🍽️", intervalValue: 1, intervalUnit: "day" });
-    const rows = getAllChores(db);
-    expect(rows.map((r) => r.name)).toEqual(["빨래", "설거지"]);
+  test("returns rows ordered by id", async () => {
+    const db = await freshDb();
+    await insertChore(db, input);
+    await insertChore(db, { ...input, name: "Dishes", intervalUnit: "day" });
+    expect((await getAllChores(db)).map((row) => row.name)).toEqual([
+      "Laundry",
+      "Dishes",
+    ]);
   });
 
-  test("updateChoreRow changes name/icon/interval but not last_done_at", () => {
-    const db = freshDb();
-    const created = insertChore(db, { name: "빨래", icon: "🧺", intervalValue: 1, intervalUnit: "week" });
-    completeChoreRow(db, created.id, "2026-07-01");
-    updateChoreRow(db, created.id, { name: "손빨래", icon: "🧴", intervalValue: 2, intervalUnit: "week" });
-    const [row] = getAllChores(db);
-    expect(row.name).toBe("손빨래");
-    expect(row.icon).toBe("🧴");
-    expect(row.interval_value).toBe(2);
-    expect(row.interval_unit).toBe("week");
-    expect(row.last_done_at).toBe("2026-07-01");
+  test("updates editable fields without changing completion date", async () => {
+    const db = await freshDb();
+    const created = await insertChore(db, input);
+    await completeChoreRow(db, created.id, "2026-07-01");
+    await updateChoreRow(db, created.id, {
+      ...input,
+      name: "Clean laundry",
+      icon: "✨",
+      intervalValue: 2,
+    });
+    expect(await getAllChores(db)).toContainEqual({
+      id: created.id,
+      name: "Clean laundry",
+      icon: "✨",
+      interval_value: 2,
+      interval_unit: "week",
+      last_done_at: "2026-07-01",
+      created_at: created.created_at,
+    });
   });
 
-  test("completeChoreRow sets last_done_at", () => {
-    const db = freshDb();
-    const created = insertChore(db, { name: "빨래", icon: "🧺", intervalValue: 1, intervalUnit: "week" });
-    completeChoreRow(db, created.id, "2026-07-27");
-    const [row] = getAllChores(db);
-    expect(row.last_done_at).toBe("2026-07-27");
-  });
-
-  test("deleteChoreRow removes the row", () => {
-    const db = freshDb();
-    const created = insertChore(db, { name: "빨래", icon: "🧺", intervalValue: 1, intervalUnit: "week" });
-    deleteChoreRow(db, created.id);
-    expect(getAllChores(db)).toHaveLength(0);
+  test("completes and deletes a chore", async () => {
+    const db = await freshDb();
+    const created = await insertChore(db, input);
+    await completeChoreRow(db, created.id, "2026-07-27");
+    expect((await getAllChores(db))[0].last_done_at).toBe("2026-07-27");
+    await deleteChoreRow(db, created.id);
+    expect(await getAllChores(db)).toEqual([]);
   });
 });

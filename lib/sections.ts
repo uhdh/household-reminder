@@ -12,7 +12,7 @@ export type Section = {
   name: string;
   icon: string;
   href: string;
-  getStatus: () => SectionStatus;
+  getStatus: () => Promise<SectionStatus>;
 };
 
 export const SECTIONS: Section[] = [
@@ -21,9 +21,9 @@ export const SECTIONS: Section[] = [
     name: "청소 관리",
     icon: "🧹",
     href: "/cleaning",
-    getStatus: () => {
+    getStatus: async () => {
       const today = todayISO();
-      const overdueCount = getAllChores(getDb()).filter(
+      const overdueCount = (await getAllChores(getDb())).filter(
         (row) => computeChoreStatus(row.last_done_at, row.interval_value, row.interval_unit, today).overdue
       ).length;
       return overdueCount > 0
@@ -36,9 +36,9 @@ export const SECTIONS: Section[] = [
     name: "생필품 관리",
     icon: "🧴",
     href: "/supplies",
-    getStatus: () => {
+    getStatus: async () => {
       const today = todayISO();
-      const overdueCount = getAllSupplies(getDb()).filter(
+      const overdueCount = (await getAllSupplies(getDb())).filter(
         (row) => computeSupplyStatus(row.last_done_at, row.cycle_days, today).overdue
       ).length;
       return overdueCount > 0
@@ -51,8 +51,8 @@ export const SECTIONS: Section[] = [
     name: "감정카드",
     icon: "💌",
     href: "/emotion-cards",
-    getStatus: () => {
-      const hasToday = getRecord(getDb(), todayISO()) !== undefined;
+    getStatus: async () => {
+      const hasToday = (await getRecord(getDb(), todayISO())) !== undefined;
       return hasToday
         ? { ready: true, label: "오늘 기록 완료" }
         : { ready: true, label: "아직 기록 전" };
@@ -63,6 +63,6 @@ export const SECTIONS: Section[] = [
     name: "가계부",
     icon: "💰",
     href: "https://couple-finance-dusky.vercel.app",
-    getStatus: () => ({ ready: true, label: "바로가기" }),
+    getStatus: async () => ({ ready: true, label: "바로가기" }),
   },
 ];

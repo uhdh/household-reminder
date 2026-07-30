@@ -16,7 +16,7 @@ export default async function HistoryDetailPage({
   params: Promise<{ date: string }>;
 }) {
   const { date } = await params;
-  const cards = ISO_DATE_RE.test(date) ? getRecord(getDb(), date) : undefined;
+  const cards = ISO_DATE_RE.test(date) ? await getRecord(getDb(), date) : undefined;
 
   if (!cards) {
     redirect("/emotion-cards/history");
