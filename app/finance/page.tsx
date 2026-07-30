@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { allocationTargets, assetItems, people, uploads } from "@/lib/finance-db";
@@ -55,6 +56,11 @@ export default async function DashboardPage({
     db.select().from(people),
     db.select().from(allocationTargets),
   ]);
+
+  if (activeUploads.length === 0) {
+    redirect("/finance/upload");
+  }
+
   const targetPctByCategory = new Map(
     allocationTargetRows.map((r) => [r.category, toNumber(r.targetPct)])
   );
