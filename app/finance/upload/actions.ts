@@ -83,6 +83,8 @@ export async function uploadAction(formData: FormData) {
         category: item.category,
         productName: item.productName,
         amount: item.amount.toString(),
+        costBasis: item.costBasis == null ? null : item.costBasis.toString(),
+        sector: item.sector,
       }))
     );
   }

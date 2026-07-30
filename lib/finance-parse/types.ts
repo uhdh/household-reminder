@@ -3,6 +3,8 @@ export type ParsedAssetItem = {
   category: string;
   productName: string | null;
   amount: number;
+  costBasis?: number | null;
+  sector?: string | null;
 };
 
 export type ParsedTransaction = {

@@ -4,7 +4,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Treemap } from "rech
 import { formatKRW, isLightColor } from "@/lib/finance-format";
 
 type CategoryDatum = { name: string; value: number; fill: string };
-type TreemapDatum = { name: string; value: number; fill: string; returnPct: number | null };
+type TreemapDatum = { name: string; value: number; fill: string; returnPct: number | null; sharePct: number };
 
 const TOOLTIP_STYLE = {
   backgroundColor: "#FFFFFF",
@@ -95,7 +95,7 @@ function truncateToWidth(text: string, availableWidth: number): string {
 }
 
 function HeatmapCell(props: unknown) {
-  const { x, y, width, height, name, value, fill, returnPct, index } = props as {
+  const { x, y, width, height, name, value, fill, returnPct, sharePct, index } = props as {
     x: number;
     y: number;
     width: number;
@@ -104,6 +104,7 @@ function HeatmapCell(props: unknown) {
     value: number;
     fill?: string;
     returnPct?: number | null;
+    sharePct: number;
     index: number;
   };
   // recharts also invokes content for the synthetic root node, which has no fill/name of its own.
@@ -116,10 +117,12 @@ function HeatmapCell(props: unknown) {
   const padding = 8;
   const clipId = `heatmap-cell-clip-${index}`;
   const label = truncateToWidth(name, width - padding * 2);
-  const subLabel =
+  const returnLabel =
     returnPct === null || returnPct === undefined
       ? formatKRW(value)
       : `${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(1)}%`;
+  const subLabel = `면적 비중 ${sharePct.toFixed(0)}%`;
+  const detailLabel = `${subLabel} · ${returnLabel}`;
   const showLabel = width > 40 && height > 22 && label.length > 0;
   const showValue = showLabel && height > 42 && width > 60;
   const textHaloProps = {
@@ -142,7 +145,7 @@ function HeatmapCell(props: unknown) {
         )}
         {showValue && (
           <text x={x + padding} y={y + 34} fontSize={11} fontWeight={600} fill={textColor} {...textHaloProps}>
-            {truncateToWidth(subLabel, width - padding * 2)}
+            {truncateToWidth(detailLabel, width - padding * 2)}
           </text>
         )}
       </g>

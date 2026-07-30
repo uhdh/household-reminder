@@ -152,7 +152,7 @@ export default async function DashboardPage({
   // 현금/예적금 계좌는 계좌별로 쪼개지 않고 카테고리 단위로 합산해서 히트맵 한 칸으로 보여준다
   const TREEMAP_AGGREGATED_CATEGORIES = new Set(["현금", "예적금"]);
   const treemapAggregatedTotals = new Map<string, number>();
-  const treemapDetailItems: { name: string; value: number; fill: string; returnPct: number | null }[] = [];
+  const treemapDetailItems: { name: string; value: number; fill: string; returnPct: number | null; sharePct: number }[] = [];
   for (const item of filteredAssets) {
     if (item.side !== "asset") continue;
     const amt = toNumber(item.amount);
@@ -168,6 +168,7 @@ export default async function DashboardPage({
         value: amt,
         fill: heatmapReturnColor(returnPct),
         returnPct,
+        sharePct: totalAsset > 0 ? (amt / totalAsset) * 100 : 0,
       });
     }
   }
@@ -177,6 +178,7 @@ export default async function DashboardPage({
       value,
       fill: heatmapReturnColor(null),
       returnPct: null as number | null,
+      sharePct: totalAsset > 0 ? (value / totalAsset) * 100 : 0,
     })),
     ...treemapDetailItems,
   ].sort((a, b) => b.value - a.value);
@@ -190,6 +192,7 @@ export default async function DashboardPage({
             value: rawTreemapItems.slice(TREEMAP_MAX_ITEMS).reduce((s, i) => s + i.value, 0),
             fill: heatmapReturnColor(null),
             returnPct: null as number | null,
+            sharePct: totalAsset > 0 ? (rawTreemapItems.slice(TREEMAP_MAX_ITEMS).reduce((s, i) => s + i.value, 0) / totalAsset) * 100 : 0,
           },
         ]
       : rawTreemapItems;

@@ -38,20 +38,36 @@ export function parseAssetItems(ws: Worksheet): ParsedAssetItem[] {
     throw new Error("재무현황 섹션의 컬럼 헤더(항목/상품명/금액)를 찾을 수 없습니다.");
   }
 
+  const header = ws.getRow(headerRow);
+  const findColumn = (labels: string[], fallback: number) => {
+    for (let c = 1; c <= ws.columnCount; c++) {
+      const value = cellText(header.getCell(c));
+      if (value && labels.some((label) => value.includes(label))) return c;
+    }
+    return fallback;
+  };
+  const assetCategoryColumn = findColumn(["항목"], 2);
+  const assetProductColumn = findColumn(["상품명", "종목명"], 3);
+  const assetAmountColumn = findColumn(["평가금액", "평가액", "금액"], 5);
+  const costBasisColumn = findColumn(["투자원금", "매입금액", "매입가", "취득금액"], -1);
+  const sectorColumn = findColumn(["섹터", "자산군"], -1);
+
   const items: ParsedAssetItem[] = [];
   for (let r = headerRow + 1; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
-    const assetCategory = cellText(row.getCell(2));
+    const assetCategory = cellText(row.getCell(assetCategoryColumn));
     if (assetCategory === "총자산") break;
 
-    const assetProduct = cellText(row.getCell(3));
-    const assetAmount = cellNumber(row.getCell(5));
+    const assetProduct = cellText(row.getCell(assetProductColumn));
+    const assetAmount = cellNumber(row.getCell(assetAmountColumn));
     if (assetCategory && assetProduct && assetAmount !== null) {
       items.push({
         side: "asset",
         category: assetCategory,
         productName: assetProduct,
         amount: assetAmount,
+        costBasis: costBasisColumn > 0 ? cellNumber(row.getCell(costBasisColumn)) : null,
+        sector: sectorColumn > 0 ? cellText(row.getCell(sectorColumn)) : null,
       });
     }
 
