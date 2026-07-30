@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { check, integer, pgTable, serial, text } from "drizzle-orm/pg-core";
 import type { SupplyCategory } from "./supplies";
 import { todayISO } from "./chores";
@@ -148,4 +148,9 @@ export async function getAllSupplies(database: AppDb): Promise<SupplyRow[]> {
 
 export async function completeSupplyRow(database: AppDb, id: number, doneDateISO: string): Promise<void> {
   await database.update(supplies).set({ lastDoneAt: doneDateISO }).where(eq(supplies.id, id));
+}
+
+export async function completeSupplyRows(database: AppDb, ids: number[], doneDateISO: string): Promise<void> {
+  if (ids.length === 0) return;
+  await database.update(supplies).set({ lastDoneAt: doneDateISO }).where(inArray(supplies.id, ids));
 }

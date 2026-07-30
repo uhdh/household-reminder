@@ -3,7 +3,7 @@ import { getAllSupplies, moveLaundrySuppliesToChores } from "@/lib/supplies-db";
 import { computeSupplyStatus } from "@/lib/supplies";
 import { todayISO } from "@/lib/chores";
 import { SupplyGrid, type SupplyViewModel } from "./supply-grid";
-import { completeSupply } from "./actions";
+import { completeSupply, completeSupplies } from "./actions";
 
 // Same reasoning as /cleaning: due-date status depends on today's date and a
 // mutable local sqlite file, so caching this page would freeze badges/progress
@@ -28,7 +28,7 @@ export default async function SuppliesPage() {
     <div className="flex-1 bg-zinc-50 dark:bg-black">
       <main className="mx-auto max-w-2xl p-4">
         <h1 className="mb-4 text-xl font-bold">생필품 관리</h1>
-        <SupplyGrid supplies={supplies} completeAction={completeSupply} />
+        <SupplyGrid supplies={supplies} completeAction={completeSupply} bulkCompleteAction={completeSupplies} />
       </main>
     </div>
   );
