@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db";
 import { getAllChores } from "@/lib/chores-db";
+import { moveLaundrySuppliesToChores } from "@/lib/supplies-db";
 import { computeChoreStatus, todayISO } from "@/lib/chores";
 import { ChoreGrid, type ChoreViewModel } from "./chore-grid";
 import { createChore, updateChore, completeChore, deleteChore } from "./actions";
@@ -12,7 +13,9 @@ export const dynamic = "force-dynamic";
 
 export default async function CleaningPage() {
   const today = todayISO();
-  const rows = await getAllChores(getDb());
+  const database = getDb();
+  await moveLaundrySuppliesToChores(database);
+  const rows = await getAllChores(database);
 
   const chores: ChoreViewModel[] = rows.map((row) => ({
     id: row.id,

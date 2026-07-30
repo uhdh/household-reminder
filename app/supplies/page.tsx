@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { getAllSupplies } from "@/lib/supplies-db";
+import { getAllSupplies, moveLaundrySuppliesToChores } from "@/lib/supplies-db";
 import { computeSupplyStatus } from "@/lib/supplies";
 import { todayISO } from "@/lib/chores";
 import { SupplyGrid, type SupplyViewModel } from "./supply-grid";
@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
 
 export default async function SuppliesPage() {
   const today = todayISO();
-  const rows = await getAllSupplies(getDb());
+  const database = getDb();
+  await moveLaundrySuppliesToChores(database);
+  const rows = await getAllSupplies(database);
 
   const supplies: SupplyViewModel[] = rows.map((row) => ({
     id: row.id,

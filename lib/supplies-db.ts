@@ -2,6 +2,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { check, integer, pgTable, serial, text } from "drizzle-orm/pg-core";
 import type { SupplyCategory } from "./supplies";
 import { todayISO } from "./chores";
+import { chores } from "./chores-db";
 import type { AppDb } from "./db";
 
 export const supplies = pgTable(
@@ -69,7 +70,7 @@ async function seedSuppliesIfEmpty(database: AppDb): Promise<void> {
   if (Number(count) > 0) return;
   const today = todayISO();
   await database.insert(supplies).values(
-    SUPPLY_CATALOG.map((entry, index) => ({
+    SUPPLY_CATALOG.filter((entry) => !entry.name.includes("세탁")).map((entry, index) => ({
       category: entry.category,
       name: entry.name,
       icon: entry.icon,
@@ -78,6 +79,43 @@ async function seedSuppliesIfEmpty(database: AppDb): Promise<void> {
       sortOrder: index,
     })),
   );
+}
+
+export async function moveLaundrySuppliesToChores(database: AppDb): Promise<void> {
+  const laundryRows = await database
+    .select()
+    .from(supplies)
+    .where(sql`${supplies.name} LIKE '%세탁%'`);
+  if (laundryRows.length === 0) return;
+
+  const existingChores = await database.select({ name: chores.name }).from(chores);
+  const existingNames = new Set(existingChores.map((row) => row.name));
+
+  for (const supply of laundryRows) {
+    const isPillow = supply.name.includes("베개");
+    const isBlanket = supply.name.includes("이불");
+    const isCurtain = supply.name.includes("커튼");
+    const isWasherFilter = supply.name.includes("세탁기");
+    const migration = isPillow
+      ? { icon: "🧺", intervalValue: 1, intervalUnit: "week" as const }
+      : isBlanket
+        ? { icon: "🛌", intervalValue: 1, intervalUnit: "month" as const }
+        : isCurtain || isWasherFilter
+          ? { icon: isCurtain ? "🧵" : "💦", intervalValue: 3, intervalUnit: "month" as const }
+          : null;
+
+    if (migration && !existingNames.has(supply.name)) {
+      await database.insert(chores).values({
+        name: supply.name,
+        icon: migration.icon,
+        intervalValue: migration.intervalValue,
+        intervalUnit: migration.intervalUnit,
+        lastDoneAt: supply.lastDoneAt,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    await database.delete(supplies).where(eq(supplies.id, supply.id));
+  }
 }
 
 export async function initSuppliesSchema(database: AppDb): Promise<void> {
