@@ -5,7 +5,7 @@ import { computeChoreStatus, todayISO } from "./chores";
 import { computeSupplyStatus } from "./supplies";
 import { getRecord } from "./emotion-cards-db";
 
-export type SectionStatus = { ready: false } | { ready: true; label: string };
+export type SectionStatus = { ready: false } | { ready: true; label: string; overdueIcons?: string[] };
 
 export type Section = {
   id: string;
@@ -23,11 +23,12 @@ export const SECTIONS: Section[] = [
     href: "/cleaning",
     getStatus: async () => {
       const today = todayISO();
-      const overdueCount = (await getAllChores(getDb())).filter(
+      const overdueRows = (await getAllChores(getDb())).filter(
         (row) => computeChoreStatus(row.last_done_at, row.interval_value, row.interval_unit, today).overdue
-      ).length;
+      );
+      const overdueCount = overdueRows.length;
       return overdueCount > 0
-        ? { ready: true, label: `밀린 항목 ${overdueCount}개` }
+        ? { ready: true, label: `밀린 항목 ${overdueCount}개`, overdueIcons: overdueRows.map((row) => row.icon) }
         : { ready: true, label: "전부 완료" };
     },
   },
@@ -38,11 +39,12 @@ export const SECTIONS: Section[] = [
     href: "/supplies",
     getStatus: async () => {
       const today = todayISO();
-      const overdueCount = (await getAllSupplies(getDb())).filter(
+      const overdueRows = (await getAllSupplies(getDb())).filter(
         (row) => computeSupplyStatus(row.last_done_at, row.cycle_days, today).overdue
-      ).length;
+      );
+      const overdueCount = overdueRows.length;
       return overdueCount > 0
-        ? { ready: true, label: `밀린 항목 ${overdueCount}개` }
+        ? { ready: true, label: `밀린 항목 ${overdueCount}개`, overdueIcons: overdueRows.map((row) => row.icon) }
         : { ready: true, label: "전부 완료" };
     },
   },

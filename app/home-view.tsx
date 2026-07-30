@@ -27,10 +27,24 @@ function SectionRow({
         {section.name}
       </span>
       {status.ready ? (
-        // red = needs-attention count (e.g. overdue items); revisit if a
-        // ready section's status isn't a "needs attention" count
-        <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
-          {status.label}
+        <span className="flex items-center gap-2">
+          {status.overdueIcons && status.overdueIcons.length > 0 && (
+            <span className="flex items-center gap-0.5" aria-label="밀린 항목 아이콘">
+              {status.overdueIcons.slice(0, 5).map((icon, index) => (
+                <span key={`${icon}-${index}`} className="text-lg leading-none" title="밀린 항목">
+                  {icon}
+                </span>
+              ))}
+              {status.overdueIcons.length > 5 && (
+                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                  +{status.overdueIcons.length - 5}
+                </span>
+              )}
+            </span>
+          )}
+          <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+            {status.label}
+          </span>
         </span>
       ) : (
         <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
