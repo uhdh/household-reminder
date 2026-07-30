@@ -36,6 +36,7 @@ describe("ChoreGrid rendering", () => {
     expect(screen.getByText("D-3")).toBeDefined();
     expect(screen.getByText("화장실 청소")).toBeDefined();
     expect(screen.getByText("D+7")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "빨래 수정" })).toBeNull();
   });
 
   test("shows an overdue badge only for overdue chores", () => {
@@ -117,34 +118,5 @@ describe("ChoreGrid add flow", () => {
   test("shows an empty-state message when there are no chores", () => {
     render(<ChoreGrid chores={[]} completeAction={vi.fn()} createAction={noop} updateAction={noop} deleteAction={vi.fn()} />);
     expect(screen.getByText("아직 등록된 집안일이 없어요 — + 버튼으로 추가해보세요")).toBeDefined();
-  });
-});
-
-describe("ChoreGrid edit/delete flow", () => {
-  test("the edit button opens a pre-filled form; submitting calls updateAction with the chore's id", async () => {
-    const user = userEvent.setup();
-    const updateAction = vi.fn().mockResolvedValue({});
-    render(
-      <ChoreGrid chores={baseChores} completeAction={vi.fn()} createAction={noop} updateAction={updateAction} deleteAction={vi.fn()} />
-    );
-
-    await user.click(screen.getByRole("button", { name: "빨래 수정" }));
-    expect(screen.getByLabelText("이름")).toHaveProperty("value", "빨래");
-
-    await user.click(screen.getByRole("button", { name: "저장" }));
-    expect(updateAction).toHaveBeenCalledTimes(1);
-    expect(updateAction.mock.calls[0][0]).toBe(1);
-  });
-
-  test("the delete button in the edit form calls deleteAction with the chore's id", async () => {
-    const user = userEvent.setup();
-    const deleteAction = vi.fn().mockResolvedValue(undefined);
-    render(
-      <ChoreGrid chores={baseChores} completeAction={vi.fn()} createAction={noop} updateAction={noop} deleteAction={deleteAction} />
-    );
-
-    await user.click(screen.getByRole("button", { name: "빨래 수정" }));
-    await user.click(screen.getByRole("button", { name: "삭제" }));
-    expect(deleteAction).toHaveBeenCalledWith(1);
   });
 });

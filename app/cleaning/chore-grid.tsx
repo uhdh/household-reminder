@@ -122,32 +122,24 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
     <div>
       {chores.length === 0 && <p>아직 등록된 집안일이 없어요 — + 버튼으로 추가해보세요</p>}
 
-      <ul className="grid grid-cols-3 gap-4 sm:grid-cols-4">
+      <ul className="grid grid-cols-3 gap-2 p-2 sm:grid-cols-4 md:grid-cols-5">
         {chores.map((chore) => (
-          <li key={chore.id} className="relative">
-            <button
-              type="button"
-              aria-label={`${chore.name} 수정`}
-              onClick={() => openEditForm(chore)}
-              className="absolute -left-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-500 text-xs text-white"
-            >
-              ✎
-            </button>
+          <li key={chore.id}>
             <button
               type="button"
               aria-label={`${chore.name} 완료 처리`}
               onClick={() => openCompleteToast(chore)}
-              className="relative flex w-full flex-col items-center gap-1 rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900"
+              className="relative flex w-full flex-col items-center gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-800"
             >
               {chore.status.overdue && (
                 <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white">
                   !
                 </span>
               )}
-              <span className="text-3xl">{chore.icon}</span>
-              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{chore.name}</span>
+              <span className="text-2xl">{chore.icon}</span>
+              <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-50">{chore.name}</span>
               <span className="flex w-full items-center gap-1">
-                <span className="text-[10px] text-zinc-500">{dayLabel(chore.status.daysRemaining)}</span>
+                <span className="text-[9px] text-zinc-500">{dayLabel(chore.status.daysRemaining)}</span>
                 <span className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
                   <span
                     className="block h-full rounded-full"
@@ -166,7 +158,7 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
             type="button"
             aria-label="새로운 집안일 추가"
             onClick={openCreateForm}
-            className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-zinc-300 p-3 text-zinc-400 dark:border-zinc-700"
+            className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-zinc-300 p-2 text-zinc-400 dark:border-zinc-700"
           >
             <span className="text-3xl">+</span>
             <span className="text-sm">추가</span>
