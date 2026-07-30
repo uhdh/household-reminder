@@ -2,6 +2,7 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { getDb } from "@/lib/db";
+import { getEmotionFamilyContext } from "@/lib/emotion-cards-context";
 import { getRecord } from "@/lib/emotion-cards-db";
 import { todayISO } from "@/lib/chores";
 
@@ -9,7 +10,8 @@ export const dynamic = "force-dynamic";
 
 export default async function EmotionCardsPage() {
   const today = todayISO();
-  const submitted = (await getRecord(getDb(), today)) !== undefined;
+  const context = await getEmotionFamilyContext();
+  const submitted = (await getRecord(getDb(), today, context?.familyId, context?.userId)) !== undefined;
   const todayLabel = format(parseISO(today), "M월 d일 EEEE", { locale: ko });
 
   return (

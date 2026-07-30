@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getEmotionFamilyContext } from "@/lib/emotion-cards-context";
 import { getDb } from "@/lib/db";
 import { getRecord, getCustomEmotions } from "@/lib/emotion-cards-db";
 import { todayISO } from "@/lib/chores";
@@ -15,7 +16,8 @@ export default async function SelectPage({
   const { edit } = await searchParams;
   const isEdit = edit === "1";
   const today = todayISO();
-  const existing = await getRecord(getDb(), today);
+  const context = await getEmotionFamilyContext();
+  const existing = await getRecord(getDb(), today, context?.familyId, context?.userId);
 
   if (existing && !isEdit) {
     redirect("/emotion-cards/result");

@@ -3,11 +3,13 @@ import { format, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { getDb } from "@/lib/db";
 import { getAllRecordsDesc } from "@/lib/emotion-cards-db";
+import { getEmotionFamilyContext } from "@/lib/emotion-cards-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function HistoryPage() {
-  const records = await getAllRecordsDesc(getDb());
+  const context = await getEmotionFamilyContext();
+  const records = context ? await getAllRecordsDesc(getDb(), context.familyId) : [];
 
   return (
     <div className="flex-1 bg-zinc-50 dark:bg-black">
@@ -24,6 +26,7 @@ export default async function HistoryPage() {
           >
             <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
               {format(parseISO(record.date), "M월 d일 (EEEEE)", { locale: ko })}
+              <span className="ml-2 text-xs font-normal text-zinc-500">{record.userId === context?.userId ? "나" : "가족"}</span>
             </span>
             <span className="flex gap-1.5">
               {record.cards.map((card, i) => (

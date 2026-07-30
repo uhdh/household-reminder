@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ko } from "date-fns/locale";
 import { getDb } from "@/lib/db";
-import { getRecord } from "@/lib/emotion-cards-db";
+import { getFamilyRecords } from "@/lib/emotion-cards-db";
+import { getEmotionFamilyContext } from "@/lib/emotion-cards-context";
 import { CardsView } from "../../cards-view";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +17,10 @@ export default async function HistoryDetailPage({
   params: Promise<{ date: string }>;
 }) {
   const { date } = await params;
-  const cards = ISO_DATE_RE.test(date) ? await getRecord(getDb(), date) : undefined;
+  const context = await getEmotionFamilyContext();
+  const records = ISO_DATE_RE.test(date) && context ? await getFamilyRecords(getDb(), date, context.familyId) : [];
 
-  if (!cards) {
+  if (records.length === 0) {
     redirect("/emotion-cards/history");
   }
 
@@ -37,7 +39,9 @@ export default async function HistoryDetailPage({
           </Link>
           <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">{dateLabel}</h1>
         </div>
-        <CardsView label="나" cards={cards} />
+        {records.map((record) => (
+          <CardsView key={record.userId ?? "legacy"} label={record.userId === context?.userId ? "나" : "가족"} cards={record.cards} />
+        ))}
       </main>
     </div>
   );

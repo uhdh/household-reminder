@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
+import { getEmotionFamilyContext } from "@/lib/emotion-cards-context";
 import { EMOTIONS, type Emotion } from "@/lib/emotions";
 import {
   getCustomEmotions,
@@ -24,7 +25,8 @@ export async function saveRecord(date: string, emotions: Emotion[]): Promise<{ e
   if (emotions.length !== 3) {
     return { error: "카드를 정확히 3장 선택해주세요." };
   }
-  await saveRecordRow(getDb(), date, emotions);
+  const context = await getEmotionFamilyContext();
+  await saveRecordRow(getDb(), date, emotions, context?.familyId, context?.userId);
   revalidatePath("/emotion-cards");
   revalidatePath("/emotion-cards/history");
   revalidatePath("/");

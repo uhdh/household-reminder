@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
-import { getRecord } from "@/lib/emotion-cards-db";
+import { getFamilyRecords } from "@/lib/emotion-cards-db";
+import { getEmotionFamilyContext } from "@/lib/emotion-cards-context";
 import { todayISO } from "@/lib/chores";
 import { CardsView } from "../cards-view";
 
@@ -9,9 +10,12 @@ export const dynamic = "force-dynamic";
 
 export default async function ResultPage() {
   const today = todayISO();
-  const cards = await getRecord(getDb(), today);
+  const context = await getEmotionFamilyContext();
+  const records = context
+    ? await getFamilyRecords(getDb(), today, context.familyId)
+    : [];
 
-  if (!cards) {
+  if (records.length === 0) {
     redirect("/emotion-cards");
   }
 
@@ -33,7 +37,9 @@ export default async function ResultPage() {
             수정하기
           </Link>
         </div>
-        <CardsView label="나" cards={cards} />
+        {records.map((record) => (
+          <CardsView key={record.userId ?? "legacy"} label={record.userId === context?.userId ? "나" : "가족"} cards={record.cards} />
+        ))}
       </main>
     </div>
   );
