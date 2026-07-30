@@ -84,5 +84,61 @@ export function parseAssetItems(ws: Worksheet): ParsedAssetItem[] {
     }
   }
 
-  return items;
+  const investmentDetails = parseInvestmentDetails(ws);
+  return items.map((item) => {
+    if (item.side !== "asset" || !item.productName) return item;
+    const detail = investmentDetails.get(item.productName);
+    if (!detail) return item;
+    return {
+      ...item,
+      costBasis: detail.costBasis,
+      sector: detail.sector,
+    };
+  });
+}
+
+function parseInvestmentDetails(ws: Worksheet): Map<string, { costBasis: number; sector: string | null }> {
+  let sectionRow: number | null = null;
+  ws.eachRow((row, rowNumber) => {
+    if (sectionRow !== null) return;
+    const values = row.values as unknown[];
+    if (values.some((value) => typeof value === "string" && value.includes("투자현황"))) {
+      sectionRow = rowNumber;
+    }
+  });
+
+  if (sectionRow === null) return new Map();
+
+  let headerRow: number | null = null;
+  for (let r = sectionRow + 1; r <= Math.min(sectionRow + 8, ws.rowCount); r++) {
+    const values = ws.getRow(r).values as unknown[];
+    if (values.some((value) => value === "투자상품종류") && values.some((value) => value === "투자원금")) {
+      headerRow = r;
+      break;
+    }
+  }
+  if (headerRow === null) return new Map();
+
+  const header = ws.getRow(headerRow);
+  const findColumn = (labels: string[], fallback: number) => {
+    for (let c = 1; c <= ws.columnCount; c++) {
+      const value = cellText(header.getCell(c));
+      if (value && labels.some((label) => value === label || value.includes(label))) return c;
+    }
+    return fallback;
+  };
+  const productColumn = findColumn(["상품명"], 4);
+  const costBasisColumn = findColumn(["투자원금"], 6);
+  const valueColumn = findColumn(["평가금액"], 7);
+  const details = new Map<string, { costBasis: number; sector: string | null }>();
+
+  for (let r = headerRow + 1; r <= ws.rowCount; r++) {
+    const row = ws.getRow(r);
+    const productName = cellText(row.getCell(productColumn));
+    const costBasis = cellNumber(row.getCell(costBasisColumn));
+    const value = cellNumber(row.getCell(valueColumn));
+    if (!productName || costBasis === null || value === null || productName === "총계") break;
+    details.set(productName, { costBasis, sector: null });
+  }
+  return details;
 }
