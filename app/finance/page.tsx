@@ -32,6 +32,14 @@ function displayAssetCategory(category: string) {
   return CATEGORY_DISPLAY_OVERRIDES[category] ?? category;
 }
 
+function isCashLikeAsset(item: { category: string; productName: string | null; sector?: string | null }) {
+  const category = displayAssetCategory(item.category);
+  if (category === "현금" || item.sector === "현금성") return true;
+
+  const productName = item.productName ?? "";
+  return /(CMA|MMF|입출금|보통예금|요구불|파킹통장)/i.test(productName);
+}
+
 function isExcludedItem(item: { side: string; personId: string; category: string; productName: string | null }) {
   if (item.side === "asset") return EXCLUDED_ASSET_CATEGORIES.has(item.category);
   return EXCLUDED_DEBT_ITEMS.some((e) => e.personId === item.personId && e.productName === item.productName);
@@ -107,7 +115,7 @@ export default async function DashboardPage({
   for (const item of filteredAssets) {
     if (item.side !== "asset") continue;
     const amt = toNumber(item.amount);
-    const cat = displayAssetCategory(item.category);
+    const cat = isCashLikeAsset(item) ? "현금" : displayAssetCategory(item.category);
     assetCategoryTotals.set(cat, (assetCategoryTotals.get(cat) ?? 0) + amt);
   }
   const assetCategoryOrder = Array.from(assetCategoryTotals.entries())
@@ -158,7 +166,7 @@ export default async function DashboardPage({
     if (item.side !== "asset") continue;
     const amt = toNumber(item.amount);
     if (amt <= 0) continue;
-    const cat = displayAssetCategory(item.category);
+    const cat = isCashLikeAsset(item) ? "현금" : displayAssetCategory(item.category);
     if (TREEMAP_AGGREGATED_CATEGORIES.has(cat)) {
       treemapAggregatedTotals.set(cat, (treemapAggregatedTotals.get(cat) ?? 0) + amt);
     } else {
