@@ -7,10 +7,10 @@ type CategoryDatum = { name: string; value: number; fill: string };
 type TreemapDatum = { name: string; value: number; fill: string; returnPct: number | null; sharePct: number };
 
 const TOOLTIP_STYLE = {
-  backgroundColor: "#FFFFFF",
-  border: "1px solid #E1E0D9",
+  backgroundColor: "var(--finance-card)",
+  border: "1px solid var(--finance-hairline)",
   borderRadius: 2,
-  color: "#0B0B0B",
+  color: "var(--finance-ink)",
   fontSize: 12,
 };
 
@@ -119,12 +119,11 @@ function HeatmapCell(props: unknown) {
   const label = truncateToWidth(name, width - padding * 2);
   const returnLabel =
     returnPct === null || returnPct === undefined
-      ? formatKRW(value)
+      ? ""
       : `${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(1)}%`;
-  const subLabel = `면적 비중 ${sharePct.toFixed(0)}%`;
-  const detailLabel = `${subLabel} · ${returnLabel}`;
-  const showLabel = width > 40 && height > 22 && label.length > 0;
-  const showValue = showLabel && height > 42 && width > 60;
+  const detailLabel = `${sharePct.toFixed(0)}%${returnLabel ? ` · ${returnLabel}` : ""}`;
+  const showLabel = width > 32 && height > 18 && label.length > 0;
+  const showValue = showLabel && height > 30 && width > 35;
   const textHaloProps = {
     stroke: haloColor,
     strokeWidth: 3,
@@ -133,7 +132,8 @@ function HeatmapCell(props: unknown) {
   };
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} style={{ fill, stroke: "#FAFAF9", strokeWidth: 2 }} />
+      <rect x={x} y={y} width={width} height={height} style={{ fill, stroke: "var(--finance-canvas)", strokeWidth: 2 }} />
+      <title>{`${name} · ${sharePct.toFixed(0)}%${returnLabel ? ` · 수익률 ${returnLabel}` : ""}`}</title>
       <clipPath id={clipId}>
         <rect x={x} y={y} width={width} height={height} />
       </clipPath>
@@ -180,7 +180,7 @@ function HeatmapCard({ data }: { data: TreemapDatum[] }) {
         <p className="text-[13px] text-ink-muted">자산 데이터가 없습니다.</p>
       ) : (
         <ResponsiveContainer width="100%" height={340}>
-          <Treemap data={data} dataKey="value" aspectRatio={4 / 3} stroke="#FAFAF9" content={<HeatmapCell />} />
+          <Treemap data={data} dataKey="value" aspectRatio={4 / 3} stroke="var(--finance-canvas)" content={<HeatmapCell />} />
         </ResponsiveContainer>
       )}
     </div>

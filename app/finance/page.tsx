@@ -153,6 +153,7 @@ export default async function DashboardPage({
   const TREEMAP_AGGREGATED_CATEGORIES = new Set(["현금", "예적금"]);
   const treemapAggregatedTotals = new Map<string, number>();
   const treemapDetailItems: { name: string; value: number; fill: string; returnPct: number | null; sharePct: number }[] = [];
+  const treemapByProduct = new Map<string, { name: string; value: number; costBasis: number | null }>();
   for (const item of filteredAssets) {
     if (item.side !== "asset") continue;
     const amt = toNumber(item.amount);
@@ -162,15 +163,27 @@ export default async function DashboardPage({
       treemapAggregatedTotals.set(cat, (treemapAggregatedTotals.get(cat) ?? 0) + amt);
     } else {
       const costBasis = item.costBasis !== null ? toNumber(item.costBasis) : null;
-      const returnPct = costBasis !== null && costBasis !== 0 ? ((amt - costBasis) / costBasis) * 100 : null;
-      treemapDetailItems.push({
-        name: item.productName || item.category,
-        value: amt,
-        fill: heatmapReturnColor(returnPct),
-        returnPct,
-        sharePct: totalAsset > 0 ? (amt / totalAsset) * 100 : 0,
+      const key = item.productName || item.category;
+      const existing = treemapByProduct.get(key);
+      treemapByProduct.set(key, {
+        name: key,
+        value: (existing?.value ?? 0) + amt,
+        costBasis:
+          existing?.costBasis !== null && existing?.costBasis !== undefined && costBasis !== null
+            ? existing.costBasis + costBasis
+            : existing?.costBasis ?? costBasis,
       });
     }
+  }
+  for (const item of treemapByProduct.values()) {
+    const returnPct = item.costBasis !== null && item.costBasis !== 0 ? ((item.value - item.costBasis) / item.costBasis) * 100 : null;
+    treemapDetailItems.push({
+      name: item.name,
+      value: item.value,
+      fill: heatmapReturnColor(returnPct),
+      returnPct,
+      sharePct: totalAsset > 0 ? (item.value / totalAsset) * 100 : 0,
+    });
   }
   const rawTreemapItems = [
     ...Array.from(treemapAggregatedTotals.entries()).map(([name, value]) => ({
@@ -197,23 +210,34 @@ export default async function DashboardPage({
         ]
       : rawTreemapItems;
 
-  const investmentItems = filteredAssets
-    .filter((item) => item.side === "asset" && item.costBasis !== null)
-    .map((item) => {
-      const costBasis = toNumber(item.costBasis!);
-      const value = toNumber(item.amount);
-      const gain = value - costBasis;
+  const investmentByProduct = new Map<string, { id: string; productName: string; personLabel: string; sector: string | null; costBasis: number; value: number }>();
+  for (const item of filteredAssets.filter((item) => item.side === "asset" && item.costBasis !== null)) {
+    const costBasis = toNumber(item.costBasis!);
+    const value = toNumber(item.amount);
+    const productName = item.productName ?? item.category;
+    const existing = investmentByProduct.get(productName);
+    investmentByProduct.set(productName, {
+      id: existing?.id ?? item.id,
+      productName,
+      personLabel: existing ? "공동" : (
+        displayNameByPerson.get(item.personId) ?? PERSON_LABELS[item.personId as PersonId] ?? item.personId
+      ).charAt(0),
+      sector: existing?.sector ?? item.sector,
+      costBasis: (existing?.costBasis ?? 0) + costBasis,
+      value: (existing?.value ?? 0) + value,
+    });
+  }
+  const investmentItems = Array.from(investmentByProduct.values()).map((item) => {
+      const gain = item.value - item.costBasis;
       return {
         id: item.id,
-        productName: item.productName ?? item.category,
-        personLabel: (
-          displayNameByPerson.get(item.personId) ?? PERSON_LABELS[item.personId as PersonId] ?? item.personId
-        ).charAt(0),
+        productName: item.productName,
+        personLabel: item.personLabel,
         sector: item.sector,
-        costBasis,
-        value,
+        costBasis: item.costBasis,
+        value: item.value,
         gain,
-        gainPct: costBasis !== 0 ? (gain / costBasis) * 100 : 0,
+        gainPct: item.costBasis !== 0 ? (gain / item.costBasis) * 100 : 0,
       };
     })
     .sort((a, b) => b.gain - a.gain);
