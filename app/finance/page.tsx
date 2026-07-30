@@ -248,7 +248,7 @@ export default async function DashboardPage({
         gainPct: item.costBasis !== 0 ? (gain / item.costBasis) * 100 : 0,
       };
     })
-    .sort((a, b) => b.gain - a.gain);
+    .sort((a, b) => b.value - a.value);
 
   const investmentTotals = investmentItems.reduce(
     (acc, i) => ({ costBasis: acc.costBasis + i.costBasis, value: acc.value + i.value }),
@@ -512,7 +512,7 @@ function InvestmentPnlCard({
           </p>
         </div>
         <div>
-          <p className="text-[11px] font-semibold text-ink-muted">평가손익</p>
+          <p className="text-[11px] font-semibold text-ink-muted">손익금액</p>
           <p className="text-[16px] font-bold">
             <GainText amount={totalGain}>
               <AnimatedNumber value={totalGain} format="signedKrw" />
