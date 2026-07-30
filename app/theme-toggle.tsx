@@ -32,7 +32,7 @@ export function ThemeToggle() {
       onClick={() => setTheme(nextTheme)}
       aria-label={`${nextTheme === "dark" ? "다크" : "라이트"} 모드로 변경`}
       title={`${nextTheme === "dark" ? "다크" : "라이트"} 모드`}
-      className="fixed right-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white/90 text-lg shadow-sm backdrop-blur transition hover:scale-105 dark:border-zinc-700 dark:bg-zinc-900/90"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white/90 text-base shadow-sm backdrop-blur transition hover:scale-105 sm:h-10 sm:w-10 sm:text-lg dark:border-zinc-700 dark:bg-zinc-900/90"
     >
       {theme === "dark" ? "☀️" : "🌙"}
     </button>
