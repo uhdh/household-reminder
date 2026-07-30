@@ -50,7 +50,7 @@ export const SECTIONS: Section[] = [
     id: "emotion-cards",
     name: "감정카드",
     icon: "💌",
-    href: "/emotion-cards",
+    href: "/emotion-cards/select",
     getStatus: async () => {
       const hasToday = (await getRecord(getDb(), todayISO())) !== undefined;
       return hasToday
