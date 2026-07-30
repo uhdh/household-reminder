@@ -1,6 +1,6 @@
 import type { Worksheet } from "exceljs";
 import { cellNumber, cellText } from "./excel-utils";
-import type { ParsedAssetItem } from "./types";
+import type { ParsedAssetItem, ParsedInvestmentDetail } from "./types";
 
 /**
  * "뱅샐현황" 시트는 병합 셀 기반 리포트라 고정 행 번호 대신
@@ -97,7 +97,7 @@ export function parseAssetItems(ws: Worksheet): ParsedAssetItem[] {
   });
 }
 
-function parseInvestmentDetails(ws: Worksheet): Map<string, { costBasis: number; sector: string | null }> {
+export function parseInvestmentDetails(ws: Worksheet): Map<string, { costBasis: number; sector: string | null }> {
   let sectionRow: number | null = null;
   ws.eachRow((row, rowNumber) => {
     if (sectionRow !== null) return;
@@ -139,6 +139,68 @@ function parseInvestmentDetails(ws: Worksheet): Map<string, { costBasis: number;
     const value = cellNumber(row.getCell(valueColumn));
     if (!productName || costBasis === null || value === null || productName === "총계") break;
     details.set(productName, { costBasis, sector: null });
+  }
+  return details;
+}
+
+export function parseInvestmentInputDetails(
+  ws: Worksheet,
+  owner: string,
+): Map<string, ParsedInvestmentDetail> {
+  let headerRow: number | null = null;
+  for (let r = 1; r <= Math.min(ws.rowCount, 10); r++) {
+    const values = Array.from({ length: ws.columnCount }, (_, index) => cellText(ws.getRow(r).getCell(index + 1)));
+    if (
+      values.includes("기준월") &&
+      values.includes("소유자") &&
+      values.includes("상품명") &&
+      values.includes("투자원금") &&
+      values.includes("섹터")
+    ) {
+      headerRow = r;
+      break;
+    }
+  }
+  if (headerRow === null) return new Map();
+
+  const header = ws.getRow(headerRow);
+  const findColumn = (label: string) => {
+    for (let c = 1; c <= ws.columnCount; c++) {
+      if (cellText(header.getCell(c)) === label) return c;
+    }
+    return -1;
+  };
+  const periodColumn = findColumn("기준월");
+  const ownerColumn = findColumn("소유자");
+  const productColumn = findColumn("상품명");
+  const costBasisColumn = findColumn("투자원금");
+  const valueColumn = findColumn("평가금액");
+  const sectorColumn = findColumn("섹터");
+  if ([periodColumn, ownerColumn, productColumn, costBasisColumn, valueColumn, sectorColumn].some((c) => c < 1)) {
+    return new Map();
+  }
+
+  const rows: { period: string; productName: string; costBasis: number; value: number; sector: string | null }[] = [];
+  for (let r = headerRow + 1; r <= ws.rowCount; r++) {
+    const row = ws.getRow(r);
+    const rowOwner = cellText(row.getCell(ownerColumn));
+    const period = cellText(row.getCell(periodColumn));
+    const productName = cellText(row.getCell(productColumn));
+    const costBasis = cellNumber(row.getCell(costBasisColumn));
+    const value = cellNumber(row.getCell(valueColumn));
+    if (rowOwner !== owner || !period || !productName || costBasis === null || value === null) continue;
+    rows.push({ period, productName, costBasis, value, sector: cellText(row.getCell(sectorColumn)) });
+  }
+  const latestPeriod = rows.reduce((latest, row) => (row.period > latest ? row.period : latest), "");
+  const details = new Map<string, ParsedInvestmentDetail>();
+  for (const row of rows.filter((item) => item.period === latestPeriod)) {
+    const existing = details.get(row.productName);
+    details.set(row.productName, {
+      productName: row.productName,
+      costBasis: (existing?.costBasis ?? 0) + row.costBasis,
+      value: (existing?.value ?? 0) + row.value,
+      sector: existing?.sector ?? row.sector,
+    });
   }
   return details;
 }

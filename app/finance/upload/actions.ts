@@ -43,7 +43,7 @@ export async function uploadAction(formData: FormData) {
   let parsed: ParsedUpload;
   try {
     const buffer = await file.arrayBuffer();
-    parsed = await parseUploadFile(buffer, file.name);
+    parsed = await parseUploadFile(buffer, file.name, personId);
   } catch (e) {
     const message =
       e instanceof Error ? e.message : "파일을 처리하는 중 오류가 발생했습니다.";

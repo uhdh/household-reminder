@@ -25,3 +25,10 @@ export type ParsedUpload = {
   assetItems: ParsedAssetItem[];
   transactions: ParsedTransaction[];
 };
+
+export type ParsedInvestmentDetail = {
+  productName: string;
+  costBasis: number;
+  value: number;
+  sector: string | null;
+};

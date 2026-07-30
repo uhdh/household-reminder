@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { parseAssetItems, parseCustomerName } from "./bank-status";
+import { parseAssetItems, parseCustomerName, parseInvestmentInputDetails } from "./bank-status";
 import { parseTransactions } from "./ledger";
 import type { ParsedUpload } from "./types";
 
@@ -9,14 +9,22 @@ const FILENAME_PERIOD_RE = /(\d{4}-\d{2}-\d{2})~(\d{4}-\d{2}-\d{2})/;
 
 export async function parseUploadFile(
   buffer: ArrayBuffer,
-  filename: string
+  filename: string,
+  personId?: "husband" | "wife",
 ): Promise<ParsedUpload> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
 
-  const statusSheet = workbook.getWorksheet("뱅샐현황");
+  const ownerSheetHint = personId === "husband" ? "_본인_원본" : personId === "wife" ? "_배우자_원본" : null;
+  const statusSheet =
+    workbook.getWorksheet("뱅샐현황") ??
+    (ownerSheetHint
+      ? workbook.worksheets.find((sheet) => sheet.name.includes(ownerSheetHint))
+      : undefined) ??
+    workbook.worksheets.find((sheet) => sheet.name.endsWith("_원본"));
   const ledgerSheet = workbook.getWorksheet("가계부 내역");
-  if (!statusSheet || !ledgerSheet) {
+  const investmentInputSheet = workbook.getWorksheet("투자 입력 DB");
+  if (!statusSheet || (!ledgerSheet && !investmentInputSheet)) {
     throw new Error(
       "엑셀 파일에서 '뱅샐현황' 또는 '가계부 내역' 시트를 찾을 수 없습니다. 뱅크샐러드에서 내보낸 파일이 맞는지 확인해 주세요."
     );
@@ -24,7 +32,20 @@ export async function parseUploadFile(
 
   const customerName = parseCustomerName(statusSheet);
   const assetItems = parseAssetItems(statusSheet);
-  const transactions = parseTransactions(ledgerSheet);
+  const transactions = ledgerSheet ? parseTransactions(ledgerSheet) : [];
+
+  if (investmentInputSheet && personId) {
+    const owner = personId === "husband" ? "본인" : "배우자";
+    const details = parseInvestmentInputDetails(investmentInputSheet, owner);
+    for (const item of assetItems) {
+      if (item.side !== "asset" || !item.productName) continue;
+      const detail = details.get(item.productName);
+      if (detail) {
+        item.costBasis = detail.costBasis;
+        item.sector = detail.sector;
+      }
+    }
+  }
 
   const nameMatch = filename.match(FILENAME_PERIOD_RE);
   let periodStart = nameMatch ? nameMatch[1] : null;
