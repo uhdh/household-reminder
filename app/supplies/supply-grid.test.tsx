@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SupplyGrid, type SupplyViewModel } from "./supply-grid";
 
@@ -21,10 +21,8 @@ const baseSupplies: SupplyViewModel[] = [
 ];
 
 describe("SupplyGrid rendering", () => {
-  test("renders every supply's name, icon, and D-day label under its own category column", () => {
+  test("renders every supply's name, icon, and D-day label in one grid", () => {
     render(<SupplyGrid supplies={baseSupplies} completeAction={vi.fn()} />);
-    expect(screen.getByText("욕실용품")).toBeDefined();
-    expect(screen.getByText("주방용품")).toBeDefined();
     expect(screen.getByText("칫솔")).toBeDefined();
     expect(screen.getByText("🪥")).toBeDefined();
     expect(screen.getByText("D-3")).toBeDefined();
@@ -39,14 +37,9 @@ describe("SupplyGrid rendering", () => {
     expect(cards[1].textContent).toContain("!");
   });
 
-  test("renders each supply under its own category column, not just anywhere on the page", () => {
+  test("uses three columns on mobile", () => {
     render(<SupplyGrid supplies={baseSupplies} completeAction={vi.fn()} />);
-    const bathroomSection = screen.getByText("욕실용품").closest("section")!;
-    const kitchenSection = screen.getByText("주방용품").closest("section")!;
-    expect(within(bathroomSection).getByText("칫솔")).toBeDefined();
-    expect(within(kitchenSection).getByText("고무장갑")).toBeDefined();
-    expect(within(bathroomSection).queryByText("고무장갑")).toBeNull();
-    expect(within(kitchenSection).queryByText("칫솔")).toBeNull();
+    expect(screen.getByRole("list").className).toContain("grid-cols-3");
   });
 });
 

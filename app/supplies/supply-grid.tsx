@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SUPPLY_CATEGORIES, type SupplyCategory, type SupplyStatus } from "@/lib/supplies";
+import type { SupplyCategory, SupplyStatus } from "@/lib/supplies";
 import { todayISO } from "@/lib/chores";
 
 export type SupplyViewModel = {
@@ -62,22 +62,9 @@ export function SupplyGrid({ supplies, completeAction }: Props) {
 
   return (
     <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        {SUPPLY_CATEGORIES.map((category) => (
-          <section
-            key={category.id}
-            className="flex-1 overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-zinc-900"
-          >
-            <h2
-              className="p-2 text-center text-sm font-bold text-white"
-              style={{ background: category.color }}
-            >
-              {category.label}
-            </h2>
-            <ul className="grid grid-cols-2 gap-2 p-2">
-              {supplies
-                .filter((s) => s.category === category.id)
-                .map((supply) => (
+      <section className="rounded-2xl bg-white p-2 shadow-sm dark:bg-zinc-900">
+        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+          {supplies.map((supply) => (
                   <li key={supply.id}>
                     <button
                       type="button"
@@ -110,11 +97,9 @@ export function SupplyGrid({ supplies, completeAction }: Props) {
                       </span>
                     </button>
                   </li>
-                ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+          ))}
+        </ul>
+      </section>
 
       {completingSupply && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
