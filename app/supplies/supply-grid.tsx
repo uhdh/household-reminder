@@ -117,7 +117,8 @@ export function SupplyGrid({ supplies, completeAction }: Props) {
       </div>
 
       {completingSupply && (
-        <div className="fixed inset-x-0 bottom-6 mx-auto flex w-full max-w-xs flex-col gap-2 rounded-xl bg-zinc-900 p-4 text-white shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-3xl bg-white p-5 text-zinc-900 shadow-2xl dark:bg-zinc-900 dark:text-white">
           <p>{completingSupply.name} 교체(관리) 완료로 표시할까요?</p>
           {completeError && <p className="text-sm text-red-400">{completeError}</p>}
           <label>
@@ -126,21 +127,22 @@ export function SupplyGrid({ supplies, completeAction }: Props) {
               type="date"
               value={doneDate}
               onChange={(e) => setDoneDate(e.target.value)}
-              className="ml-2 rounded bg-zinc-800 px-1 text-white"
+              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
             />
           </label>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={closeToast} disabled={isCompleting}>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button type="button" onClick={closeToast} disabled={isCompleting} className="rounded-xl border border-zinc-200 px-3 py-2.5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
               취소
             </button>
             <button
               type="button"
               onClick={confirmComplete}
               disabled={isCompleting || !doneDate}
-              className="font-semibold text-blue-400 disabled:opacity-50"
+              className="rounded-xl bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
             >
               완료로 표시
             </button>
+          </div>
           </div>
         </div>
       )}
