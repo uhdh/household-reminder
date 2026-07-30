@@ -10,10 +10,23 @@ export default defineConfig({
     "./lib/supplies-db.ts",
     "./lib/emotion-cards-db.ts",
     "./lib/family-db.ts",
+    "./lib/finance-db.ts",
   ],
   // This Neon project also contains the finance app's tables. Only manage
   // the tables owned by this app when running `drizzle-kit push`.
-  tablesFilter: ["chores", "supplies", "custom_emotions", "emotion_records", "families", "family_members"],
+  tablesFilter: [
+    "chores",
+    "supplies",
+    "custom_emotions",
+    "emotion_records",
+    "families",
+    "family_members",
+    "people",
+    "uploads",
+    "asset_items",
+    "allocation_targets",
+    "transactions",
+  ],
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL!,

@@ -60,9 +60,9 @@ export const SECTIONS: Section[] = [
   },
   {
     id: "budget",
-    name: "가계부",
+    name: "자산관리",
     icon: "💰",
-    href: "https://couple-finance-dusky.vercel.app",
+    href: "/finance",
     getStatus: async () => ({ ready: true, label: "바로가기" }),
   },
 ];

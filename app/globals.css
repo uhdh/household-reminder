@@ -12,6 +12,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-office: Arial, Helvetica, sans-serif;
+  --color-canvas: #fafaf9;
+  --color-card: #ffffff;
+  --color-ink: #0b0b0b;
+  --color-ink-muted: #6b6b65;
+  --color-hairline: #e1e0d9;
+  --color-hairline2: #d7d6cf;
+  --color-legend1: #1f5f46;
+  --color-gain: #c43d3d;
+  --color-husband: #4f46e5;
+  --color-wife: #db2777;
 }
 
 html.dark {
