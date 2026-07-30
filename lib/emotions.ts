@@ -58,12 +58,12 @@ export const EMOTIONS: Emotion[] = [
 ];
 
 export const COLORS: Record<EmotionColor, { bg: string; border: string; text: string }> = {
-  green: { bg: "#E8F1EA", border: "#8FB89D", text: "#3F6B4C" },
-  pink: { bg: "#FCE9F1", border: "#E38FBC", text: "#A03D72" },
-  blue: { bg: "#E9F1F7", border: "#8FB0D1", text: "#3F5F7C" },
-  red: { bg: "#FCEAE0", border: "#DE8A63", text: "#95452A" },
-  yellow: { bg: "#FBF3E1", border: "#DDB463", text: "#8C6A2C" },
-  purple: { bg: "#F0EBF3", border: "#B29CC0", text: "#6B4F7A" },
+  green: { bg: "var(--emotion-green-bg)", border: "var(--emotion-green-border)", text: "var(--emotion-green-text)" },
+  pink: { bg: "var(--emotion-pink-bg)", border: "var(--emotion-pink-border)", text: "var(--emotion-pink-text)" },
+  blue: { bg: "var(--emotion-blue-bg)", border: "var(--emotion-blue-border)", text: "var(--emotion-blue-text)" },
+  red: { bg: "var(--emotion-red-bg)", border: "var(--emotion-red-border)", text: "var(--emotion-red-text)" },
+  yellow: { bg: "var(--emotion-yellow-bg)", border: "var(--emotion-yellow-border)", text: "var(--emotion-yellow-text)" },
+  purple: { bg: "var(--emotion-purple-bg)", border: "var(--emotion-purple-border)", text: "var(--emotion-purple-text)" },
 };
 
 export const DEFINITIONS: Record<string, string> = {

@@ -5,6 +5,30 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --finance-canvas: #fafaf9;
+  --finance-card: #ffffff;
+  --finance-ink: #0b0b0b;
+  --finance-ink-muted: #6b6b65;
+  --finance-hairline: #e1e0d9;
+  --finance-hairline2: #d7d6cf;
+  --emotion-green-bg: #e8f1ea;
+  --emotion-green-border: #8fb89d;
+  --emotion-green-text: #3f6b4c;
+  --emotion-pink-bg: #fce9f1;
+  --emotion-pink-border: #e38fbc;
+  --emotion-pink-text: #a03d72;
+  --emotion-blue-bg: #e9f1f7;
+  --emotion-blue-border: #8fb0d1;
+  --emotion-blue-text: #3f5f7c;
+  --emotion-red-bg: #fceae0;
+  --emotion-red-border: #de8a63;
+  --emotion-red-text: #95452a;
+  --emotion-yellow-bg: #fbf3e1;
+  --emotion-yellow-border: #ddb463;
+  --emotion-yellow-text: #8c6a2c;
+  --emotion-purple-bg: #f0ebf3;
+  --emotion-purple-border: #b29cc0;
+  --emotion-purple-text: #6b4f7a;
 }
 
 @theme inline {
@@ -13,12 +37,12 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-office: Arial, Helvetica, sans-serif;
-  --color-canvas: #fafaf9;
-  --color-card: #ffffff;
-  --color-ink: #0b0b0b;
-  --color-ink-muted: #6b6b65;
-  --color-hairline: #e1e0d9;
-  --color-hairline2: #d7d6cf;
+  --color-canvas: var(--finance-canvas);
+  --color-card: var(--finance-card);
+  --color-ink: var(--finance-ink);
+  --color-ink-muted: var(--finance-ink-muted);
+  --color-hairline: var(--finance-hairline);
+  --color-hairline2: var(--finance-hairline2);
   --color-legend1: #1f5f46;
   --color-gain: #c43d3d;
   --color-husband: #4f46e5;
@@ -28,6 +52,30 @@
 html.dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --finance-canvas: #111111;
+  --finance-card: #1c1c1c;
+  --finance-ink: #f5f5f5;
+  --finance-ink-muted: #a3a3a3;
+  --finance-hairline: #3a3a3a;
+  --finance-hairline2: #4a4a4a;
+  --emotion-green-bg: #193323;
+  --emotion-green-border: #75b88a;
+  --emotion-green-text: #b9e8c5;
+  --emotion-pink-bg: #3b1d2d;
+  --emotion-pink-border: #e38fbc;
+  --emotion-pink-text: #ffc1df;
+  --emotion-blue-bg: #1d2d3b;
+  --emotion-blue-border: #8fb0d1;
+  --emotion-blue-text: #c1ddf5;
+  --emotion-red-bg: #3c241b;
+  --emotion-red-border: #de8a63;
+  --emotion-red-text: #ffc5a8;
+  --emotion-yellow-bg: #3b301b;
+  --emotion-yellow-border: #ddb463;
+  --emotion-yellow-text: #ffe3a1;
+  --emotion-purple-bg: #30243a;
+  --emotion-purple-border: #b29cc0;
+  --emotion-purple-text: #e0c9ee;
 }
 
 body {
