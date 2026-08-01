@@ -7,6 +7,7 @@ import { buildCategoryColorMap, formatKRW, heatmapReturnColor, toNumber } from "
 import { AnimatedNumber } from "./_components/animated-number";
 import { DashboardCharts } from "./_components/charts";
 import { TargetAllocationCard } from "./_components/target-allocation";
+import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -223,8 +224,9 @@ export default async function DashboardPage({
     const costBasis = toNumber(item.costBasis!);
     const value = toNumber(item.amount);
     const productName = item.productName ?? item.category;
-    const existing = investmentByProduct.get(productName);
-    investmentByProduct.set(productName, {
+    const productKey = normalizeInvestmentProductName(productName);
+    const existing = investmentByProduct.get(productKey);
+    investmentByProduct.set(productKey, {
       id: existing?.id ?? item.id,
       productName,
       personLabel: existing ? "공동" : (

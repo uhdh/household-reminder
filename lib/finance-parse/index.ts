@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { parseAssetItems, parseCustomerName, parseInvestmentInputDetails } from "./bank-status";
 import { parseTransactions } from "./ledger";
+import { normalizeInvestmentProductName } from "./investment-utils";
 import type { ParsedUpload } from "./types";
 
 export * from "./types";
@@ -40,12 +41,13 @@ export async function parseUploadFile(
     const costBasisApplied = new Set<string>();
     for (const item of assetItems) {
       if (item.side !== "asset" || !item.productName) continue;
-      const detail = details.get(item.productName);
+      const productKey = normalizeInvestmentProductName(item.productName);
+      const detail = details.get(productKey);
       if (detail) {
         // 재무현황에는 같은 종목이 계좌별로 여러 행에 있을 수 있다.
         // 투자 입력 DB에서 이미 계좌별 투자원금을 합산했으므로 한 번만 붙여야 한다.
-        item.costBasis = costBasisApplied.has(item.productName) ? 0 : detail.costBasis;
-        costBasisApplied.add(item.productName);
+        item.costBasis = costBasisApplied.has(productKey) ? 0 : detail.costBasis;
+        costBasisApplied.add(productKey);
         item.sector = detail.sector;
       }
     }

@@ -1,5 +1,6 @@
 import type { Worksheet } from "exceljs";
 import { cellNumber, cellText } from "./excel-utils";
+import { normalizeInvestmentProductName } from "./investment-utils";
 import type { ParsedAssetItem, ParsedInvestmentDetail } from "./types";
 
 /**
@@ -85,13 +86,17 @@ export function parseAssetItems(ws: Worksheet): ParsedAssetItem[] {
   }
 
   const investmentDetails = parseInvestmentDetails(ws);
+  const costBasisApplied = new Set<string>();
   return items.map((item) => {
     if (item.side !== "asset" || !item.productName) return item;
-    const detail = investmentDetails.get(item.productName);
+    const productKey = normalizeInvestmentProductName(item.productName);
+    const detail = investmentDetails.get(productKey);
     if (!detail) return item;
+    const costBasis = costBasisApplied.has(productKey) ? 0 : detail.costBasis;
+    costBasisApplied.add(productKey);
     return {
       ...item,
-      costBasis: detail.costBasis,
+      costBasis,
       sector: detail.sector,
     };
   });
@@ -138,7 +143,12 @@ export function parseInvestmentDetails(ws: Worksheet): Map<string, { costBasis: 
     const costBasis = cellNumber(row.getCell(costBasisColumn));
     const value = cellNumber(row.getCell(valueColumn));
     if (!productName || costBasis === null || value === null || productName === "총계") break;
-    details.set(productName, { costBasis, sector: null });
+    const productKey = normalizeInvestmentProductName(productName);
+    const existing = details.get(productKey);
+    details.set(productKey, {
+      costBasis: (existing?.costBasis ?? 0) + costBasis,
+      sector: existing?.sector ?? null,
+    });
   }
   return details;
 }
@@ -194,9 +204,10 @@ export function parseInvestmentInputDetails(
   const latestPeriod = rows.reduce((latest, row) => (row.period > latest ? row.period : latest), "");
   const details = new Map<string, ParsedInvestmentDetail>();
   for (const row of rows.filter((item) => item.period === latestPeriod)) {
-    const existing = details.get(row.productName);
-    details.set(row.productName, {
-      productName: row.productName,
+    const productKey = normalizeInvestmentProductName(row.productName);
+    const existing = details.get(productKey);
+    details.set(productKey, {
+      productName: existing?.productName ?? row.productName,
       costBasis: (existing?.costBasis ?? 0) + row.costBasis,
       value: (existing?.value ?? 0) + row.value,
       sector: existing?.sector ?? row.sector,
