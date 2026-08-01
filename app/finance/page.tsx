@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { allocationTargets, assetItems, people, uploads } from "@/lib/finance-db";
+import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
 import { buildCategoryColorMap, formatKRW, heatmapReturnColor, toNumber } from "@/lib/finance-format";
 import { AnimatedNumber } from "./_components/animated-number";
 import { DashboardCharts } from "./_components/charts";
@@ -232,7 +233,7 @@ export default async function DashboardPage({
       personLabel: existing ? "공동" : (
         displayNameByPerson.get(item.personId) ?? PERSON_LABELS[item.personId as PersonId] ?? item.personId
       ).charAt(0),
-      sector: existing?.sector ?? item.sector,
+      sector: existing?.sector ?? item.sector ?? classifyInvestmentSector(productName),
       costBasis: (existing?.costBasis ?? 0) + costBasis,
       value: (existing?.value ?? 0) + value,
     });

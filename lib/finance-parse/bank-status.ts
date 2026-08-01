@@ -1,5 +1,6 @@
 import type { Worksheet } from "exceljs";
 import { cellNumber, cellText } from "./excel-utils";
+import { classifyInvestmentSector } from "./investment-sector";
 import { normalizeInvestmentProductName } from "./investment-utils";
 import type { ParsedAssetItem, ParsedInvestmentDetail } from "./types";
 
@@ -97,7 +98,7 @@ export function parseAssetItems(ws: Worksheet): ParsedAssetItem[] {
     return {
       ...item,
       costBasis,
-      sector: detail.sector,
+      sector: detail.sector ?? classifyInvestmentSector(item.productName),
     };
   });
 }

@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { parseAssetItems, parseCustomerName, parseInvestmentInputDetails } from "./bank-status";
+import { classifyInvestmentSector } from "./investment-sector";
 import { parseTransactions } from "./ledger";
 import { normalizeInvestmentProductName } from "./investment-utils";
 import type { ParsedUpload } from "./types";
@@ -48,7 +49,7 @@ export async function parseUploadFile(
         // 투자 입력 DB에서 이미 계좌별 투자원금을 합산했으므로 한 번만 붙여야 한다.
         item.costBasis = costBasisApplied.has(productKey) ? 0 : detail.costBasis;
         costBasisApplied.add(productKey);
-        item.sector = detail.sector;
+        item.sector = detail.sector ?? classifyInvestmentSector(item.productName);
       }
     }
   }
