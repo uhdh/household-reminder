@@ -7,6 +7,7 @@ import {
   time,
   boolean,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 export const people = pgTable("people", {
@@ -60,4 +61,31 @@ export const transactions = pgTable("transactions", {
   description: text("description"),
   amount: numeric("amount", { precision: 18, scale: 2 }).notNull(),
   paymentMethod: text("payment_method"),
+  // 아래는 원본 뱅크샐러드 내보내기에는 없는, "우리집 자산흐름" 정리 과정에서 계산해 보강하는 파생 필드
+  stdCategory: text("std_category"), // 카테고리매핑을 통해 정규화한 표준카테고리. 매핑이 없으면 null(미분류)
+  included: boolean("included").notNull().default(true), // 자기계좌이체 등을 제외한, 수입/지출 집계에 포함할지 여부
+  isInternalTransfer: boolean("is_internal_transfer").notNull().default(false), // 짝이 맞는 자기계좌이체로 판정됐는지(참고용)
+  beneficiary: text("beneficiary").notNull(), // 'husband' | 'wife' | 'joint' - 누구를 위해 쓴 지출인지, 기본값은 업로드한 사람이며 건별로 수정 가능
+});
+
+// 뱅크샐러드 원본 (타입, 대분류, 소분류) 조합을 표준카테고리로 정규화하는 매핑 테이블. 수기로 관리한다.
+export const categoryMappings = pgTable(
+  "category_mappings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    txnType: text("txn_type").notNull(), // '수입' | '지출' | '이체'
+    rawCategory: text("raw_category").notNull(),
+    rawSubcategory: text("raw_subcategory").notNull(),
+    stdCategory: text("std_category").notNull(),
+  },
+  (table) => [unique().on(table.txnType, table.rawCategory, table.rawSubcategory)]
+);
+
+// 표준카테고리별 성격(고정비/변동비/고정수입/변동수입)과 월 예산 목표. 수기로 관리한다.
+export const budgetCategories = pgTable("budget_categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  kind: text("kind").notNull(), // '고정비' | '변동비' | '고정수입' | '변동수입'
+  sortOrder: numeric("sort_order", { precision: 6, scale: 0 }).notNull().default("0"),
+  monthlyBudget: numeric("monthly_budget", { precision: 18, scale: 2 }),
 });

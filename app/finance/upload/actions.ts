@@ -4,8 +4,9 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assetItems, people, transactions, uploads } from "@/lib/finance-db";
+import { assetItems, categoryMappings, people, transactions, uploads } from "@/lib/finance-db";
 import { parseUploadFile, type ParsedUpload } from "@/lib/finance-parse";
+import { buildMappingIndex, deriveTransactionFields } from "@/lib/spending-derive";
 
 const PERSON_IDS = ["husband", "wife"] as const;
 type PersonId = (typeof PERSON_IDS)[number];
@@ -89,9 +90,14 @@ export async function uploadAction(formData: FormData) {
     );
   }
 
-  for (const rows of chunk(parsed.transactions, INSERT_CHUNK_SIZE)) {
+  const mappingRows = await db.select().from(categoryMappings);
+  const mappingIndex = buildMappingIndex(mappingRows);
+  const derived = deriveTransactionFields(parsed.transactions, mappingIndex);
+  const transactionsWithDerived = parsed.transactions.map((t, i) => ({ t, d: derived[i] }));
+
+  for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {
     await db.insert(transactions).values(
-      rows.map((t) => ({
+      rows.map(({ t, d }) => ({
         uploadId,
         personId,
         txnDate: t.txnDate,
@@ -102,6 +108,10 @@ export async function uploadAction(formData: FormData) {
         description: t.description,
         amount: t.amount.toString(),
         paymentMethod: t.paymentMethod,
+        stdCategory: d.stdCategory,
+        included: d.included,
+        isInternalTransfer: d.isInternalTransfer,
+        beneficiary: personId,
       }))
     );
   }

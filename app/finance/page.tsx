@@ -284,6 +284,9 @@ export default async function DashboardPage({
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-[16px] font-semibold tracking-tight text-ink">우리집 자산 대시보드</h1>
           <div className="flex items-center gap-4">
+            <Link href="/finance/spending" className="text-[13px] text-ink-muted transition-colors hover:text-ink">
+              우리집 자산흐름
+            </Link>
             <Link href="/" className="text-[13px] text-ink-muted transition-colors hover:text-ink">
               홈
             </Link>

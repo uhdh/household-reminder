@@ -26,6 +26,8 @@ export default defineConfig({
     "asset_items",
     "allocation_targets",
     "transactions",
+    "category_mappings",
+    "budget_categories",
   ],
   dialect: "postgresql",
   dbCredentials: {
