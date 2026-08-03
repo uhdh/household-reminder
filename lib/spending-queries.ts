@@ -96,3 +96,136 @@ export function flowLabel(txn: { txnType: string; category: string | null }): "�
   if (txn.txnType === "이체") return txn.category === "현금" ? "지출" : "입금";
   return "지출";
 }
+
+export type PersonSplit = Record<PersonId, number>;
+
+function emptySplit(): PersonSplit {
+  return { husband: 0, wife: 0 };
+}
+
+export interface MonthlySummary {
+  totalIncome: number;
+  totalIncomeByPerson: PersonSplit;
+  fixedIncome: number;
+  fixedIncomeByPerson: PersonSplit;
+  variableIncome: number;
+  variableIncomeByPerson: PersonSplit;
+  totalExpense: number;
+  totalExpenseByPerson: PersonSplit;
+  fixedExpense: number;
+  fixedExpenseByPerson: PersonSplit;
+  variableExpense: number;
+  variableExpenseByPerson: PersonSplit;
+  balance: number;
+  balanceByPerson: PersonSplit;
+  savingsRate: number;
+  savingsRateByPerson: PersonSplit;
+  categoryTotals: Map<string, number>;
+  categoryByPerson: Map<string, PersonSplit>;
+  categoryByBeneficiary: Map<string, Record<Beneficiary, number>>;
+}
+
+export const UNMAPPED_CATEGORY = "미분류";
+
+/**
+ * 한 달치 거래를 집계해서 가구 전체 합계와 남편/아내 개인별 합계를 함께 반환한다.
+ * kindOf는 표준카테고리(+수입/지출 흐름)로부터 '고정비/변동비/고정수입/변동수입' 성격을 결정하는 함수로,
+ * budgetCategories 테이블 내용에 의존하므로 페이지 쪽에서 주입한다.
+ */
+export function summarizeMonthlyTransactions(
+  monthTx: Txn[],
+  kindOf: (stdCategory: string | null, flow: "입금" | "지출") => string
+): MonthlySummary {
+  let totalIncome = 0;
+  let fixedIncome = 0;
+  let variableIncome = 0;
+  let totalExpense = 0;
+  let fixedExpense = 0;
+  let variableExpense = 0;
+
+  const totalIncomeByPerson = emptySplit();
+  const fixedIncomeByPerson = emptySplit();
+  const variableIncomeByPerson = emptySplit();
+  const totalExpenseByPerson = emptySplit();
+  const fixedExpenseByPerson = emptySplit();
+  const variableExpenseByPerson = emptySplit();
+
+  const categoryTotals = new Map<string, number>();
+  const categoryByPerson = new Map<string, PersonSplit>();
+  const categoryByBeneficiary = new Map<string, Record<Beneficiary, number>>();
+
+  for (const t of monthTx) {
+    const flow = flowLabel(t);
+    const amt = Math.abs(toNum(t.amount));
+    const kind = kindOf(t.stdCategory, flow);
+    const personId = t.personId as PersonId;
+
+    if (flow === "입금") {
+      totalIncome += amt;
+      totalIncomeByPerson[personId] += amt;
+      if (kind === "고정수입") {
+        fixedIncome += amt;
+        fixedIncomeByPerson[personId] += amt;
+      } else {
+        variableIncome += amt;
+        variableIncomeByPerson[personId] += amt;
+      }
+      continue;
+    }
+
+    totalExpense += amt;
+    totalExpenseByPerson[personId] += amt;
+    if (kind === "고정비") {
+      fixedExpense += amt;
+      fixedExpenseByPerson[personId] += amt;
+    } else {
+      variableExpense += amt;
+      variableExpenseByPerson[personId] += amt;
+    }
+
+    const cat = t.stdCategory ?? UNMAPPED_CATEGORY;
+    categoryTotals.set(cat, (categoryTotals.get(cat) ?? 0) + amt);
+
+    const byPerson = categoryByPerson.get(cat) ?? emptySplit();
+    byPerson[personId] += amt;
+    categoryByPerson.set(cat, byPerson);
+
+    const byBen = categoryByBeneficiary.get(cat) ?? { husband: 0, wife: 0, joint: 0 };
+    const ben = t.beneficiary as Beneficiary;
+    byBen[ben] = (byBen[ben] ?? 0) + amt;
+    categoryByBeneficiary.set(cat, byBen);
+  }
+
+  const balance = totalIncome - totalExpense;
+  const balanceByPerson: PersonSplit = {
+    husband: totalIncomeByPerson.husband - totalExpenseByPerson.husband,
+    wife: totalIncomeByPerson.wife - totalExpenseByPerson.wife,
+  };
+  const savingsRate = totalIncome > 0 ? (balance / totalIncome) * 100 : 0;
+  const savingsRateByPerson: PersonSplit = {
+    husband: totalIncomeByPerson.husband > 0 ? (balanceByPerson.husband / totalIncomeByPerson.husband) * 100 : 0,
+    wife: totalIncomeByPerson.wife > 0 ? (balanceByPerson.wife / totalIncomeByPerson.wife) * 100 : 0,
+  };
+
+  return {
+    totalIncome,
+    totalIncomeByPerson,
+    fixedIncome,
+    fixedIncomeByPerson,
+    variableIncome,
+    variableIncomeByPerson,
+    totalExpense,
+    totalExpenseByPerson,
+    fixedExpense,
+    fixedExpenseByPerson,
+    variableExpense,
+    variableExpenseByPerson,
+    balance,
+    balanceByPerson,
+    savingsRate,
+    savingsRateByPerson,
+    categoryTotals,
+    categoryByPerson,
+    categoryByBeneficiary,
+  };
+}

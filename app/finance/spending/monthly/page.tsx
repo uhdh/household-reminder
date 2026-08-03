@@ -3,23 +3,25 @@ import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import {
   MONTH_RE,
+  PERSON_IDS,
   PERSON_LABELS,
-  flowLabel,
   getActiveTransactions,
   latestMonth,
   monthKeyOf,
   shiftMonth,
+  summarizeMonthlyTransactions,
   toNum,
-  type Beneficiary,
+  UNMAPPED_CATEGORY,
   type PersonId,
+  type PersonSplit,
 } from "@/lib/spending-queries";
 import { buildCategoryColorMap, formatKRW } from "@/lib/finance-format";
-import { AnimatedNumber } from "@/app/finance/_components/animated-number";
+import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { ExpenseDonut } from "./chart";
 
 export const dynamic = "force-dynamic";
 
-const UNMAPPED = "미분류";
+const UNMAPPED = UNMAPPED_CATEGORY;
 
 function initials(displayNameByPerson: Map<string, string>): Record<PersonId, string> {
   return {
@@ -101,52 +103,15 @@ export default async function MonthlyPage({
     return flow === "입금" ? "변동수입" : "변동비";
   }
 
-  let totalIncome = 0;
-  let totalExpense = 0;
-  let fixedIncome = 0;
-  let variableIncome = 0;
-  let fixedExpense = 0;
-  let variableExpense = 0;
-
-  const categoryTotals = new Map<string, number>();
-  const categoryByPerson = new Map<string, Record<PersonId, number>>();
-  const categoryByBeneficiary = new Map<string, Record<Beneficiary, number>>();
-
-  for (const t of monthTx) {
-    const flow = flowLabel(t);
-    const amt = Math.abs(toNum(t.amount));
-    const kind = kindOf(t.stdCategory, flow);
-
-    if (flow === "입금") {
-      totalIncome += amt;
-      if (kind === "고정수입") fixedIncome += amt;
-      else variableIncome += amt;
-      continue;
-    }
-
-    totalExpense += amt;
-    if (kind === "고정비") fixedExpense += amt;
-    else variableExpense += amt;
-
-    const cat = t.stdCategory ?? UNMAPPED;
-    categoryTotals.set(cat, (categoryTotals.get(cat) ?? 0) + amt);
-
-    const byPerson = categoryByPerson.get(cat) ?? { husband: 0, wife: 0 };
-    const personId = t.personId as PersonId;
-    byPerson[personId] = (byPerson[personId] ?? 0) + amt;
-    categoryByPerson.set(cat, byPerson);
-
-    const byBen = categoryByBeneficiary.get(cat) ?? { husband: 0, wife: 0, joint: 0 };
-    const ben = t.beneficiary as Beneficiary;
-    byBen[ben] = (byBen[ben] ?? 0) + amt;
-    categoryByBeneficiary.set(cat, byBen);
-  }
-
-  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
+  const summary = summarizeMonthlyTransactions(monthTx, kindOf);
+  const { categoryTotals, categoryByPerson, categoryByBeneficiary } = summary;
 
   const personLabels = initials(displayNameByPerson);
   const personLabelOf = (key: string) => personLabels[key as PersonId] ?? key;
   const benLabelOf = (key: string) => (key === "joint" ? "우리" : personLabelOf(key));
+
+  const fullNameOf = (id: PersonId) => displayNameByPerson.get(id) ?? PERSON_LABELS[id];
+  const cardBreakdown = (split: PersonSplit) => PERSON_IDS.map((id) => ({ label: fullNameOf(id), value: split[id] }));
 
   const donutEntries = Array.from(categoryTotals.entries())
     .filter(([, v]) => v > 0)
@@ -179,40 +144,43 @@ export default async function MonthlyPage({
         </Link>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {[
-          { label: "총수입", value: totalIncome },
-          { label: "고정수입", value: fixedIncome },
-          { label: "변동수입", value: variableIncome },
-          { label: "총지출", value: totalExpense },
-          { label: "고정비", value: fixedExpense },
-        ].map((s) => (
-          <div key={s.label} className="border-[0.8px] border-hairline bg-card px-3 py-2">
-            <p className="mb-1 text-[11px] font-semibold text-ink-muted">{s.label}</p>
-            <p className="text-[16px] font-bold text-ink">
-              <AnimatedNumber value={s.value} />
-            </p>
-          </div>
-        ))}
+      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SummaryCard label="총수입" value={summary.totalIncome} breakdown={cardBreakdown(summary.totalIncomeByPerson)} />
+        <SummaryCard label="총지출" value={summary.totalExpense} breakdown={cardBreakdown(summary.totalExpenseByPerson)} />
+        <SummaryCard label="당월 잔고" value={summary.balance} breakdown={cardBreakdown(summary.balanceByPerson)} />
+        <SummaryCard
+          label="저축율"
+          value={summary.savingsRate}
+          breakdown={cardBreakdown(summary.savingsRateByPerson)}
+          format="signedPct"
+        />
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="border-[0.8px] border-hairline bg-card px-3 py-2">
-          <p className="mb-1 text-[11px] font-semibold text-ink-muted">변동비</p>
-          <p className="text-[16px] font-bold text-ink">
-            <AnimatedNumber value={variableExpense} />
-          </p>
-        </div>
-        <div className="border-[0.8px] border-hairline bg-card px-3 py-2">
-          <p className="mb-1 text-[11px] font-semibold text-ink-muted">당월 잔고</p>
-          <p className="text-[16px] font-bold text-ink">
-            <AnimatedNumber value={totalIncome - totalExpense} />
-          </p>
-        </div>
-        <div className="border-[0.8px] border-hairline bg-card px-3 py-2">
-          <p className="mb-1 text-[11px] font-semibold text-ink-muted">저축율</p>
-          <p className="text-[16px] font-bold text-ink">{savingsRate.toFixed(1)}%</p>
-        </div>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SummaryCard
+          label="고정수입"
+          value={summary.fixedIncome}
+          breakdown={cardBreakdown(summary.fixedIncomeByPerson)}
+          variant="detail"
+        />
+        <SummaryCard
+          label="변동수입"
+          value={summary.variableIncome}
+          breakdown={cardBreakdown(summary.variableIncomeByPerson)}
+          variant="detail"
+        />
+        <SummaryCard
+          label="고정비"
+          value={summary.fixedExpense}
+          breakdown={cardBreakdown(summary.fixedExpenseByPerson)}
+          variant="detail"
+        />
+        <SummaryCard
+          label="변동비"
+          value={summary.variableExpense}
+          breakdown={cardBreakdown(summary.variableExpenseByPerson)}
+          variant="detail"
+        />
       </div>
 
       <div className="mb-4 border-[0.8px] border-hairline bg-card p-4">
