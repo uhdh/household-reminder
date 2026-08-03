@@ -15,9 +15,9 @@ import {
   type PersonId,
   type PersonSplit,
 } from "@/lib/spending-queries";
-import { buildCategoryColorMap, formatKRW } from "@/lib/finance-format";
+import { buildCategoryColorMap, formatKRW, topNWithOther } from "@/lib/finance-format";
 import { SummaryCard } from "@/app/finance/_components/summary-card";
-import { ExpenseDonut } from "./chart";
+import { CategoryPie } from "./chart";
 
 export const dynamic = "force-dynamic";
 
@@ -113,11 +113,22 @@ export default async function MonthlyPage({
   const fullNameOf = (id: PersonId) => displayNameByPerson.get(id) ?? PERSON_LABELS[id];
   const cardBreakdown = (split: PersonSplit) => PERSON_IDS.map((id) => ({ label: fullNameOf(id), value: split[id] }));
 
-  const donutEntries = Array.from(categoryTotals.entries())
-    .filter(([, v]) => v > 0)
-    .sort((a, b) => b[1] - a[1]);
-  const colorMap = buildCategoryColorMap(donutEntries.map(([name]) => name));
-  const donutData = donutEntries.map(([name, value]) => ({ name, value, fill: colorMap[name] }));
+  function categoryEntriesForKind(kind: "고정비" | "변동비"): [string, number][] {
+    return Array.from(categoryTotals.entries()).filter(([name, value]) => {
+      if (value <= 0) return false;
+      const categoryKind = name === UNMAPPED ? "변동비" : budgetByName.get(name)?.kind;
+      return categoryKind === kind;
+    });
+  }
+
+  function pieDataForKind(kind: "고정비" | "변동비") {
+    const top = topNWithOther(categoryEntriesForKind(kind), 5);
+    const colorMap = buildCategoryColorMap(top.map(([name]) => name));
+    return top.map(([name, value]) => ({ name, value, fill: colorMap[name] }));
+  }
+
+  const fixedPieData = pieDataForKind("고정비");
+  const variablePieData = pieDataForKind("변동비");
 
   const fixedRows = sortedBudgets.filter((b) => b.kind === "고정비");
   const variableRows = sortedBudgets.filter((b) => b.kind === "변동비");
@@ -183,9 +194,9 @@ export default async function MonthlyPage({
         />
       </div>
 
-      <div className="mb-4 border-[0.8px] border-hairline bg-card p-4">
-        <h2 className="mb-3 text-[13px] font-semibold text-ink">지출 구성비</h2>
-        <ExpenseDonut data={donutData} />
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <CategoryPie title="고정비" data={fixedPieData} />
+        <CategoryPie title="변동비" data={variablePieData} />
       </div>
 
       <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">

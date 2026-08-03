@@ -17,6 +17,18 @@ export const CATEGORY_PALETTE = [
   "#E34948",
 ];
 
+/**
+ * 값 기준 내림차순 정렬 후 상위 n개만 남기고 나머지는 otherLabel 항목 하나로 합친다.
+ * 파이차트 등에서 라벨 겹침을 막기 위해 항목 수를 제한할 때 쓴다.
+ */
+export function topNWithOther(entries: [string, number][], n: number, otherLabel = "기타"): [string, number][] {
+  const sorted = [...entries].sort((a, b) => b[1] - a[1]);
+  if (sorted.length <= n) return sorted;
+  const top = sorted.slice(0, n);
+  const otherTotal = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
+  return otherTotal > 0 ? [...top, [otherLabel, otherTotal]] : top;
+}
+
 export function buildCategoryColorMap(categoriesInOrder: string[]): Record<string, string> {
   const map: Record<string, string> = {};
   let i = 0;
