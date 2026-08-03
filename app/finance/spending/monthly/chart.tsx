@@ -42,11 +42,9 @@ function renderLeaderLabel(props: PieLabelRenderProps) {
     <g key={name}>
       <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
       <circle cx={sx} cy={sy} r={2} fill={fill} stroke="none" />
-      <text x={textX} y={ey - 6} textAnchor={textAnchor} fontSize={11} fill="var(--finance-ink)">
+      <text x={textX} y={ey} dominantBaseline="central" textAnchor={textAnchor} fontSize={11} fill="var(--finance-ink)">
         {name}
-      </text>
-      <text x={textX} y={ey + 7} textAnchor={textAnchor} fontSize={11} fill="var(--finance-ink-muted)">
-        {`${(percent * 100).toFixed(1)}%`}
+        <tspan fill="var(--finance-ink-muted)">{` ${(percent * 100).toFixed(1)}%`}</tspan>
       </text>
     </g>
   );

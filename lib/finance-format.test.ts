@@ -42,6 +42,22 @@ describe("topNWithOther", () => {
     ]);
   });
 
+  test("merges the overflow into an existing category that already has the other label's name", () => {
+    const entries: [string, number][] = [
+      ["식비", 300],
+      ["교통비", 100],
+      ["기타", 50],
+      ["관광", 40],
+      ["선물", 20],
+      ["문화", 10],
+    ];
+    expect(topNWithOther(entries, 3)).toEqual([
+      ["식비", 300],
+      ["교통비", 100],
+      ["기타", 120],
+    ]);
+  });
+
   test("supports a custom other label", () => {
     const entries: [string, number][] = [
       ["식비", 300],

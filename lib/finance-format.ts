@@ -26,7 +26,17 @@ export function topNWithOther(entries: [string, number][], n: number, otherLabel
   if (sorted.length <= n) return sorted;
   const top = sorted.slice(0, n);
   const otherTotal = sorted.slice(n).reduce((s, [, v]) => s + v, 0);
-  return otherTotal > 0 ? [...top, [otherLabel, otherTotal]] : top;
+  if (otherTotal <= 0) return top;
+
+  // 상위 n개 중 이미 otherLabel과 이름이 같은 실제 카테고리가 있으면(예: "기타"라는 실제 예산 카테고리),
+  // 별도 항목을 새로 만드는 대신 그 항목에 합산해서 라벨이 중복되지 않게 한다.
+  const existingIndex = top.findIndex(([name]) => name === otherLabel);
+  if (existingIndex >= 0) {
+    const merged = [...top];
+    merged[existingIndex] = [otherLabel, merged[existingIndex][1] + otherTotal];
+    return merged;
+  }
+  return [...top, [otherLabel, otherTotal]];
 }
 
 export function buildCategoryColorMap(categoriesInOrder: string[]): Record<string, string> {
