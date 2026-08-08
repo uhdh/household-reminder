@@ -9,6 +9,7 @@ import { AnimatedNumber } from "./_components/animated-number";
 import { DashboardCharts } from "./_components/charts";
 import { TargetAllocationCard } from "./_components/target-allocation";
 import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
+import { AppShell, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -279,11 +280,13 @@ export default async function DashboardPage({
   const hasAnyData = activeUploads.length > 0;
 
   return (
-    <div className="min-h-screen bg-canvas px-4 py-8 font-office text-ink">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-[16px] font-semibold tracking-tight text-ink">우리집 자산 대시보드</h1>
-          <div className="flex items-center gap-4">
+    <AppShell size="wide" className="font-office text-ink">
+        <PageHeader
+          title="우리집 자산 대시보드"
+          description="가족 자산과 부채, 투자 현황을 한눈에 확인해요."
+          className="mb-5"
+          action={
+            <div className="flex items-center gap-4">
             <Link href="/finance/spending" className="text-[13px] text-ink-muted transition-colors hover:text-ink">
               우리집 자산흐름
             </Link>
@@ -293,8 +296,9 @@ export default async function DashboardPage({
             <Link href="/finance/upload" className="text-[13px] text-ink-muted transition-colors hover:text-ink">
               파일 업로드
             </Link>
-          </div>
-        </div>
+            </div>
+          }
+        />
 
         {hasAnyData && (
           <PersonFilterTabs
@@ -347,8 +351,7 @@ export default async function DashboardPage({
             )}
           </>
         )}
-      </div>
-    </div>
+    </AppShell>
   );
 }
 

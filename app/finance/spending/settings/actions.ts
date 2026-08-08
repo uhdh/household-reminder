@@ -82,8 +82,7 @@ export async function addBudgetCategoryAction(formData: FormData) {
   redirect("/finance/spending/settings");
 }
 
-export async function deleteBudgetCategoryAction(formData: FormData) {
-  const name = String(formData.get("name") ?? "");
+export async function deleteBudgetCategoryAction(name: string) {
   if (name) {
     const db = getDb();
     await db.delete(budgetCategories).where(eq(budgetCategories.name, name));

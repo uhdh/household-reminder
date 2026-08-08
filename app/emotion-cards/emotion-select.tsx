@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ActionButton, BottomSheet, FeedbackMessage, TextInput } from "@/components/ui";
 import { EMOTIONS, COLORS, type Emotion } from "@/lib/emotions";
 
 type Props = {
@@ -86,25 +87,25 @@ export function EmotionSelect({
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
+    <div className="seed-page flex flex-col">
       <div className="flex items-center gap-3.5 px-5 pt-4 pb-2">
         <button
           type="button"
           aria-label="뒤로가기"
           onClick={() => router.push(backHref)}
-          className="text-xl leading-none text-zinc-500 dark:text-zinc-400"
+          className="seed-icon-button text-xl leading-none"
         >
           ←
         </button>
-        <div className="flex-1 text-base font-bold text-zinc-900 dark:text-zinc-50">감정 선택</div>
-        <div className="text-sm font-semibold text-orange-600">{selected.length}/3</div>
+        <div className="flex-1 text-base font-bold text-fg-neutral">감정 선택</div>
+        <div className="t4-bold text-fg-brand">{selected.length}/3</div>
       </div>
 
-      <div className="px-5 pb-3 text-sm text-zinc-500 dark:text-zinc-400">
+      <div className="px-5 pb-3 text-sm text-fg-neutral-muted">
         지금 마음에 가장 가까운 카드 3장을 골라주세요
       </div>
 
-      {saveError && <p className="px-5 pb-2 text-sm text-red-600">{saveError}</p>}
+      {saveError && <FeedbackMessage tone="critical" className="mx-5 mb-2">{saveError}</FeedbackMessage>}
 
       <div className="grid flex-1 grid-cols-3 gap-2.5 overflow-auto px-4 pb-6">
         {allEmotions.map((emotion) => {
@@ -143,37 +144,28 @@ export function EmotionSelect({
           type="button"
           aria-label="새 감정 추가"
           onClick={() => setSheetOpen(true)}
-          className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-zinc-300 px-1.5 pt-3.5 pb-2.5 dark:border-zinc-700"
+          className="flex flex-col items-center justify-center gap-1.5 rounded-r4 border-2 border-dashed border-stroke-neutral-muted px-1.5 pb-2.5 pt-3.5 transition hover:bg-bg-neutral-weak"
         >
-          <span className="text-2xl leading-none text-zinc-400">+</span>
-          <span className="text-xs font-semibold text-zinc-400">추가하기</span>
+          <span className="text-2xl leading-none text-fg-neutral-subtle">+</span>
+          <span className="text-xs font-semibold text-fg-neutral-subtle">추가하기</span>
         </button>
       </div>
 
-      <div className="sticky bottom-0 bg-zinc-50 px-5 pt-3.5 pb-5 dark:bg-black">
-        <button
+      <div className="sticky bottom-0 border-t border-stroke-neutral-subtle bg-bg-layer-basement px-5 pb-5 pt-3.5">
+        <ActionButton
           type="button"
           disabled={!canComplete || isSaving}
           onClick={handleComplete}
-          className="w-full rounded-2xl bg-orange-600 py-4 text-base font-bold text-white disabled:bg-zinc-300 disabled:text-zinc-500"
+          className="w-full"
         >
           완료
-        </button>
+        </ActionButton>
       </div>
 
       {sheetOpen && (
-        <div
-          data-testid="add-emotion-sheet-backdrop"
-          onClick={closeSheet}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 transition-opacity duration-200"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="flex w-full max-w-md flex-col gap-4 rounded-t-2xl bg-white px-6 pt-7 pb-8 transition-transform duration-200 dark:bg-zinc-900"
-          >
-            <div className="text-base font-bold text-zinc-900 dark:text-zinc-50">나만의 감정 추가하기</div>
-            {sheetError && <p className="text-sm text-red-600">{sheetError}</p>}
-            <input
+        <BottomSheet title="나만의 감정 추가하기" testId="add-emotion-sheet-backdrop" onBackdropClick={closeSheet} footer={<><ActionButton variant="secondary" className="flex-1" onClick={closeSheet}>취소</ActionButton><ActionButton className="flex-1" disabled={!sheetName.trim()} onClick={handleAddCustom}>추가</ActionButton></>}>
+            {sheetError && <FeedbackMessage tone="critical">{sheetError}</FeedbackMessage>}
+            <TextInput
               autoFocus
               aria-label="감정 이름"
               value={sheetName}
@@ -182,27 +174,8 @@ export function EmotionSelect({
                 if (e.key === "Enter") handleAddCustom();
               }}
               placeholder="예: 허탈함, 뭉클함..."
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-3.5 text-zinc-900 outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
             />
-            <div className="flex gap-2.5">
-              <button
-                type="button"
-                onClick={closeSheet}
-                className="flex-1 rounded-2xl bg-zinc-200 py-3.5 font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                disabled={!sheetName.trim()}
-                onClick={handleAddCustom}
-                className="flex-1 rounded-2xl bg-orange-600 py-3.5 font-bold text-white disabled:bg-zinc-300"
-              >
-                추가
-              </button>
-            </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </div>
   );

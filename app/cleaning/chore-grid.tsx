@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ActionButton, BottomSheet, CompletionDialog, FeedbackMessage, FormField, ItemGrid, ItemTile, SelectInput, TextInput } from "@/components/ui";
 import type { IntervalUnit, ChoreStatus } from "@/lib/chores";
 import { todayISO } from "@/lib/chores";
 
@@ -23,16 +24,6 @@ type Props = {
 
 type FormState = { mode: "create" } | { mode: "edit"; chore: ChoreViewModel };
 
-function progressColor(percent: number, overdue: boolean): string {
-  if (overdue || percent >= 100) return "#e03131";
-  if (percent >= 70) return "#e8a33d";
-  return "#2bb3a3";
-}
-
-function dayLabel(daysRemaining: number): string {
-  return daysRemaining >= 0 ? `D-${daysRemaining}` : `D+${-daysRemaining}`;
-}
-
 export function ChoreGrid({ chores, completeAction, createAction, updateAction, deleteAction }: Props) {
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [doneDate, setDoneDate] = useState("");
@@ -42,6 +33,7 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteArmed, setDeleteArmed] = useState(false);
 
   const completingChore = chores.find((c) => c.id === completingId) ?? null;
 
@@ -72,17 +64,14 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
 
   function openCreateForm() {
     setFormError(null);
+    setDeleteArmed(false);
     setFormState({ mode: "create" });
-  }
-
-  function openEditForm(chore: ChoreViewModel) {
-    setFormError(null);
-    setFormState({ mode: "edit", chore });
   }
 
   function closeForm() {
     setFormState(null);
     setFormError(null);
+    setDeleteArmed(false);
   }
 
   async function submitForm(formData: FormData) {
@@ -106,11 +95,16 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
 
   async function handleDelete() {
     if (!formState || formState.mode !== "edit" || isDeleting) return;
+    if (!deleteArmed) {
+      setDeleteArmed(true);
+      return;
+    }
     setIsDeleting(true);
     try {
       await deleteAction(formState.chore.id);
       setFormState(null);
       setFormError(null);
+      setDeleteArmed(false);
     } catch {
       setFormError("삭제에 실패했어요. 다시 시도해주세요.");
     } finally {
@@ -122,35 +116,18 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
     <div>
       {chores.length === 0 && <p>아직 등록된 집안일이 없어요 — + 버튼으로 추가해보세요</p>}
 
-      <ul className="grid grid-cols-3 gap-2 p-2 sm:grid-cols-4 md:grid-cols-5">
+      <ItemGrid>
         {chores.map((chore) => (
           <li key={chore.id}>
-            <button
-              type="button"
+            <ItemTile
               aria-label={`${chore.name} 완료 처리`}
               onClick={() => openCompleteToast(chore)}
-              className="relative flex w-full flex-col items-center gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-800"
-            >
-              {chore.status.overdue && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white">
-                  !
-                </span>
-              )}
-              <span className="text-2xl">{chore.icon}</span>
-              <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-50">{chore.name}</span>
-              <span className="flex w-full items-center gap-1">
-                <span className="text-[9px] text-zinc-500">{dayLabel(chore.status.daysRemaining)}</span>
-                <span className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
-                  <span
-                    className="block h-full rounded-full"
-                    style={{
-                      width: `${chore.status.percent}%`,
-                      background: progressColor(chore.status.percent, chore.status.overdue),
-                    }}
-                  />
-                </span>
-              </span>
-            </button>
+              icon={chore.icon}
+              name={chore.name}
+              daysRemaining={chore.status.daysRemaining}
+              percent={chore.status.percent}
+              overdue={chore.status.overdue}
+            />
           </li>
         ))}
         <li>
@@ -158,126 +135,75 @@ export function ChoreGrid({ chores, completeAction, createAction, updateAction, 
             type="button"
             aria-label="새로운 집안일 추가"
             onClick={openCreateForm}
-            className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-zinc-300 p-2 text-zinc-400 dark:border-zinc-700"
+            className="flex min-h-24 w-full flex-col items-center justify-center gap-1 rounded-r3 border border-dashed border-stroke-neutral-muted p-2 text-fg-neutral-subtle transition hover:bg-bg-neutral-weak"
           >
             <span className="text-3xl">+</span>
             <span className="text-sm">추가</span>
           </button>
         </li>
-      </ul>
+      </ItemGrid>
 
       {completingChore && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-3xl bg-white p-5 text-zinc-900 shadow-2xl dark:bg-zinc-900 dark:text-white">
-          <p>{completingChore.name} 완료로 표시할까요?</p>
-          {completeError && <p className="text-sm text-red-400">{completeError}</p>}
-          <label>
-            완료한 날짜
-            <input
-              type="date"
-              value={doneDate}
-              onChange={(e) => setDoneDate(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-zinc-900 outline-none focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-            />
-          </label>
-          <div className="mt-5 grid grid-cols-2 gap-2">
-            <button type="button" onClick={closeToast} disabled={isCompleting} className="rounded-xl border border-zinc-200 px-3 py-2.5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800">
-              취소
-            </button>
-            <button
-              type="button"
-              onClick={confirmComplete}
-              disabled={isCompleting}
-              className="rounded-xl bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-            >
-              완료로 표시
-            </button>
-          </div>
-          </div>
-        </div>
+        <CompletionDialog title={`${completingChore.name} 완료로 표시할까요?`} date={doneDate} error={completeError} isSubmitting={isCompleting} confirmDisabled={!doneDate} onDateChange={setDoneDate} onCancel={closeToast} onConfirm={confirmComplete} />
       )}
 
       {formState && (
-        <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/35">
-          <form
-            action={submitForm}
-            className="w-full max-w-md rounded-t-2xl bg-white p-4 dark:bg-zinc-900"
-          >
-            <h2 className="mb-2 text-base font-bold">{formState.mode === "create" ? "새로운 집안일" : "항목 수정"}</h2>
-
-            {formError && <p className="mb-2 text-sm text-red-600">{formError}</p>}
-
-            <label className="mb-2 flex items-center justify-between gap-2">
-              이름
-              <input
+        <BottomSheet title={formState.mode === "create" ? "새로운 집안일" : "항목 수정"} onBackdropClick={closeForm} footer={<><ActionButton variant="secondary" className="flex-1" onClick={closeForm} disabled={isSubmitting || isDeleting}>취소</ActionButton><ActionButton type="submit" form="chore-form" className="flex-1" disabled={isSubmitting || isDeleting}>저장</ActionButton></>}>
+          <form id="chore-form" action={submitForm} className="space-y-4">
+            {formError && <FeedbackMessage tone="critical">{formError}</FeedbackMessage>}
+            <FormField label="이름">
+              <TextInput
                 name="name"
                 type="text"
                 required
                 defaultValue={formState.mode === "edit" ? formState.chore.name : ""}
-                className="flex-1 rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-800"
               />
-            </label>
-            <label className="mb-2 flex items-center justify-between gap-2">
-              이모지
-              <input
+            </FormField>
+            <FormField label="이모지">
+              <TextInput
                 name="icon"
                 type="text"
                 required
                 defaultValue={formState.mode === "edit" ? formState.chore.icon : ""}
-                className="w-16 rounded border border-zinc-300 px-2 py-1 text-center dark:border-zinc-700 dark:bg-zinc-800"
+                className="max-w-24 text-center"
               />
-            </label>
-            <label className="mb-2 flex items-center justify-between gap-2">
-              주기 값
-              <input
+            </FormField>
+            <div className="grid grid-cols-2 gap-3">
+            <FormField label="주기 값">
+              <TextInput
                 name="intervalValue"
                 type="number"
                 min={1}
                 defaultValue={formState.mode === "edit" ? formState.chore.intervalValue : 1}
-                className="w-16 rounded border border-zinc-300 px-2 py-1 text-center dark:border-zinc-700 dark:bg-zinc-800"
+                className="text-center"
               />
-            </label>
-            <label className="mb-3 flex items-center justify-between gap-2">
-              주기 단위
-              <select
+            </FormField>
+            <FormField label="주기 단위">
+              <SelectInput
                 name="intervalUnit"
                 defaultValue={formState.mode === "edit" ? formState.chore.intervalUnit : "week"}
-                className="rounded border border-zinc-300 px-2 py-1 dark:border-zinc-700 dark:bg-zinc-800"
               >
                 <option value="day">일</option>
                 <option value="week">주</option>
                 <option value="month">개월</option>
-              </select>
-            </label>
-
-            <div className="flex justify-between">
-              <div>
+              </SelectInput>
+            </FormField>
+            </div>
+            <div>
                 {formState.mode === "edit" && (
-                  <button
+                  <ActionButton
+                    variant="danger"
                     type="button"
                     onClick={handleDelete}
                     disabled={isSubmitting || isDeleting}
-                    className="text-red-600 disabled:opacity-50"
                   >
-                    삭제
-                  </button>
+                    {isDeleting ? "삭제 중…" : deleteArmed ? "정말 삭제" : "삭제"}
+                  </ActionButton>
                 )}
-              </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={closeForm} disabled={isSubmitting || isDeleting}>
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || isDeleting}
-                  className="font-semibold text-blue-600 disabled:opacity-50"
-                >
-                  저장
-                </button>
-              </div>
+                {deleteArmed && <FeedbackMessage tone="critical" className="mt-2">삭제하면 되돌릴 수 없습니다. 한 번 더 눌러 확인해주세요.</FeedbackMessage>}
             </div>
           </form>
-        </div>
+        </BottomSheet>
       )}
     </div>
   );

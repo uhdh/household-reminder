@@ -14,7 +14,7 @@ export function CardsView({ label, cards }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-sm font-bold text-zinc-500 dark:text-zinc-400">{label}</div>
+      <div className="text-sm font-bold text-fg-neutral-muted">{label}</div>
       <div className="flex gap-2.5">
         {cards.map((card) => (
           <button
@@ -52,7 +52,7 @@ export function CardsView({ label, cards }: Props) {
             <div className="text-[22px] font-bold" style={{ color: COLORS[expanded.color].text }}>
               {expanded.name}
             </div>
-            <div className="text-center text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+            <div className="text-center text-sm leading-relaxed text-fg-neutral-muted">
               {DEFINITIONS[expanded.name] ?? ""}
             </div>
           </div>

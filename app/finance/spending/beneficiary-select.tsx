@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { SelectInput } from "@/components/ui";
 import { updateBeneficiaryAction } from "./actions";
 
 const OPTIONS: { value: string; label: string }[] = [
@@ -24,18 +25,18 @@ export function BeneficiarySelect({
     <form ref={formRef} action={updateBeneficiaryAction}>
       <input type="hidden" name="txnId" value={txnId} />
       <input type="hidden" name="returnTo" value={returnTo} />
-      <select
+      <SelectInput
         name="beneficiary"
         defaultValue={value}
         onChange={() => formRef.current?.requestSubmit()}
-        className="border-[0.8px] border-hairline2 bg-card px-1.5 py-0.5 text-[12px] text-ink outline-none"
+        className="min-h-8 rounded-r2 px-1.5 py-0.5 text-[12px] text-ink"
       >
         {OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
         ))}
-      </select>
+      </SelectInput>
     </form>
   );
 }

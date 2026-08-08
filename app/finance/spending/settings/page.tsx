@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { budgetCategories, categoryMappings } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
 import { getActiveTransactions, toNum } from "@/lib/spending-queries";
+import { ActionButton, SelectInput, TextInput } from "@/components/ui";
 import {
   addBudgetCategoryAction,
   deleteBudgetCategoryAction,
@@ -74,7 +75,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       {unmapped.length > 0 && (
-        <div className="border-[0.8px] border-gain/30 bg-gain/10 p-4">
+        <div className="seed-card bg-bg-critical-weak p-4">
           <h2 className="mb-1 text-[13px] font-semibold text-gain">매핑되지 않은 카테고리 ({unmapped.length}건)</h2>
           <p className="mb-3 text-[12px] text-ink-muted">
             실제 수입/지출 집계에 반영되는 거래만 모았고, 금액이 큰 순서로 정렬했습니다. 목록에서 카테고리를
@@ -100,10 +101,10 @@ export default async function SettingsPage() {
                     {u.count}건 · {formatKRW(u.totalAmount)}
                   </span>
                   <span className="text-ink-muted">→</span>
-                  <select
+                  <SelectInput
                     name="stdCategory"
                     defaultValue={guess}
-                    className="border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none"
+                    className="min-h-9 w-auto px-2 py-1"
                   >
                     {Object.entries(grouped).map(([kind, names]) => (
                       <optgroup key={kind} label={kind}>
@@ -114,10 +115,10 @@ export default async function SettingsPage() {
                         ))}
                       </optgroup>
                     ))}
-                  </select>
-                  <button type="submit" className="bg-legend1 px-2 py-1 font-medium text-canvas hover:opacity-90">
+                  </SelectInput>
+                  <ActionButton type="submit" className="min-h-9 px-3 py-1">
                     저장
-                  </button>
+                  </ActionButton>
                 </form>
               );
             })}
@@ -125,7 +126,7 @@ export default async function SettingsPage() {
         </div>
       )}
 
-      <div className="border-[0.8px] border-hairline bg-card p-4">
+      <div className="seed-card p-4">
         <h2 className="mb-3 text-[13px] font-semibold text-ink">카테고리 매핑</h2>
         <div className="mb-4 overflow-x-auto">
           <table className="w-full text-[12px]">
@@ -149,22 +150,22 @@ export default async function SettingsPage() {
                       <input type="hidden" name="txnType" value={m.txnType} />
                       <input type="hidden" name="rawCategory" value={m.rawCategory} />
                       <input type="hidden" name="rawSubcategory" value={m.rawSubcategory} />
-                      <input
+                      <TextInput
                         name="stdCategory"
                         defaultValue={m.stdCategory}
-                        className="w-28 border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none"
+                        className="min-h-9 w-28 px-2 py-1"
                       />
-                      <button type="submit" className="border-[0.8px] border-hairline2 px-2 py-1 text-ink-muted hover:text-ink">
+                      <ActionButton type="submit" variant="secondary" className="min-h-9 px-2 py-1">
                         저장
-                      </button>
+                      </ActionButton>
                     </form>
                   </td>
                   <td className="px-2 py-1.5">
                     <form action={deleteCategoryMappingAction}>
                       <input type="hidden" name="id" value={m.id} />
-                      <button type="submit" className="text-gain hover:underline">
+                      <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">
                         삭제
-                      </button>
+                      </ActionButton>
                     </form>
                   </td>
                 </tr>
@@ -175,38 +176,38 @@ export default async function SettingsPage() {
 
         <h3 className="mb-2 text-[12px] font-semibold text-ink-muted">새 매핑 추가</h3>
         <form action={upsertCategoryMappingAction} className="flex flex-wrap items-center gap-2 text-[12px]">
-          <select name="txnType" required className="border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none">
+          <SelectInput name="txnType" required className="min-h-9 w-auto px-2 py-1">
             {TXN_TYPES.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
             ))}
-          </select>
-          <input
+          </SelectInput>
+          <TextInput
             name="rawCategory"
             placeholder="대분류"
             required
-            className="border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none"
+            className="min-h-9 w-auto px-2 py-1"
           />
-          <input
+          <TextInput
             name="rawSubcategory"
             placeholder="소분류 (기본: 미분류)"
-            className="border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none"
+            className="min-h-9 w-auto px-2 py-1"
           />
           <span className="text-ink-muted">→</span>
-          <input
+          <TextInput
             name="stdCategory"
             placeholder="표준카테고리"
             required
-            className="border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none"
+            className="min-h-9 w-auto px-2 py-1"
           />
-          <button type="submit" className="bg-legend1 px-3 py-1 font-medium text-canvas hover:opacity-90">
+          <ActionButton type="submit" className="min-h-9 px-3 py-1">
             추가
-          </button>
+          </ActionButton>
         </form>
       </div>
 
-      <div className="border-[0.8px] border-hairline bg-card p-4">
+      <div className="seed-card p-4">
         <h2 className="mb-3 text-[13px] font-semibold text-ink">카테고리 성격 · 월 예산</h2>
         <form action={updateBudgetCategoriesAction}>
           <div className="mb-4 overflow-x-auto">
@@ -224,75 +225,74 @@ export default async function SettingsPage() {
                   <tr key={b.id} className="border-b-[0.8px] border-hairline2 last:border-0">
                     <td className="px-2 py-1.5 text-ink">{b.name}</td>
                     <td className="px-2 py-1.5">
-                      <select
+                      <SelectInput
                         name={`kind:${b.name}`}
                         defaultValue={b.kind}
-                        className="border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none"
+                        className="min-h-9 w-auto px-2 py-1"
                       >
                         {KINDS.map((k) => (
                           <option key={k} value={k}>
                             {k}
                           </option>
                         ))}
-                      </select>
+                      </SelectInput>
                     </td>
                     <td className="px-2 py-1.5 text-right">
-                      <input
+                      <TextInput
                         type="number"
                         min={0}
                         step={1000}
                         name={`budget:${b.name}`}
                         defaultValue={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : ""}
-                        className="w-28 border-[0.8px] border-hairline2 bg-card px-2 py-1 text-right outline-none"
+                        className="min-h-9 w-28 px-2 py-1 text-right"
                       />
                     </td>
                     <td className="px-2 py-1.5">
-                      <button
+                      <ActionButton
+                        variant="ghost"
                         type="submit"
-                        formAction={deleteBudgetCategoryAction}
-                        name="name"
-                        value={b.name}
-                        className="text-gain hover:underline"
+                        formAction={deleteBudgetCategoryAction.bind(null, b.name)}
+                        className="min-h-9 px-2 py-1 text-fg-critical"
                       >
                         삭제
-                      </button>
+                      </ActionButton>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <button type="submit" className="bg-legend1 px-3 py-1.5 text-[12px] font-medium text-canvas hover:opacity-90">
+          <ActionButton type="submit" className="min-h-9 px-3 py-1.5 text-[12px]">
             전체 저장
-          </button>
+          </ActionButton>
         </form>
 
         <h3 className="mb-2 mt-5 text-[12px] font-semibold text-ink-muted">새 카테고리 추가</h3>
         <form action={addBudgetCategoryAction} className="flex flex-wrap items-center gap-2 text-[12px]">
-          <input
+          <TextInput
             name="name"
             placeholder="카테고리명"
             required
-            className="border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none"
+            className="min-h-9 w-auto px-2 py-1"
           />
-          <select name="kind" required className="border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none">
+          <SelectInput name="kind" required className="min-h-9 w-auto px-2 py-1">
             {KINDS.map((k) => (
               <option key={k} value={k}>
                 {k}
               </option>
             ))}
-          </select>
-          <input
+          </SelectInput>
+          <TextInput
             type="number"
             min={0}
             step={1000}
             name="monthlyBudget"
             placeholder="월 예산(선택)"
-            className="w-32 border-[0.8px] border-hairline2 bg-card px-2 py-1 outline-none"
+            className="min-h-9 w-32 px-2 py-1"
           />
-          <button type="submit" className="bg-legend1 px-3 py-1 font-medium text-canvas hover:opacity-90">
+          <ActionButton type="submit" className="min-h-9 px-3 py-1">
             추가
-          </button>
+          </ActionButton>
         </form>
       </div>
     </div>

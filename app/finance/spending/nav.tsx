@@ -14,7 +14,7 @@ export function SpendingNav() {
   const pathname = usePathname();
 
   return (
-    <div className="mb-4 flex w-full gap-1 overflow-x-auto border-[0.8px] border-hairline bg-card p-1 sm:inline-flex sm:w-auto">
+    <nav aria-label="지출 분석 메뉴" className="seed-card mb-4 flex w-full gap-1 overflow-x-auto p-1 sm:inline-flex sm:w-auto">
       {TABS.map((tab) => {
         const active =
           tab.href === "/finance/spending" ? pathname === "/finance/spending" : pathname.startsWith(tab.href);
@@ -22,14 +22,14 @@ export function SpendingNav() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={`shrink-0 px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-              active ? "bg-canvas text-ink" : "text-ink-muted hover:text-ink"
+            className={`shrink-0 rounded-full px-3 py-2 text-[12px] font-semibold transition-colors ${
+              active ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-fg-neutral-muted hover:bg-bg-neutral-weak hover:text-fg-neutral"
             }`}
           >
             {tab.label}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

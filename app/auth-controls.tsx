@@ -10,14 +10,14 @@ export function AuthControls() {
     <div className="flex min-w-0 items-center gap-2">
       <Show when="signed-out">
         <SignInButton mode="modal">
-          <button className="min-h-9 rounded-full border border-zinc-200 bg-white/90 px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90">로그인</button>
+          <button className="seed-pill">로그인</button>
         </SignInButton>
         <SignUpButton mode="modal">
-          <button className="min-h-9 rounded-full bg-zinc-900 px-3 py-2 text-xs font-semibold text-white shadow-sm dark:bg-white dark:text-zinc-900">가입</button>
+          <button className="seed-pill bg-bg-brand-solid text-fg-neutral-inverted">가입</button>
         </SignUpButton>
       </Show>
       <Show when="signed-in">
-        <Link href="/family" className="min-h-9 rounded-full border border-zinc-200 bg-white/90 px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/90">가족</Link>
+        <Link href="/family" className="seed-pill">가족</Link>
         <UserButton />
       </Show>
     </div>

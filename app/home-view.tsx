@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SECTIONS, type Section, type SectionStatus } from "@/lib/sections";
+import { AppShell, Card, PageHeader, StatusBadge } from "@/components/ui";
 
 function formatToday() {
   return new Intl.DateTimeFormat("ko-KR", {
@@ -17,13 +18,11 @@ function SectionRow({
   status: SectionStatus;
 }) {
   const card = (
-    <div
-      className={`flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm dark:bg-zinc-900 ${status.ready ? "" : "opacity-60 shadow-none"}`}
-    >
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-100 text-lg dark:bg-zinc-800">
+    <Card className={`flex items-center gap-3 p-3 transition-colors hover:bg-bg-layer-default-pressed ${status.ready ? "" : "opacity-60 shadow-none"}`}>
+      <span className="flex h-10 w-10 items-center justify-center rounded-r3 bg-bg-brand-weak text-xl">
         {section.icon}
       </span>
-      <span className="flex-1 font-semibold text-zinc-900 dark:text-zinc-50">
+      <span className="flex-1 t5-bold text-fg-neutral">
         {section.name}
       </span>
       {status.ready ? (
@@ -36,22 +35,22 @@ function SectionRow({
                 </span>
               ))}
               {status.overdueIcons.length > 5 && (
-                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                <span className="text-xs font-semibold text-fg-neutral-muted">
                   +{status.overdueIcons.length - 5}
                 </span>
               )}
             </span>
           )}
-          <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+          <StatusBadge tone={status.overdueIcons?.length ? "critical" : "brand"}>
             {status.label}
-          </span>
+          </StatusBadge>
         </span>
       ) : (
-        <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-semibold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+        <StatusBadge tone="neutral">
           준비중
-        </span>
+        </StatusBadge>
       )}
-    </div>
+    </Card>
   );
 
   if (!status.ready) {
@@ -79,14 +78,8 @@ export async function HomeView({
   const statuses = await Promise.all(sections.map((section) => section.getStatus()));
 
   return (
-    <div className="flex flex-1 flex-col items-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex w-full max-w-md flex-1 flex-col px-5 py-10">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {formatToday()}
-        </p>
-        <h1 className="mb-6 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-          우리집 👋
-        </h1>
+    <AppShell size="compact" className="font-sans">
+        <PageHeader title="우리집 👋" eyebrow={formatToday()} className="mb-6" />
         <ul className="flex flex-col gap-3">
           {sections.map((section, index) => (
             <li key={section.id}>
@@ -94,7 +87,6 @@ export async function HomeView({
             </li>
           ))}
         </ul>
-      </main>
-    </div>
+    </AppShell>
   );
 }

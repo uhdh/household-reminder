@@ -4,6 +4,7 @@ import { moveLaundrySuppliesToChores } from "@/lib/supplies-db";
 import { computeChoreStatus, todayISO } from "@/lib/chores";
 import { ChoreGrid, type ChoreViewModel } from "./chore-grid";
 import { createChore, updateChore, completeChore, deleteChore } from "./actions";
+import { AppShell, PageHeader } from "@/components/ui";
 
 // This page reads a mutable local SQLite file and computes time-dependent
 // due-date status (today's date) on every read — there's nothing to gain
@@ -27,9 +28,12 @@ export default async function CleaningPage() {
   }));
 
   return (
-    <div className="flex-1 bg-zinc-50 dark:bg-black">
-      <main className="mx-auto max-w-2xl p-4">
-        <h1 className="mb-4 text-xl font-bold">청소 관리</h1>
+    <AppShell>
+        <PageHeader
+          title="청소 관리"
+          description="주기와 최근 완료일을 기준으로 오늘 할 일을 확인해요."
+          className="mb-5"
+        />
         <ChoreGrid
           chores={chores}
           completeAction={completeChore}
@@ -37,7 +41,6 @@ export default async function CleaningPage() {
           updateAction={updateChore}
           deleteAction={deleteChore}
         />
-      </main>
-    </div>
+    </AppShell>
   );
 }

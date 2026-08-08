@@ -27,17 +27,17 @@ export default async function HistoryDetailPage({
   const dateLabel = format(parseISO(date), "M월 d일 EEEE", { locale: ko });
 
   return (
-    <div className="flex-1 bg-zinc-50 dark:bg-black">
+    <div className="seed-page">
       <main className="mx-auto flex max-w-md flex-1 flex-col gap-4 p-5">
         <div className="flex items-center gap-3">
           <Link
             href="/emotion-cards/history"
             aria-label="뒤로가기"
-            className="text-xl leading-none text-zinc-500 dark:text-zinc-400"
+            className="seed-icon-button text-xl leading-none"
           >
             ←
           </Link>
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">{dateLabel}</h1>
+          <h1 className="text-xl font-bold text-fg-neutral">{dateLabel}</h1>
         </div>
         {records.map((record) => (
           <CardsView key={record.userId ?? "legacy"} label={record.userId === context?.userId ? "나" : "가족"} cards={record.cards} />

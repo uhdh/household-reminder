@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
 
-function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
+function getPreferredTheme(): Theme {
   const saved = window.localStorage.getItem("theme");
   if (saved === "light" || saved === "dark") return saved;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -13,15 +12,30 @@ function getInitialTheme(): Theme {
 
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.dataset.seedUserColorScheme = theme;
   document.documentElement.style.colorScheme = theme;
 }
 
+function subscribeToTheme(onStoreChange: () => void) {
+  window.addEventListener("themechange", onStoreChange);
+  window.addEventListener("storage", onStoreChange);
+  return () => {
+    window.removeEventListener("themechange", onStoreChange);
+    window.removeEventListener("storage", onStoreChange);
+  };
+}
+
+function setThemePreference(theme: Theme) {
+  window.localStorage.setItem("theme", theme);
+  applyTheme(theme);
+  window.dispatchEvent(new Event("themechange"));
+}
+
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const theme = useSyncExternalStore(subscribeToTheme, getPreferredTheme, (): Theme => "light");
 
   useEffect(() => {
     applyTheme(theme);
-    window.localStorage.setItem("theme", theme);
   }, [theme]);
 
   const nextTheme = theme === "dark" ? "light" : "dark";
@@ -29,10 +43,10 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      onClick={() => setTheme(nextTheme)}
+      onClick={() => setThemePreference(nextTheme)}
       aria-label={`${nextTheme === "dark" ? "다크" : "라이트"} 모드로 변경`}
       title={`${nextTheme === "dark" ? "다크" : "라이트"} 모드`}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white/90 text-base shadow-sm backdrop-blur transition hover:scale-105 sm:h-10 sm:w-10 sm:text-lg dark:border-zinc-700 dark:bg-zinc-900/90"
+      className="seed-icon-button text-lg"
     >
       {theme === "dark" ? "☀️" : "🌙"}
     </button>
