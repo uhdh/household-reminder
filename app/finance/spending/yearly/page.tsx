@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
-import { flowLabel, getActiveTransactions, latestYear, monthOf, toNum, yearOf } from "@/lib/spending-queries";
+import { flowLabel, getActiveTransactions, isPersonId, latestYear, monthOf, toNum, yearOf, type PersonId } from "@/lib/spending-queries";
+import { PersonFilter } from "../person-filter";
+import { YearlyView } from "./yearly-view";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,7 @@ function emptyMonths(): number[] {
 }
 
 function fmt(n: number): string {
-  return n === 0 ? "-" : Math.round(n).toLocaleString("ko-KR");
+  return n === 0 ? "-" : Math.round(n / 10_000).toLocaleString("ko-KR");
 }
 
 function Row({
@@ -62,14 +64,15 @@ function SectionHeader({ label }: { label: string }) {
 export default async function YearlyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<{ year?: string; person?: string }>;
 }) {
-  const { year: yearParam } = await searchParams;
+  const { year: yearParam, person } = await searchParams;
+  const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
 
-  const { transactions: allTx } = await getActiveTransactions();
+  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions();
   const includedTx = allTx.filter((t) => t.included);
   const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : latestYear(includedTx);
-  const yearTx = includedTx.filter((t) => yearOf(t.txnDate) === year);
+  const yearTx = includedTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));
 
   const db = getDb();
   const budgetRows = await db.select().from(budgetCategories);
@@ -127,26 +130,38 @@ export default async function YearlyPage({
 
   const fixedRows = sortedBudgets.filter((b) => b.kind === "고정비");
   const variableRows = sortedBudgets.filter((b) => b.kind === "변동비");
+  const hrefForYear = (value: number) => `/finance/spending/yearly?year=${value}${personFilter === "all" ? "" : `&person=${personFilter}`}`;
+  const chartData = MONTH_LABELS.map((monthLabel, index) => ({
+    month: monthLabel,
+    income: Math.round(totalIncomeM[index] / 10_000),
+    expense: Math.round(totalExpenseM[index] / 10_000),
+    fixedExpense: Math.round(fixedExpenseM[index] / 10_000),
+    variableExpense: Math.round(variableExpenseM[index] / 10_000),
+  }));
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
         <Link
-          href={`/finance/spending/yearly?year=${year - 1}`}
+          href={hrefForYear(year - 1)}
           className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
         >
           ← {year - 1}년
         </Link>
         <span className="text-[14px] font-semibold text-ink">{year}년</span>
         <Link
-          href={`/finance/spending/yearly?year=${year + 1}`}
+          href={hrefForYear(year + 1)}
           className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
         >
           {year + 1}년 →
         </Link>
         <span className="ml-2 text-[12px] text-ink-muted">{divisor}월까지 · 평균은 {divisor}개월 기준</span>
+        </div>
+        <PersonFilter pathname="/finance/spending/yearly" periodKey="year" periodValue={String(year)} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
+      <YearlyView data={chartData}>
       <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">
         <table className="w-full text-[13px]">
           <thead>
@@ -182,6 +197,7 @@ export default async function YearlyPage({
           </tbody>
         </table>
       </div>
+      </YearlyView>
     </div>
   );
 }

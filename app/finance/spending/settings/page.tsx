@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { budgetCategories, categoryMappings } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
@@ -74,6 +75,16 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
+      <section className="seed-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-[13px] font-semibold text-ink">파일 업로드</h2>
+          <p className="mt-1 text-[12px] text-ink-muted">뱅크샐러드 엑셀 파일로 자산과 거래 내역을 갱신합니다.</p>
+        </div>
+        <Link href="/finance/upload" className="seed-button seed-button-primary shrink-0">
+          업로드 화면 열기
+        </Link>
+      </section>
+
       {unmapped.length > 0 && (
         <div className="seed-card bg-bg-critical-weak p-4">
           <h2 className="mb-1 text-[13px] font-semibold text-gain">매핑되지 않은 카테고리 ({unmapped.length}건)</h2>

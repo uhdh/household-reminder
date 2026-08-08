@@ -2,14 +2,6 @@ import Link from "next/link";
 import { SECTIONS, type Section, type SectionStatus } from "@/lib/sections";
 import { AppShell, Card, PageHeader, StatusBadge } from "@/components/ui";
 
-function formatToday() {
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(new Date());
-}
-
 function SectionRow({
   section,
   status,
@@ -79,7 +71,7 @@ export async function HomeView({
 
   return (
     <AppShell size="compact" className="font-sans">
-        <PageHeader title="우리집 👋" eyebrow={formatToday()} className="mb-6" />
+        <PageHeader title="우리집" className="mb-6" />
         <ul className="flex flex-col gap-3">
           {sections.map((section, index) => (
             <li key={section.id}>

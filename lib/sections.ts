@@ -61,6 +61,13 @@ export const SECTIONS: Section[] = [
     },
   },
   {
+    id: "household-ledger",
+    name: "가계부",
+    icon: "📒",
+    href: "/finance/spending/monthly",
+    getStatus: async () => ({ ready: true, label: "바로가기" }),
+  },
+  {
     id: "budget",
     name: "자산관리",
     icon: "💰",

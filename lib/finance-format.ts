@@ -6,6 +6,12 @@ export function formatKRW(amount: number): string {
   return `${Math.round(amount).toLocaleString("ko-KR")}원`;
 }
 
+export function formatCompactKRW(amount: number): string {
+  const rounded = Math.round(amount);
+  if (Math.abs(rounded) < 10_000) return formatKRW(rounded);
+  return `${Math.round(rounded / 10_000).toLocaleString("ko-KR")}만원`;
+}
+
 export const CATEGORY_PALETTE = [
   "#2A78D6",
   "#EB6834",

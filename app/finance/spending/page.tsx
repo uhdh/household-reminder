@@ -3,7 +3,6 @@ import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import {
   MONTH_RE,
-  PERSON_IDS,
   PERSON_LABELS,
   flowLabel,
   getActiveTransactions,
@@ -17,6 +16,7 @@ import {
 import { formatKRW } from "@/lib/finance-format";
 import { BeneficiarySelect } from "./beneficiary-select";
 import { CategorySelect } from "./category-select";
+import { PersonFilter } from "./person-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -70,23 +70,7 @@ export default async function SpendingPage({
           </Link>
         </div>
 
-        <div className="inline-flex gap-1 border-[0.8px] border-hairline bg-card p-1">
-          {(["all", ...PERSON_IDS] as const).map((p) => {
-            const active = p === personFilter;
-            const label = p === "all" ? "전체" : displayNameByPerson.get(p) ?? PERSON_LABELS[p as PersonId];
-            return (
-              <Link
-                key={p}
-                href={hrefFor(month, p)}
-                className={`px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-                  active ? "bg-canvas text-ink" : "text-ink-muted hover:text-ink"
-                }`}
-              >
-                {label}
-              </Link>
-            );
-          })}
-        </div>
+        <PersonFilter pathname="/finance/spending" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
       {unmappedCount > 0 && (
