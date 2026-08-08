@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { budgetCategories, categoryMappings } from "@/lib/finance-db";
+import { budgetCategories, categoryMappings, transactions } from "@/lib/finance-db";
 
 const VALID_TXN_TYPES = new Set(["수입", "지출", "이체"]);
 const VALID_KINDS = new Set(["고정비", "변동비", "고정수입", "변동수입"]);
@@ -23,6 +23,21 @@ export async function upsertCategoryMappingAction(formData: FormData) {
         target: [categoryMappings.txnType, categoryMappings.rawCategory, categoryMappings.rawSubcategory],
         set: { stdCategory },
       });
+
+    await db
+      .update(transactions)
+      .set({ stdCategory })
+      .where(
+        and(
+          eq(transactions.txnType, txnType),
+          rawCategory === "미분류"
+            ? or(isNull(transactions.category), eq(transactions.category, rawCategory))
+            : eq(transactions.category, rawCategory),
+          rawSubcategory === "미분류"
+            ? or(isNull(transactions.subcategory), eq(transactions.subcategory, rawSubcategory))
+            : eq(transactions.subcategory, rawSubcategory)
+        )
+      );
   }
 
   redirect("/finance/spending/settings");

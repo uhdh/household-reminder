@@ -75,6 +75,11 @@ export async function uploadAction(formData: FormData) {
     isActive: true,
   });
 
+  await db
+    .update(transactions)
+    .set({ uploadId })
+    .where(and(eq(transactions.personId, personId), eq(transactions.category, "직접 입력"), eq(transactions.subcategory, "직접 입력")));
+
   for (const rows of chunk(parsed.assetItems, INSERT_CHUNK_SIZE)) {
     await db.insert(assetItems).values(
       rows.map((item) => ({

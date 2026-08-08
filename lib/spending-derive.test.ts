@@ -1,0 +1,67 @@
+import { describe, expect, test } from "vitest";
+import type { ParsedTransaction } from "@/lib/finance-parse/types";
+import { deriveTransactionFields, mapStdCategory, matchSelfTransferPairs } from "@/lib/spending-derive";
+
+function transaction(overrides: Partial<ParsedTransaction>): ParsedTransaction {
+  return {
+    txnDate: "2026-01-29",
+    txnTime: "09:48:43",
+    txnType: "수입",
+    category: "금융수입",
+    subcategory: "미분류",
+    description: "거래소 출금",
+    amount: 31_665_591,
+    paymentMethod: "생활통장",
+    ...overrides,
+  };
+}
+
+describe("matchSelfTransferPairs", () => {
+  test("수수료로 금액이 조금 다른 같은 날 금융 이동을 내부이체로 묶는다", () => {
+    const rows = [
+      transaction({}),
+      transaction({
+        txnTime: "09:54:25",
+        txnType: "지출",
+        category: "금융",
+        subcategory: "은행",
+        description: "본인 계좌",
+        amount: -31_703_356,
+      }),
+    ];
+
+    expect(matchSelfTransferPairs(rows)).toEqual([true, true]);
+    expect(deriveTransactionFields(rows, new Map())).toMatchObject([
+      { included: false, isInternalTransfer: true },
+      { included: false, isInternalTransfer: true },
+    ]);
+  });
+
+  test("시간이 멀거나 금액 차이가 큰 금융 거래는 임의로 묶지 않는다", () => {
+    const rows = [
+      transaction({}),
+      transaction({ txnTime: "12:00:00", txnType: "지출", category: "금융", amount: -31_703_356 }),
+      transaction({ txnTime: "09:50:00", txnType: "지출", category: "금융", amount: -30_000_000 }),
+    ];
+
+    expect(matchSelfTransferPairs(rows)).toEqual([false, false, false]);
+  });
+});
+
+describe("mapStdCategory", () => {
+  test("수입 설명에 급여가 있으면 원본 금융수입보다 월급을 우선한다", () => {
+    const row = transaction({ description: "SK텔레콤급여", amount: 5_772_867 });
+    const mappings = new Map([["수입|금융수입|미분류", "금융수입"]]);
+
+    expect(mapStdCategory(row, mappings)).toBe("월급");
+  });
+
+  test("자산수정으로 매핑된 거래는 지출 집계에서 제외한다", () => {
+    const row = transaction({ txnType: "지출", category: "자산수정", amount: -100_000 });
+    const mappings = new Map([["지출|자산수정|미분류", "자산수정"]]);
+
+    expect(deriveTransactionFields([row], mappings)).toMatchObject([
+      { stdCategory: "자산수정", included: false, isInternalTransfer: false },
+    ]);
+  });
+});

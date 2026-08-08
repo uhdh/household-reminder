@@ -1,4 +1,4 @@
-import { formatKRW } from "@/lib/finance-format";
+import { formatKRW, formatManwon } from "@/lib/finance-format";
 import { AnimatedNumber } from "./animated-number";
 
 export function SummaryCard({
@@ -11,19 +11,19 @@ export function SummaryCard({
   label: string;
   value: number;
   breakdown?: { label: string; value: number }[];
-  format?: "krw" | "compactKrw" | "signedPct";
+  format?: "krw" | "compactKrw" | "manwon" | "signedPct";
   variant?: "hero" | "detail";
 }) {
   const isHero = variant === "hero";
   const breakdownText = breakdown
-    .map((b) => `${b.label} ${format === "signedPct" ? `${b.value.toFixed(1)}%` : formatKRW(b.value)}`)
+    .map((b) => `${b.label} ${format === "signedPct" ? `${b.value.toFixed(1)}%` : format === "manwon" ? formatManwon(b.value) : formatKRW(b.value)}`)
     .join(" · ");
 
   return (
     <div className="seed-card px-4 py-3 shadow-none">
       <p className="mb-1 text-[12px] font-semibold text-ink-muted">{label}</p>
       <p
-        title={format === "signedPct" ? `${value >= 0 ? "+" : ""}${value.toFixed(1)}%` : formatKRW(value)}
+        title={format === "signedPct" ? `${value >= 0 ? "+" : ""}${value.toFixed(1)}%` : format === "manwon" ? formatManwon(value) : formatKRW(value)}
         className={
           isHero
             ? "text-[22px] font-bold tabular-nums text-ink sm:text-[24px]"

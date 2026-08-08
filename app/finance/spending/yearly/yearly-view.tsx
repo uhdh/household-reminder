@@ -20,11 +20,13 @@ const tooltipStyle = {
 };
 
 export function YearlyView({ data, children }: { data: YearlyDatum[]; children: ReactNode }) {
-  const [view, setView] = useState<"table" | "chart">("table");
+  const [view, setView] = useState<"table" | "chart">("chart");
   const fixedTotal = data.reduce((sum, item) => sum + item.fixedExpense, 0);
   const variableTotal = data.reduce((sum, item) => sum + item.variableExpense, 0);
   const expenseTotal = fixedTotal + variableTotal;
   const variableRatio = expenseTotal > 0 ? (variableTotal / expenseTotal) * 100 : 0;
+  const incomeTotal = data.reduce((sum, item) => sum + item.income, 0);
+  const savingsRate = incomeTotal > 0 ? ((incomeTotal - expenseTotal) / incomeTotal) * 100 : 0;
 
   return (
     <section>
@@ -67,13 +69,13 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
                   formatter={(value) => [`${Number(value).toLocaleString("ko-KR")}만원`]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
-                <Bar dataKey="income" name="수입" fill="var(--seed-color-bg-brand-solid)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="income" name="수입" fill="var(--seed-color-bg-informative-solid)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="expense" name="지출" fill="var(--seed-color-bg-critical-solid)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="seed-card p-4 shadow-none">
             <p className="text-[11px] font-semibold text-ink-muted">연간 고정비</p>
             <p className="mt-1 text-[20px] font-bold tabular-nums text-ink">{fixedTotal.toLocaleString("ko-KR")}만원</p>
@@ -85,6 +87,12 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
           <div className="seed-card p-4 shadow-none">
             <p className="text-[11px] font-semibold text-ink-muted">변동비 비중</p>
             <p className="mt-1 text-[20px] font-bold tabular-nums text-ink">{variableRatio.toFixed(1)}%</p>
+          </div>
+          <div className="seed-card p-4 shadow-none">
+            <p className="text-[11px] font-semibold text-ink-muted">연간 저축률</p>
+            <p className={`mt-1 text-[20px] font-bold tabular-nums ${savingsRate >= 0 ? "text-fg-positive" : "text-fg-critical"}`}>
+              {savingsRate >= 0 ? "+" : ""}{savingsRate.toFixed(1)}%
+            </p>
           </div>
         </div>
         <div className="border-[0.8px] border-hairline bg-card px-2 py-4 sm:p-5">
@@ -103,7 +111,7 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
                   formatter={(value) => [`${Number(value).toLocaleString("ko-KR")}만원`]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
-                <Bar dataKey="fixedExpense" name="고정비" stackId="expense" fill="var(--seed-color-palette-blue-500)" />
+                <Bar dataKey="fixedExpense" name="고정비" stackId="expense" fill="var(--seed-color-bg-informative-solid)" />
                 <Bar dataKey="variableExpense" name="변동비" stackId="expense" fill="var(--seed-color-bg-brand-solid)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

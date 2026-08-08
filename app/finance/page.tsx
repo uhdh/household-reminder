@@ -6,6 +6,7 @@ import { allocationTargets, assetItems, uploads } from "@/lib/finance-db";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
 import { buildCategoryColorMap, formatManwon, heatmapReturnColor, toNumber } from "@/lib/finance-format";
 import { AnimatedNumber } from "./_components/animated-number";
+import { SummaryCard } from "./_components/summary-card";
 import { DashboardCharts } from "./_components/charts";
 import { TargetAllocationCard } from "./_components/target-allocation";
 import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
@@ -264,14 +265,15 @@ export default async function DashboardPage({
 
   return (
     <AppShell size="wide" className="font-office text-ink">
-        <div className="mb-2 text-right text-[11px] text-ink-muted">단위: 만원</div>
-
         {hasAnyData && (
-          <PersonFilterTabs
-            current={personFilter}
-            husbandLabel={displayNameByPerson.get("husband") ?? PERSON_LABELS.husband}
-            wifeLabel={displayNameByPerson.get("wife") ?? PERSON_LABELS.wife}
-          />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <PersonFilterTabs
+              current={personFilter}
+              husbandLabel={displayNameByPerson.get("husband") ?? PERSON_LABELS.husband}
+              wifeLabel={displayNameByPerson.get("wife") ?? PERSON_LABELS.wife}
+            />
+            <span className="text-[11px] text-ink-muted">단위: 만원</span>
+          </div>
         )}
 
         {!hasAnyData ? (
@@ -337,35 +339,21 @@ function HeroRow({
 
   if (personFilter !== "all") {
     return (
-      <div className="border-[0.8px] border-hairline bg-card px-4 py-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3">
-          <StatItem label="순자산" value={totalNet} first accent={personFilter} />
-          <StatItem label="총자산" value={totalAsset} />
-          <StatItem label="총부채" value={totalDebt} />
-        </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <SummaryCard label="순자산" value={totalNet} format="manwon" />
+        <SummaryCard label="총자산" value={totalAsset} format="manwon" />
+        <SummaryCard label="총부채" value={totalDebt} format="manwon" />
       </div>
     );
   }
 
   return (
-    <div className="border-[0.8px] border-hairline bg-card px-4 py-3">
-      <div className="grid grid-cols-1 sm:grid-cols-[1.35fr_1fr_1fr_1fr_1fr]">
-        <StatItem label="순자산" value={totalNet} subtext={`자산 ${formatManwon(totalAsset)}`} first />
-        <StatItem label="총자산" value={totalAsset} />
-        <StatItem label="총부채" value={totalDebt} />
-        <StatItem
-          label={`${husband.label} 순자산`}
-          value={husband.net}
-          subtext={husband.hasData ? undefined : "데이터 없음"}
-          accent="husband"
-        />
-        <StatItem
-          label={`${wife.label} 순자산`}
-          value={wife.net}
-          subtext={wife.hasData ? undefined : "데이터 없음"}
-          accent="wife"
-        />
-      </div>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+      <SummaryCard label="순자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }]} />
+      <SummaryCard label="총자산" value={totalAsset} format="manwon" />
+      <SummaryCard label="총부채" value={totalDebt} format="manwon" />
+      <SummaryCard label={`${husband.label} 순자산`} value={husband.net} format="manwon" />
+      <SummaryCard label={`${wife.label} 순자산`} value={wife.net} format="manwon" />
     </div>
   );
 }
@@ -385,7 +373,7 @@ function PersonFilterTabs({
     { key: "wife", label: wifeLabel, dotColor: "bg-wife" },
   ];
   return (
-    <div className="mb-4 inline-flex gap-1 border-[0.8px] border-hairline bg-card p-1">
+    <div className="seed-card inline-flex gap-1 p-1 shadow-none">
       {tabs.map((tab) => {
         const active = tab.key === current;
         const href = tab.key === "all" ? "/finance" : `/finance?person=${tab.key}`;
@@ -393,8 +381,8 @@ function PersonFilterTabs({
           <Link
             key={tab.key}
             href={href}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-              active ? "bg-canvas text-ink" : "text-ink-muted hover:text-ink"
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+              active ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-ink-muted hover:bg-bg-neutral-weak hover:text-ink"
             }`}
           >
             {tab.dotColor && <span className={`h-1.5 w-1.5 rounded-full ${tab.dotColor}`} />}
@@ -402,40 +390,6 @@ function PersonFilterTabs({
           </Link>
         );
       })}
-    </div>
-  );
-}
-
-function StatItem({
-  label,
-  value,
-  subtext,
-  first,
-  accent,
-}: {
-  label: string;
-  value: number;
-  subtext?: string;
-  first?: boolean;
-  accent?: "husband" | "wife";
-}) {
-  const dotColor = accent === "husband" ? "bg-husband" : accent === "wife" ? "bg-wife" : null;
-  return (
-    <div
-      className={`py-2 ${
-        first
-          ? "sm:pr-4"
-          : "border-t-[0.8px] border-hairline2 sm:border-l-[0.8px] sm:border-t-0 sm:px-4"
-      }`}
-    >
-      <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-ink-muted">
-        {dotColor && <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />}
-        {label}
-      </p>
-      <p className="text-[22px] font-bold tabular-nums text-ink sm:text-[25px]">
-        <AnimatedNumber value={value} format="manwon" />
-      </p>
-      {subtext && <p className="mt-0.5 text-[11px] text-ink-muted">{subtext}</p>}
     </div>
   );
 }

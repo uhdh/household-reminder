@@ -15,6 +15,7 @@ export type DerivedResult = {
 
 // 원본 엑셀 M열 수식에서, 매핑표와 무관하게 특정 키워드가 포함된 거래는 항상 "보험"으로 분류한다.
 const INSURANCE_KEYWORDS = ["11삼생", "DB생", "삼성생보험금"];
+const SALARY_KEYWORDS = ["급여", "월급"];
 
 // 원본 엑셀 P열: 대분류가 아래 중 하나면 자기계좌이체 후보로 본다.
 const TRANSFER_CATEGORY_KEYWORDS = new Set(["카드대금", "저축", "투자", "현금", "내계좌이체"]);
@@ -47,6 +48,7 @@ export function mapStdCategory(
 ): string | null {
   const description = txn.description ?? "";
   if (INSURANCE_KEYWORDS.some((kw) => description.includes(kw))) return "보험";
+  if (txn.txnType === "수입" && SALARY_KEYWORDS.some((kw) => description.includes(kw))) return "월급";
   const rawCategory = txn.category ?? "미분류";
   const rawSubcategory = txn.subcategory ?? "미분류";
   return mappingIndex.get(mapKey(txn.txnType, rawCategory, rawSubcategory)) ?? null;
@@ -62,6 +64,12 @@ export function isTransferCandidate(txn: ParsedTransaction): boolean {
 
 function toTimestamp(date: string, time: string | null): number {
   return new Date(`${date}T${time ?? "00:00:00"}Z`).getTime();
+}
+
+function isFinanceTransferHint(txn: ParsedTransaction): boolean {
+  const category = txn.category ?? "";
+  const description = txn.description ?? "";
+  return category.includes("금융") || /(입금|출금|이체)/.test(description);
 }
 
 /**
@@ -99,6 +107,39 @@ export function matchSelfTransferPairs(transactions: ParsedTransaction[]): boole
     }
   }
 
+  // 거래소·증권사 등에서 내 계좌로 옮길 때 수수료 때문에 양쪽 금액과 설명이
+  // 조금 달라지는 경우를 보완한다. 같은 날 1시간 이내의 금융 거래 중 부호가
+  // 반대이고 금액 차이가 0.5% 및 5만원 이내인 가장 가까운 한 쌍만 매칭한다.
+  for (let i = 0; i < n; i++) {
+    if (isMatched[i] || !isFinanceTransferHint(transactions[i])) continue;
+
+    let bestIndex = -1;
+    let bestTimeDiff = Number.POSITIVE_INFINITY;
+    const amount = Math.abs(transactions[i].amount);
+
+    for (let j = i + 1; j < n; j++) {
+      if (isMatched[j] || signs[j] === signs[i] || !isFinanceTransferHint(transactions[j])) continue;
+
+      const timeDiff = Math.abs(timestamps[i] - timestamps[j]);
+      if (timeDiff > 60 * 60 * 1000) continue;
+
+      const otherAmount = Math.abs(transactions[j].amount);
+      const amountDiff = Math.abs(amount - otherAmount);
+      const relativeDiff = amountDiff / Math.max(amount, otherAmount);
+      if (amountDiff > 50_000 || relativeDiff > 0.005) continue;
+
+      if (timeDiff < bestTimeDiff) {
+        bestIndex = j;
+        bestTimeDiff = timeDiff;
+      }
+    }
+
+    if (bestIndex >= 0) {
+      isMatched[i] = true;
+      isMatched[bestIndex] = true;
+    }
+  }
+
   return isMatched;
 }
 
@@ -122,9 +163,10 @@ export function deriveTransactionFields(
   return transactions.map((txn, i) => {
     const isTransferCand = isTransferCandidate(txn);
     const isMatchedPair = matched[i];
+    const stdCategory = mapStdCategory(txn, mappingIndex);
     return {
-      stdCategory: mapStdCategory(txn, mappingIndex),
-      included: computeIncluded(txn, isTransferCand, isMatchedPair),
+      stdCategory,
+      included: stdCategory !== "자산수정" && computeIncluded(txn, isTransferCand, isMatchedPair),
       isInternalTransfer: isMatchedPair,
     };
   });

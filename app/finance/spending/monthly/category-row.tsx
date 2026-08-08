@@ -88,7 +88,7 @@ export function CategoryRow({
           <td colSpan={5} className="px-3 py-4">
             <div className="flex flex-col gap-5 sm:flex-row sm:gap-8">
               {!hidePayerBreakdown && <Breakdown title="결제한 사람" items={paidBy} />}
-              <Breakdown title="사용 주체" items={beneficiaries} />
+              <Breakdown title="사용 대상" items={beneficiaries} />
             </div>
           </td>
         </tr>

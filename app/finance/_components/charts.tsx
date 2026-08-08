@@ -50,7 +50,7 @@ function LegendList({ data }: { data: CategoryDatum[] }) {
 
 function AllocationCard({ title, data }: { title: string; data: CategoryDatum[] }) {
   return (
-    <div className="border-[0.8px] border-hairline bg-card p-4">
+    <div className="seed-card p-4 shadow-none">
       <CardHeader title={title} caption={`${data.length}개 항목`} />
       {data.length === 0 ? (
         <p className="text-[13px] text-ink-muted">데이터가 없습니다.</p>
@@ -186,7 +186,7 @@ function HeatmapLegend() {
 
 function HeatmapCard({ data }: { data: TreemapDatum[] }) {
   return (
-    <div className="border-[0.8px] border-hairline bg-card p-4">
+    <div className="seed-card p-4 shadow-none">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div>
           <h2 className="text-[13px] font-semibold text-ink">자산 항목 히트맵</h2>
@@ -222,8 +222,8 @@ export function DashboardCharts({
   sectorComposition: CategoryDatum[];
 }) {
   return (
-    <div className="mt-4 flex flex-col gap-4">
-      <div className={`grid grid-cols-1 gap-4 ${sectorComposition.length > 0 ? "lg:grid-cols-2" : ""}`}>
+    <div className="mt-3 flex flex-col gap-3">
+      <div className={`grid grid-cols-1 gap-3 ${sectorComposition.length > 0 ? "lg:grid-cols-2" : ""}`}>
         <AllocationCard title="자산 구성" data={assetComposition} />
         {sectorComposition.length > 0 && <AllocationCard title="섹터별 평가금액" data={sectorComposition} />}
       </div>
