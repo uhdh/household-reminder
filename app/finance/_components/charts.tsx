@@ -1,7 +1,7 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Treemap } from "recharts";
-import { formatKRW, isLightColor } from "@/lib/finance-format";
+import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL, formatManwon } from "@/lib/finance-format";
 
 type CategoryDatum = { name: string; value: number; fill: string };
 type TreemapDatum = { name: string; value: number; fill: string; returnPct: number | null; sharePct: number };
@@ -39,7 +39,7 @@ function LegendList({ data }: { data: CategoryDatum[] }) {
                 style={{ width: `${pct}%`, backgroundColor: d.fill }}
               />
             </span>
-            <span className="w-24 shrink-0 text-right tabular-nums text-ink">{formatKRW(d.value)}</span>
+            <span className="w-24 shrink-0 text-right tabular-nums text-ink">{formatManwon(d.value)}</span>
             <span className="w-10 shrink-0 text-right tabular-nums text-ink-muted">{pct.toFixed(0)}%</span>
           </li>
         );
@@ -71,7 +71,7 @@ function AllocationCard({ title, data }: { title: string; data: CategoryDatum[] 
                   <Cell key={d.name} fill={d.fill} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => formatKRW(Number(value))} contentStyle={TOOLTIP_STYLE} />
+              <Tooltip formatter={(value) => formatManwon(Number(value))} contentStyle={TOOLTIP_STYLE} />
             </PieChart>
           </ResponsiveContainer>
           <div className="w-full sm:w-[55%]">
@@ -95,13 +95,12 @@ function truncateToWidth(text: string, availableWidth: number): string {
 }
 
 function HeatmapCell(props: unknown) {
-  const { x, y, width, height, name, value, fill, returnPct, sharePct, index } = props as {
+  const { x, y, width, height, name, fill, returnPct, sharePct, index } = props as {
     x: number;
     y: number;
     width: number;
     height: number;
     name?: string;
-    value: number;
     fill?: string;
     returnPct?: number | null;
     sharePct: number;
@@ -111,9 +110,12 @@ function HeatmapCell(props: unknown) {
   if (!fill || !name) {
     return <rect x={x} y={y} width={width} height={height} fill="none" />;
   }
-  const light = isLightColor(fill);
-  const textColor = light ? "#0B0B0B" : "#FFFFFF";
-  const haloColor = light ? "rgba(255,255,255,0.85)" : "rgba(11,11,11,0.55)";
+  const statusColor =
+    returnPct === null || returnPct === undefined || returnPct === 0
+      ? HEATMAP_NEUTRAL
+      : returnPct > 0
+        ? HEATMAP_GAIN
+        : HEATMAP_LOSS;
   const padding = 8;
   const clipId = `heatmap-cell-clip-${index}`;
   const label = truncateToWidth(name, width - padding * 2);
@@ -121,31 +123,47 @@ function HeatmapCell(props: unknown) {
     returnPct === null || returnPct === undefined
       ? ""
       : `${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(1)}%`;
-  const detailLabel = `${sharePct.toFixed(0)}%${returnLabel ? ` · ${returnLabel}` : ""}`;
+  const shareLabel = `${sharePct.toFixed(0)}%`;
   const showLabel = width > 32 && height > 18 && label.length > 0;
   const showValue = showLabel && height > 30 && width > 35;
-  const textHaloProps = {
-    stroke: haloColor,
-    strokeWidth: 3,
-    strokeLinejoin: "round" as const,
-    paintOrder: "stroke" as const,
-  };
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} style={{ fill, stroke: "var(--finance-canvas)", strokeWidth: 2 }} />
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        style={{ fill: "var(--seed-color-bg-neutral-weak)", stroke: "var(--finance-canvas)", strokeWidth: 2 }}
+      />
       <title>{`${name} · ${sharePct.toFixed(0)}%${returnLabel ? ` · 수익률 ${returnLabel}` : ""}`}</title>
       <clipPath id={clipId}>
         <rect x={x} y={y} width={width} height={height} />
       </clipPath>
       <g clipPath={`url(#${clipId})`}>
+        <rect x={x + 2} y={y + 2} width={Math.max(0, width - 4)} height={4} fill={statusColor} />
         {showLabel && (
-          <text x={x + padding} y={y + 18} fontSize={12} fontWeight={700} fill={textColor} {...textHaloProps}>
+          <text
+            x={x + padding}
+            y={y + 22}
+            fontSize={12}
+            fontWeight={700}
+            stroke="none"
+            className="fill-[#0B0B0B] dark:fill-[#F7F7F5]"
+          >
             {label}
           </text>
         )}
         {showValue && (
-          <text x={x + padding} y={y + 34} fontSize={11} fontWeight={600} fill={textColor} {...textHaloProps}>
-            {truncateToWidth(detailLabel, width - padding * 2)}
+          <text
+            x={x + padding}
+            y={y + 39}
+            fontSize={11}
+            fontWeight={600}
+            stroke="none"
+            className="fill-[#57574F] dark:fill-[#D6D4CB]"
+          >
+            <tspan>{shareLabel}</tspan>
+            {returnLabel && width > 65 && <tspan fill={statusColor}>{` · ${returnLabel}`}</tspan>}
           </text>
         )}
       </g>
@@ -156,11 +174,11 @@ function HeatmapCell(props: unknown) {
 function HeatmapLegend() {
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-muted">
-      <span className="h-2.5 w-2.5 shrink-0" style={{ backgroundColor: "#D03B3B" }} />
+      <span className="h-2.5 w-2.5 shrink-0" style={{ backgroundColor: HEATMAP_LOSS }} />
       손실
-      <span className="ml-2 h-2.5 w-2.5 shrink-0" style={{ backgroundColor: "#D6D4CB" }} />
+      <span className="ml-2 h-2.5 w-2.5 shrink-0" style={{ backgroundColor: HEATMAP_NEUTRAL }} />
       현금성/무손익
-      <span className="ml-2 h-2.5 w-2.5 shrink-0" style={{ backgroundColor: "#15803D" }} />
+      <span className="ml-2 h-2.5 w-2.5 shrink-0" style={{ backgroundColor: HEATMAP_GAIN }} />
       수익
     </div>
   );
@@ -172,7 +190,7 @@ function HeatmapCard({ data }: { data: TreemapDatum[] }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div>
           <h2 className="text-[13px] font-semibold text-ink">자산 항목 히트맵</h2>
-          <span className="text-[11px] text-ink-muted">면적 = 금액 비중 · 색상 = 수익률</span>
+          <span className="text-[11px] text-ink-muted">면적 = 금액 비중 · 상단 띠 = 수익·손실</span>
         </div>
         <HeatmapLegend />
       </div>
@@ -180,7 +198,14 @@ function HeatmapCard({ data }: { data: TreemapDatum[] }) {
         <p className="text-[13px] text-ink-muted">자산 데이터가 없습니다.</p>
       ) : (
         <ResponsiveContainer width="100%" height={340}>
-          <Treemap data={data} dataKey="value" aspectRatio={4 / 3} stroke="var(--finance-canvas)" content={<HeatmapCell />} />
+          <Treemap
+            data={data}
+            dataKey="value"
+            aspectRatio={4 / 3}
+            stroke="var(--finance-canvas)"
+            content={<HeatmapCell />}
+            isAnimationActive={false}
+          />
         </ResponsiveContainer>
       )}
     </div>
@@ -189,22 +214,19 @@ function HeatmapCard({ data }: { data: TreemapDatum[] }) {
 
 export function DashboardCharts({
   assetComposition,
-  debtComposition,
   treemapData,
   sectorComposition,
 }: {
   assetComposition: CategoryDatum[];
-  debtComposition: CategoryDatum[];
   treemapData: TreemapDatum[];
   sectorComposition: CategoryDatum[];
 }) {
   return (
     <div className="mt-4 flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className={`grid grid-cols-1 gap-4 ${sectorComposition.length > 0 ? "lg:grid-cols-2" : ""}`}>
         <AllocationCard title="자산 구성" data={assetComposition} />
-        <AllocationCard title="부채 구성" data={debtComposition} />
+        {sectorComposition.length > 0 && <AllocationCard title="섹터별 평가금액" data={sectorComposition} />}
       </div>
-      {sectorComposition.length > 0 && <AllocationCard title="섹터별 평가금액" data={sectorComposition} />}
       <HeatmapCard data={treemapData} />
     </div>
   );

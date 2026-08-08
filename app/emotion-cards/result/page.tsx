@@ -31,14 +31,14 @@ export default async function ResultPage() {
             >
               ←
             </Link>
-            <h1 className="text-xl font-bold text-fg-neutral">오늘의 마음</h1>
+            <h1 className="text-xl font-bold text-fg-neutral">오늘 우리 마음</h1>
           </div>
           <Link href="/emotion-cards/select?edit=1" className="t4-bold text-fg-brand">
             수정하기
           </Link>
         </div>
         {records.map((record) => (
-          <CardsView key={record.userId ?? "legacy"} label={record.userId === context?.userId ? "나" : "가족"} cards={record.cards} />
+          <CardsView key={record.userId ?? "legacy"} label={record.userId === context?.userId ? "나" : "배우자"} cards={record.cards} />
         ))}
       </main>
     </div>

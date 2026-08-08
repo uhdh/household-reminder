@@ -1,6 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { people, transactions, uploads } from "@/lib/finance-db";
+import { transactions, uploads } from "@/lib/finance-db";
 
 export const PERSON_IDS = ["husband", "wife"] as const;
 export type PersonId = (typeof PERSON_IDS)[number];
@@ -28,12 +28,8 @@ export async function getActiveTransactions(): Promise<{
   displayNameByPerson: Map<string, string>;
 }> {
   const db = getDb();
-  const [activeUploads, allPeople] = await Promise.all([
-    db.select().from(uploads).where(eq(uploads.isActive, true)),
-    db.select().from(people),
-  ]);
-
-  const displayNameByPerson = new Map(allPeople.map((p) => [p.id, p.displayName]));
+  const activeUploads = await db.select().from(uploads).where(eq(uploads.isActive, true));
+  const displayNameByPerson = new Map<string, string>(PERSON_IDS.map((id) => [id, PERSON_LABELS[id]]));
   const activeUploadIds = activeUploads.map((u) => u.id);
   if (activeUploadIds.length === 0) {
     return { transactions: [], displayNameByPerson };
@@ -45,7 +41,7 @@ export async function getActiveTransactions(): Promise<{
 
 export function beneficiaryLabel(value: string, displayNameByPerson: Map<string, string>): string {
   if (value === "joint") return "우리";
-  return displayNameByPerson.get(value) ?? PERSON_LABELS[value as PersonId] ?? value;
+  return PERSON_LABELS[value as PersonId] ?? displayNameByPerson.get(value) ?? value;
 }
 
 export function monthKeyOf(txnDate: string): string {

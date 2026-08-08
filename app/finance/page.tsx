@@ -2,14 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { allocationTargets, assetItems, people, uploads } from "@/lib/finance-db";
+import { allocationTargets, assetItems, uploads } from "@/lib/finance-db";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
-import { buildCategoryColorMap, formatKRW, heatmapReturnColor, toNumber } from "@/lib/finance-format";
+import { buildCategoryColorMap, formatManwon, heatmapReturnColor, toNumber } from "@/lib/finance-format";
 import { AnimatedNumber } from "./_components/animated-number";
 import { DashboardCharts } from "./_components/charts";
 import { TargetAllocationCard } from "./_components/target-allocation";
 import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
-import { AppShell, PageHeader } from "@/components/ui";
+import { AppShell } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -62,9 +62,8 @@ export default async function DashboardPage({
 
   const db = getDb();
 
-  const [activeUploads, allPeople, allocationTargetRows] = await Promise.all([
+  const [activeUploads, allocationTargetRows] = await Promise.all([
     db.select().from(uploads).where(eq(uploads.isActive, true)),
-    db.select().from(people),
     db.select().from(allocationTargets),
   ]);
 
@@ -78,7 +77,7 @@ export default async function DashboardPage({
 
   const activeUploadIds = activeUploads.map((u) => u.id);
   const peopleWithData = new Set(activeUploads.map((u) => u.personId));
-  const displayNameByPerson = new Map(allPeople.map((p) => [p.id, p.displayName]));
+  const displayNameByPerson = new Map<string, string>(PERSON_IDS.map((id) => [id, PERSON_LABELS[id]]));
 
   const rawAssets = activeUploadIds.length
     ? await db.select().from(assetItems).where(inArray(assetItems.uploadId, activeUploadIds))
@@ -125,27 +124,11 @@ export default async function DashboardPage({
     .sort((a, b) => b[1] - a[1])
     .map(([name]) => name);
 
-  const debtCategoryTotals = new Map<string, number>();
-  for (const item of filteredAssets) {
-    if (item.side !== "debt") continue;
-    const amt = toNumber(item.amount);
-    debtCategoryTotals.set(item.category, (debtCategoryTotals.get(item.category) ?? 0) + amt);
-  }
-  const debtCategoryOrder = Array.from(debtCategoryTotals.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([name]) => name);
-
-  const colorByCategory = buildCategoryColorMap([...assetCategoryOrder, ...debtCategoryOrder]);
+  const colorByCategory = buildCategoryColorMap(assetCategoryOrder);
 
   const assetComposition = assetCategoryOrder.map((name) => ({
     name,
     value: assetCategoryTotals.get(name) ?? 0,
-    fill: colorByCategory[name],
-  }));
-
-  const debtComposition = debtCategoryOrder.map((name) => ({
-    name,
-    value: debtCategoryTotals.get(name) ?? 0,
     fill: colorByCategory[name],
   }));
 
@@ -281,24 +264,7 @@ export default async function DashboardPage({
 
   return (
     <AppShell size="wide" className="font-office text-ink">
-        <PageHeader
-          title="우리집 자산 대시보드"
-          description="가족 자산과 부채, 투자 현황을 한눈에 확인해요."
-          className="mb-5"
-          action={
-            <div className="flex items-center gap-4">
-            <Link href="/finance/spending" className="text-[13px] text-ink-muted transition-colors hover:text-ink">
-              우리집 자산흐름
-            </Link>
-            <Link href="/" className="text-[13px] text-ink-muted transition-colors hover:text-ink">
-              홈
-            </Link>
-            <Link href="/finance/upload" className="text-[13px] text-ink-muted transition-colors hover:text-ink">
-              파일 업로드
-            </Link>
-            </div>
-          }
-        />
+        <div className="mb-2 text-right text-[11px] text-ink-muted">단위: 만원</div>
 
         {hasAnyData && (
           <PersonFilterTabs
@@ -332,7 +298,6 @@ export default async function DashboardPage({
 
             <DashboardCharts
               assetComposition={assetComposition}
-              debtComposition={debtComposition}
               treemapData={treemapData}
               sectorComposition={sectorComposition}
             />
@@ -385,7 +350,7 @@ function HeroRow({
   return (
     <div className="border-[0.8px] border-hairline bg-card px-4 py-3">
       <div className="grid grid-cols-1 sm:grid-cols-[1.35fr_1fr_1fr_1fr_1fr]">
-        <StatItem label="순자산" value={totalNet} subtext={`자산 ${formatKRW(totalAsset)}`} first />
+        <StatItem label="순자산" value={totalNet} subtext={`자산 ${formatManwon(totalAsset)}`} first />
         <StatItem label="총자산" value={totalAsset} />
         <StatItem label="총부채" value={totalDebt} />
         <StatItem
@@ -468,7 +433,7 @@ function StatItem({
         {label}
       </p>
       <p className="text-[22px] font-bold tabular-nums text-ink sm:text-[25px]">
-        <AnimatedNumber value={value} />
+        <AnimatedNumber value={value} format="manwon" />
       </p>
       {subtext && <p className="mt-0.5 text-[11px] text-ink-muted">{subtext}</p>}
     </div>
@@ -486,7 +451,7 @@ type InvestmentItem = {
 };
 
 function GainText({ amount, children }: { amount: number; children: React.ReactNode }) {
-  return <span className={amount >= 0 ? "text-legend1" : "text-gain"}>{children}</span>;
+  return <span className={amount >= 0 ? "text-fg-positive" : "text-fg-critical"}>{children}</span>;
 }
 
 function InvestmentPnlCard({
@@ -511,20 +476,20 @@ function InvestmentPnlCard({
         <div>
           <p className="text-[11px] font-semibold text-ink-muted">투자원금</p>
           <p className="text-[16px] font-bold text-ink">
-            <AnimatedNumber value={totals.costBasis} />
+            <AnimatedNumber value={totals.costBasis} format="manwon" />
           </p>
         </div>
         <div>
           <p className="text-[11px] font-semibold text-ink-muted">평가금액</p>
           <p className="text-[16px] font-bold text-ink">
-            <AnimatedNumber value={totals.value} />
+            <AnimatedNumber value={totals.value} format="manwon" />
           </p>
         </div>
         <div>
           <p className="text-[11px] font-semibold text-ink-muted">손익금액</p>
           <p className="text-[16px] font-bold">
             <GainText amount={totalGain}>
-              <AnimatedNumber value={totalGain} format="signedKrw" />
+              <AnimatedNumber value={totalGain} format="signedManwon" />
             </GainText>
           </p>
         </div>
@@ -555,12 +520,12 @@ function InvestmentPnlCard({
               <tr key={i.id} className="border-b-[0.8px] border-hairline2 last:border-0">
                 <td className="py-2 pr-2 text-ink-muted">{i.personLabel}</td>
                 <td className="py-2 pr-3 text-ink">{i.productName}</td>
-                <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{formatKRW(i.costBasis)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums text-ink">{formatKRW(i.value)}</td>
+                <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{formatManwon(i.costBasis)}</td>
+                <td className="py-2 pr-3 text-right tabular-nums text-ink">{formatManwon(i.value)}</td>
                 <td className="py-2 pr-3 text-right font-semibold tabular-nums">
                   <GainText amount={i.gain}>
                     {i.gain >= 0 ? "+" : ""}
-                    {formatKRW(i.gain)}
+                    {formatManwon(i.gain)}
                   </GainText>
                 </td>
                 <td className="py-2 pl-3 text-right font-semibold tabular-nums">

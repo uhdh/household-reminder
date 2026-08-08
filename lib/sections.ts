@@ -15,6 +15,8 @@ export type Section = {
   getStatus: () => Promise<SectionStatus>;
 };
 
+const HOME_SECTION_ORDER = ["budget", "household-ledger", "cleaning", "supplies", "emotion-cards"];
+
 export const SECTIONS: Section[] = [
   {
     id: "cleaning",
@@ -74,4 +76,4 @@ export const SECTIONS: Section[] = [
     href: "/finance",
     getStatus: async () => ({ ready: true, label: "바로가기" }),
   },
-];
+].sort((a, b) => HOME_SECTION_ORDER.indexOf(a.id) - HOME_SECTION_ORDER.indexOf(b.id));

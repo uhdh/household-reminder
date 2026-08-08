@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -18,11 +19,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   const content = (
     <>
       <header className="sticky top-0 z-50 flex w-full items-center justify-between gap-3 border-b border-stroke-neutral-muted bg-bg-layer-default/95 px-3 py-2 backdrop-blur sm:px-4">
-        <div className="flex shrink-0 items-center gap-2">
-          <Link href="/" aria-label="홈으로 이동" title="홈으로" className="seed-icon-button text-lg">🏠</Link>
+        <Link
+          href="/"
+          aria-label="우리집 홈으로 이동"
+          className="flex shrink-0 items-center gap-2 rounded-r2 px-1.5 py-1 text-sm font-bold text-fg-neutral hover:bg-bg-layer-default-pressed"
+        >
+          <Image src="/icon.svg" alt="" width={28} height={28} priority />
+          <span>우리집</span>
+        </Link>
+        <div className="flex min-w-0 items-center gap-2">
           <ThemeToggle />
+          <AuthControls />
         </div>
-        <AuthControls />
       </header>
       {children}
     </>

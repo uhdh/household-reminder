@@ -40,7 +40,7 @@ export default async function HistoryDetailPage({
           <h1 className="text-xl font-bold text-fg-neutral">{dateLabel}</h1>
         </div>
         {records.map((record) => (
-          <CardsView key={record.userId ?? "legacy"} label={record.userId === context?.userId ? "나" : "가족"} cards={record.cards} />
+          <CardsView key={record.userId ?? "legacy"} label={record.userId === context?.userId ? "나" : "배우자"} cards={record.cards} />
         ))}
       </main>
     </div>

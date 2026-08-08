@@ -52,7 +52,7 @@ export async function uploadAction(formData: FormData) {
   }
 
   const db = getDb();
-  const displayName = parsed.customerName ?? PERSON_LABELS[personId];
+  const displayName = PERSON_LABELS[personId];
   const uploadId = randomUUID();
 
   await db

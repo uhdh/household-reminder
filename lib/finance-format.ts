@@ -12,6 +12,10 @@ export function formatCompactKRW(amount: number): string {
   return `${Math.round(rounded / 10_000).toLocaleString("ko-KR")}만원`;
 }
 
+export function formatManwon(amount: number): string {
+  return `${Math.round(amount / 10_000).toLocaleString("ko-KR")}만원`;
+}
+
 export const CATEGORY_PALETTE = [
   "#2A78D6",
   "#EB6834",
@@ -65,9 +69,9 @@ export function isLightColor(hex: string): boolean {
   return luminance > 0.6;
 }
 
-const HEATMAP_NEUTRAL = "#D6D4CB";
-const HEATMAP_GAIN = "#15803D";
-const HEATMAP_LOSS = "#D03B3B";
+export const HEATMAP_NEUTRAL = "#C4C2BA";
+export const HEATMAP_GAIN = "#079171";
+export const HEATMAP_LOSS = "#FA342C";
 const HEATMAP_RETURN_CLAMP_PCT = 20;
 
 function mixHex(from: string, to: string, t: number): string {

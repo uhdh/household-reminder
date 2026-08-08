@@ -1,4 +1,4 @@
-import { formatKRW } from "@/lib/finance-format";
+import { formatManwon } from "@/lib/finance-format";
 import { updateAllocationTargetsAction } from "./allocation-actions";
 
 type AllocationRow = {
@@ -48,7 +48,7 @@ function AllocationTargetRow({ row, totalAsset }: { row: AllocationRow; totalAss
           {deltaPct.toFixed(1)}%p
         </span>
         <span className="text-ink">
-          {rebalanceAmount >= 0 ? "▲" : "▼"} {formatKRW(Math.abs(rebalanceAmount))}
+          {rebalanceAmount >= 0 ? "▲" : "▼"} {formatManwon(Math.abs(rebalanceAmount))}
         </span>
       </div>
     </div>
