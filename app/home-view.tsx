@@ -71,7 +71,22 @@ export async function HomeView({
 
   return (
     <AppShell size="compact" className="font-sans">
-        <PageHeader title="우리집" className="mb-6" />
+        <PageHeader title="우리집" className="mb-4" />
+        <Link href="/get-started" className="mb-6 block">
+          <Card className="overflow-hidden border-bg-brand-solid/25 bg-bg-brand-weak p-4 transition-colors hover:bg-bg-brand-weak-pressed">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="seed-pill bg-bg-brand-solid text-fg-neutral-inverted">Get Started</span>
+              <span aria-hidden className="text-2xl">🏡</span>
+            </div>
+            <h2 className="t6-bold text-fg-neutral">우리집 돈 관리, 입력하지 말고 자동으로</h2>
+            <p className="mt-2 text-sm leading-6 text-fg-neutral-muted">
+              뱅크샐러드 데이터를 올리면 부부의 자산과 소비를 합치고 카테고리까지 자동으로 정리해요.
+            </p>
+            <span className="mt-4 inline-flex items-center text-sm font-bold text-fg-brand">
+              우리집 사용법 보기&nbsp;→
+            </span>
+          </Card>
+        </Link>
         <ul className="flex flex-col gap-3">
           {sections.map((section, index) => (
             <li key={section.id}>
