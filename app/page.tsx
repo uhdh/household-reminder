@@ -1,4 +1,4 @@
-import { HomeView } from "./home-view";
+import { StartView } from "./start-view";
 
 // The greeting date comes from new Date() at render time; without this the page
 // is statically rendered once at build and the date freezes. NOTE: `revalidate`
@@ -7,5 +7,5 @@ import { HomeView } from "./home-view";
 export const revalidate = 3600;
 
 export default async function Page() {
-  return <HomeView />;
+  return <StartView />;
 }
