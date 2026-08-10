@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/finance/spending", label: "지출 내역" },
   { href: "/finance/spending/monthly", label: "월별지출" },
+  { href: "/finance/spending", label: "지출 내역" },
   { href: "/finance/spending/yearly", label: "연지출" },
   { href: "/finance/spending/settings", label: "설정" },
 ];

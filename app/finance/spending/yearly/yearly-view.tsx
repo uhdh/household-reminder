@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type YearlyDatum = {
   month: string;
@@ -9,6 +9,7 @@ type YearlyDatum = {
   expense: number;
   fixedExpense: number;
   variableExpense: number;
+  savingsRate: number | null;
 };
 
 const tooltipStyle = {
@@ -60,17 +61,19 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
           </div>
           <div className="h-[360px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+              <BarChart data={data} margin={{ top: 8, right: 18, bottom: 4, left: 0 }}>
                 <CartesianGrid vertical={false} stroke="var(--finance-hairline2)" />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
-                <YAxis axisLine={false} tickLine={false} width={52} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
+                <YAxis yAxisId="amount" axisLine={false} tickLine={false} width={52} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
+                <YAxis yAxisId="rate" orientation="right" axisLine={false} tickLine={false} width={42} tickFormatter={(value) => `${value}%`} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  formatter={(value) => [`${Number(value).toLocaleString("ko-KR")}만원`]}
+                  formatter={(value, name) => [String(name) === "저축률" ? `${Number(value).toFixed(1)}%` : `${Number(value).toLocaleString("ko-KR")}만원`, name]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
-                <Bar dataKey="income" name="수입" fill="var(--seed-color-bg-informative-solid)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" name="지출" fill="var(--seed-color-bg-critical-solid)" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="amount" dataKey="income" name="수입" fill="var(--seed-color-bg-informative-solid)" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="amount" dataKey="expense" name="지출" fill="var(--seed-color-bg-warning-solid)" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="rate" type="monotone" dataKey="savingsRate" name="저축률" stroke="var(--seed-color-fg-positive)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--seed-color-fg-positive)" }} activeDot={{ r: 5 }} connectNulls />
               </BarChart>
             </ResponsiveContainer>
           </div>

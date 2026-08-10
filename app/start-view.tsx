@@ -6,6 +6,9 @@ import { assetItems, budgetCategories, uploads } from "@/lib/finance-db";
 import { CATEGORY_PALETTE, formatManwon, toNumber } from "@/lib/finance-format";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
 import { flowLabel, getActiveTransactions, latestMonth, monthKeyOf, toNum } from "@/lib/spending-queries";
+import { SummaryCard } from "@/app/finance/_components/summary-card";
+import { AllocationCharts } from "@/app/finance/_components/charts";
+import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 
 const benefits = [
   {
@@ -49,47 +52,21 @@ function chartSlices(totals: Map<string, number>, limit = 5): ChartSlice[] {
   return leading.map(([label, value], index) => ({ label, value, color: CATEGORY_PALETTE[index % CATEGORY_PALETTE.length] }));
 }
 
-function chartBackground(slices: ChartSlice[]): string {
-  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-  if (total <= 0) return "conic-gradient(var(--seed-color-bg-neutral-weak) 0 100%)";
-  let offset = 0;
-  return `conic-gradient(${slices.map((slice) => {
-    const start = offset;
-    offset += (slice.value / total) * 100;
-    return `${slice.color} ${start}% ${offset}%`;
-  }).join(", ")})`;
-}
-
-function DonutPreview({ slices }: { slices: ChartSlice[] }) {
+function CompositionCard({ title, items }: { title: string; items: { label: string; value: number; color: string }[] }) {
+  const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
-    <div className="relative mx-auto h-32 w-32 rounded-full" style={{ background: chartBackground(slices) }} aria-label="구성 비율 차트">
-      <div className="absolute inset-[28%] rounded-full bg-bg-layer-default" />
-    </div>
-  );
-}
-
-function SliceLegend({ slices, total }: { slices: ChartSlice[]; total: number }) {
-  return (
-    <div className="space-y-2">
-      {slices.map((slice) => (
-        <div key={slice.label} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 text-[13px]">
-          <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: slice.color }} />
-          <span className="truncate text-fg-neutral-muted">{slice.label}</span>
-          <span className="text-right text-fg-neutral-muted">{total > 0 ? Math.round((slice.value / total) * 100) : 0}%</span>
-          <span className="col-start-2 col-end-4 mt-0.5 whitespace-nowrap text-right font-semibold text-fg-neutral">{formatManwon(slice.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MetricCard({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div className="rounded-r3 bg-bg-layer-default p-4">
-      <p className="text-sm font-semibold text-fg-neutral-muted">{label}</p>
-      <p className="mt-2 whitespace-nowrap text-xl font-bold tracking-[-0.03em] text-fg-neutral sm:text-2xl">{value}</p>
-      {note && <p className="mt-1 text-sm text-fg-neutral-muted">{note}</p>}
-    </div>
+    <section className="seed-card p-4 shadow-none">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
+        <span className="text-[12px] tabular-nums text-ink-muted">{formatManwon(total)}</span>
+      </div>
+      <div className="mb-4 flex h-2 overflow-hidden rounded-full bg-bg-neutral-weak" aria-hidden="true">
+        {items.map((item) => <span key={item.label} className={item.color} style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }} />)}
+      </div>
+      <ul className="space-y-3">
+        {items.map((item) => <li key={item.label} className="flex items-center gap-2 text-[12px]"><span className={`h-2.5 w-2.5 rounded-full ${item.color}`} /><span className="flex-1 text-ink-muted">{item.label}</span><span className="font-semibold tabular-nums text-ink">{formatManwon(item.value)}</span><span className="w-10 text-right tabular-nums text-ink-muted">{total > 0 ? ((item.value / total) * 100).toFixed(0) : 0}%</span></li>)}
+      </ul>
+    </section>
   );
 }
 
@@ -111,8 +88,6 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
   );
   const totalAsset = assets.filter((item) => item.side === "asset").reduce((sum, item) => sum + toNumber(item.amount), 0);
   const totalDebt = assets.filter((item) => item.side === "debt").reduce((sum, item) => sum + toNumber(item.amount), 0);
-  const investmentItems = assets.filter((item) => item.side === "asset" && item.costBasis !== null);
-  const investmentValue = investmentItems.reduce((sum, item) => sum + toNumber(item.amount), 0);
   const netByPerson = new Map<string, number>();
   const assetTotals = new Map<string, number>();
   const sectorTotals = new Map<string, number>();
@@ -176,31 +151,22 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
   const hasPreviewData = totalAsset > 0 || monthlyExpense > 0;
 
   return (
-    <AppShell size="default" className="font-sans">
+    <AppShell size="wide" className="font-sans">
       {showHomeLink && (
         <Link href="/" className="mb-6 text-sm font-semibold text-fg-neutral-muted hover:text-fg-neutral">
-          ← 시작하기
+          ← 홈으로
         </Link>
       )}
 
-      <section className="rounded-r4 bg-bg-brand-weak px-5 py-8 sm:px-8 sm:py-10">
-        <span className="seed-pill bg-bg-brand-solid text-fg-neutral-inverted">시작하기</span>
-        <p className="mt-5 text-sm font-bold text-fg-brand">효율의 끝판왕, 모든 것이 귀찮은 사람을 위한 자산 관리 시스템</p>
-        <h1 className="mt-5 text-3xl font-bold leading-tight tracking-[-0.03em] text-fg-neutral sm:text-4xl">
-          자산관리와 가계부,
-          <br />이제 입력보다 확인에 집중하세요
+      <section className="rounded-r4 bg-bg-brand-weak px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
+        <p className="text-sm font-bold text-fg-brand">효율의 끝판왕, 모든 것이 귀찮은 사람을 위한 자산 관리 시스템</p>
+        <h1 className="mt-5 text-3xl font-bold leading-tight tracking-[-0.03em] text-fg-neutral sm:text-4xl lg:text-5xl">
+          자산관리, 가계부
+          <br />100% 자동화
         </h1>
-        <p className="mt-4 max-w-xl text-base leading-7 text-fg-neutral-muted">
+        <p className="mt-4 max-w-2xl text-base leading-7 text-fg-neutral-muted lg:text-lg lg:leading-8">
           뱅크샐러드 데이터를 업로드하면 거래를 자동 분류하고, 부부의 소비·자산·투자 현황을 우리집 기준으로 하나로 합쳐줍니다.
         </p>
-        <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-          <Link href="/finance/upload" className="seed-button seed-button-primary min-h-12 px-5">
-            파일 업로드로 시작하기
-          </Link>
-          <Link href="/finance" className="seed-button seed-button-secondary min-h-12 px-5">
-            자산 현황 둘러보기
-          </Link>
-        </div>
       </section>
 
       <section className="py-10">
@@ -233,16 +199,15 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
             <Link href="/finance" className="block">
               <Card className="overflow-hidden p-5 transition-colors hover:bg-bg-layer-default-pressed sm:p-6">
                 <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-bold text-fg-neutral">자산 현황</h3><span className="text-sm text-fg-neutral-muted">자산관리에서 자세히 보기 →</span></div>
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <MetricCard label="순자산" value={formatManwon(totalAsset - totalDebt)} />
-                  <MetricCard label="총자산" value={formatManwon(totalAsset)} />
-                  <MetricCard label="총부채" value={formatManwon(totalDebt)} />
-                  <MetricCard label="남편 순자산" value={formatManwon(netByPerson.get("husband") ?? 0)} />
-                  <MetricCard label="아내 순자산" value={formatManwon(netByPerson.get("wife") ?? 0)} />
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+                  <SummaryCard label="순자산" value={totalAsset - totalDebt} format="manwon" breakdown={[{ label: "자산", value: totalAsset }]} />
+                  <SummaryCard label="총자산" value={totalAsset} format="manwon" />
+                  <SummaryCard label="총부채" value={totalDebt} format="manwon" />
+                  <SummaryCard label="남편 순자산" value={netByPerson.get("husband") ?? 0} format="manwon" />
+                  <SummaryCard label="아내 순자산" value={netByPerson.get("wife") ?? 0} format="manwon" />
                 </div>
-                <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-r3 bg-bg-neutral-weak p-5"><h4 className="font-bold text-fg-neutral">자산 구성</h4><div className="mt-4 grid items-center gap-5"><DonutPreview slices={assetSlices} /><SliceLegend slices={assetSlices} total={totalAsset} /></div></div>
-                  <div className="rounded-r3 bg-bg-neutral-weak p-5"><h4 className="font-bold text-fg-neutral">섹터별 평가금액</h4><div className="mt-4 grid items-center gap-5"><DonutPreview slices={sectorSlices} /><SliceLegend slices={sectorSlices} total={investmentValue} /></div></div>
+                <div className="mt-3">
+                  <AllocationCharts assetComposition={assetSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} sectorComposition={sectorSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
                 </div>
               </Card>
             </Link>
@@ -250,19 +215,19 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
             <Link href={`/finance/spending/monthly?month=${month}`} className="block">
               <Card className="overflow-hidden p-5 transition-colors hover:bg-bg-layer-default-pressed sm:p-6">
                 <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-bold text-fg-neutral">{month} 월별 지출</h3><span className="text-sm text-fg-neutral-muted">가계부에서 자세히 보기 →</span></div>
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <MetricCard label="총수입" value={formatManwon(monthlyIncome)} />
-                  <MetricCard label="총지출" value={formatManwon(monthlyExpense)} />
-                  <MetricCard label="당월 잔고" value={formatManwon(monthlyBalance)} />
-                  <MetricCard label="저축률" value={`${savingsRate >= 0 ? "+" : ""}${savingsRate.toFixed(1)}%`} />
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <SummaryCard label="총수입" value={monthlyIncome} format="compactKrw" />
+                  <SummaryCard label="총지출" value={monthlyExpense} format="compactKrw" />
+                  <SummaryCard label="당월 잔고" value={monthlyBalance} format="compactKrw" />
+                  <SummaryCard label="저축률" value={savingsRate} format="signedPct" />
                 </div>
-                <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-r3 bg-bg-neutral-weak p-5"><div className="flex justify-between gap-3"><h4 className="font-bold text-fg-neutral">수입 구성</h4><span className="text-sm text-fg-neutral-muted">{formatManwon(monthlyIncome)}</span></div><div className="mt-4 flex h-3 overflow-hidden rounded-full bg-bg-layer-default"><div className="h-full bg-legend1" style={{ width: `${monthlyIncome > 0 ? (fixedIncome / monthlyIncome) * 100 : 0}%` }} /><div className="h-full bg-[#1BAF7A]" style={{ width: `${monthlyIncome > 0 ? (variableIncome / monthlyIncome) * 100 : 0}%` }} /></div><div className="mt-4 space-y-2 text-sm"><div className="flex justify-between"><span className="text-fg-neutral-muted">● 고정수입</span><span className="font-semibold">{formatManwon(fixedIncome)}</span></div><div className="flex justify-between"><span className="text-fg-neutral-muted">● 변동수입</span><span className="font-semibold">{formatManwon(variableIncome)}</span></div></div></div>
-                  <div className="rounded-r3 bg-bg-neutral-weak p-5"><div className="flex justify-between gap-3"><h4 className="font-bold text-fg-neutral">지출 구성</h4><span className="text-sm text-fg-neutral-muted">{formatManwon(monthlyExpense)}</span></div><div className="mt-4 flex h-3 overflow-hidden rounded-full bg-bg-layer-default"><div className="h-full bg-legend1" style={{ width: `${monthlyExpense > 0 ? (fixedExpense / monthlyExpense) * 100 : 0}%` }} /><div className="h-full bg-[#EDA100]" style={{ width: `${monthlyExpense > 0 ? (variableExpense / monthlyExpense) * 100 : 0}%` }} /></div><div className="mt-4 space-y-2 text-sm"><div className="flex justify-between"><span className="text-fg-neutral-muted">● 고정비</span><span className="font-semibold">{formatManwon(fixedExpense)}</span></div><div className="flex justify-between"><span className="text-fg-neutral-muted">● 변동비</span><span className="font-semibold">{formatManwon(variableExpense)}</span></div></div></div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <CompositionCard title="수입 구성" items={[{ label: "고정수입", value: fixedIncome, color: "bg-bg-brand-solid" }, { label: "변동수입", value: variableIncome, color: "bg-bg-positive-solid" }]} />
+                  <CompositionCard title="지출 구성" items={[{ label: "고정비", value: fixedExpense, color: "bg-bg-informative-solid" }, { label: "변동비", value: variableExpense, color: "bg-bg-warning-solid" }]} />
                 </div>
-                <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-r3 bg-bg-neutral-weak p-5"><h4 className="font-bold text-fg-neutral">고정비</h4><div className="mt-4 grid items-center gap-5"><DonutPreview slices={fixedSlices} /><SliceLegend slices={fixedSlices} total={fixedExpense} /></div></div>
-                  <div className="rounded-r3 bg-bg-neutral-weak p-5"><h4 className="font-bold text-fg-neutral">변동비</h4><div className="mt-4 grid items-center gap-5"><DonutPreview slices={variableSlices} /><SliceLegend slices={variableSlices} total={variableExpense} /></div></div>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CategoryPie title="고정비" data={fixedSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
+                  <CategoryPie title="변동비" data={variableSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
                 </div>
               </Card>
             </Link>
@@ -309,7 +274,7 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
         </p>
         <p className="mt-4 text-sm font-semibold text-fg-brand">앞으로도 계속 관리하고, 개발자가 꾸준히 업데이트합니다.</p>
         <Link href="/finance/upload" className="seed-button seed-button-primary mt-6 min-h-12 px-6">
-          우리집 돈 관리 시작하기
+          파일 업로드하기
         </Link>
       </section>
     </AppShell>

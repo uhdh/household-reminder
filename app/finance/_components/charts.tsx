@@ -1,84 +1,27 @@
 "use client";
 
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Treemap } from "recharts";
-import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL, formatManwon } from "@/lib/finance-format";
+import { ResponsiveContainer, Treemap } from "recharts";
+import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL } from "@/lib/finance-format";
+import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 
 type CategoryDatum = { name: string; value: number; fill: string };
 type TreemapDatum = { name: string; value: number; fill: string; returnPct: number | null; sharePct: number };
 
-const TOOLTIP_STYLE = {
-  backgroundColor: "var(--finance-card)",
-  border: "1px solid var(--finance-hairline)",
-  borderRadius: 2,
-  color: "var(--finance-ink)",
-  fontSize: 12,
-};
-
-function CardHeader({ title, caption }: { title: string; caption?: string }) {
-  return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
-      {caption && <span className="text-[11px] text-ink-muted">{caption}</span>}
-    </div>
-  );
-}
-
-function LegendList({ data }: { data: CategoryDatum[] }) {
-  const total = data.reduce((s, d) => s + d.value, 0) || 1;
-  return (
-    <ul className="mt-3 space-y-2">
-      {data.map((d) => {
-        const pct = (d.value / total) * 100;
-        return (
-          <li key={d.name} className="flex items-center gap-2 text-[12px]">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: d.fill }} />
-            <span className="w-20 shrink-0 truncate text-ink-muted">{d.name}</span>
-            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-canvas">
-              <span
-                className="block h-1.5 rounded-full"
-                style={{ width: `${pct}%`, backgroundColor: d.fill }}
-              />
-            </span>
-            <span className="w-24 shrink-0 text-right tabular-nums text-ink">{formatManwon(d.value)}</span>
-            <span className="w-10 shrink-0 text-right tabular-nums text-ink-muted">{pct.toFixed(0)}%</span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 function AllocationCard({ title, data }: { title: string; data: CategoryDatum[] }) {
+  return <CategoryPie title={title} data={data} />;
+}
+
+export function AllocationCharts({
+  assetComposition,
+  sectorComposition,
+}: {
+  assetComposition: CategoryDatum[];
+  sectorComposition: CategoryDatum[];
+}) {
   return (
-    <div className="seed-card p-4 shadow-none">
-      <CardHeader title={title} caption={`${data.length}개 항목`} />
-      {data.length === 0 ? (
-        <p className="text-[13px] text-ink-muted">데이터가 없습니다.</p>
-      ) : (
-        <div className="flex flex-col items-center gap-2 sm:flex-row">
-          <ResponsiveContainer width="100%" height={180} className="sm:w-[45%]">
-            <PieChart>
-              <Pie
-                data={data}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={48}
-                outerRadius={80}
-                paddingAngle={2}
-                isAnimationActive={false}
-              >
-                {data.map((d) => (
-                  <Cell key={d.name} fill={d.fill} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => formatManwon(Number(value))} contentStyle={TOOLTIP_STYLE} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="w-full sm:w-[55%]">
-            <LegendList data={data} />
-          </div>
-        </div>
-      )}
+    <div className={`grid grid-cols-1 gap-3 ${sectorComposition.length > 0 ? "lg:grid-cols-2" : ""}`}>
+      <AllocationCard title="자산 구성" data={assetComposition} />
+      {sectorComposition.length > 0 && <AllocationCard title="섹터별 평가금액" data={sectorComposition} />}
     </div>
   );
 }
@@ -223,10 +166,7 @@ export function DashboardCharts({
 }) {
   return (
     <div className="mt-3 flex flex-col gap-3">
-      <div className={`grid grid-cols-1 gap-3 ${sectorComposition.length > 0 ? "lg:grid-cols-2" : ""}`}>
-        <AllocationCard title="자산 구성" data={assetComposition} />
-        {sectorComposition.length > 0 && <AllocationCard title="섹터별 평가금액" data={sectorComposition} />}
-      </div>
+      <AllocationCharts assetComposition={assetComposition} sectorComposition={sectorComposition} />
       <HeatmapCard data={treemapData} />
     </div>
   );

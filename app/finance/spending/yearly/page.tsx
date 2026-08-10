@@ -137,6 +137,7 @@ export default async function YearlyPage({
     expense: Math.round(totalExpenseM[index] / 10_000),
     fixedExpense: Math.round(fixedExpenseM[index] / 10_000),
     variableExpense: Math.round(variableExpenseM[index] / 10_000),
+    savingsRate: totalIncomeM[index] > 0 ? ((totalIncomeM[index] - totalExpenseM[index]) / totalIncomeM[index]) * 100 : null,
   }));
 
   return (

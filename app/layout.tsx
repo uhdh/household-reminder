@@ -23,7 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <div className="flex items-center justify-between gap-3 px-3 py-2 sm:px-4">
           <Link
             href="/"
-            aria-label="우리집 시작하기로 이동"
+            aria-label="우리집 홈으로 이동"
             className="flex shrink-0 items-center gap-2 rounded-r2 px-1.5 py-1 text-sm font-bold text-fg-neutral hover:bg-bg-layer-default-pressed"
           >
             <Image src="/icon.svg" alt="" width={28} height={28} priority />

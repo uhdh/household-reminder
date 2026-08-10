@@ -6,9 +6,6 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { label: "자산관리", href: "/finance", active: (pathname: string) => pathname === "/finance" },
   { label: "가계부", href: "/finance/spending/monthly", active: (pathname: string) => pathname.startsWith("/finance/spending") || pathname === "/finance/upload" },
-  { label: "청소관리", href: "/cleaning", active: (pathname: string) => pathname.startsWith("/cleaning") },
-  { label: "생필품", href: "/supplies", active: (pathname: string) => pathname.startsWith("/supplies") },
-  { label: "감정카드", href: "/emotion-cards/select", active: (pathname: string) => pathname.startsWith("/emotion-cards") },
 ];
 
 export function TopTabs() {
