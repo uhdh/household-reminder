@@ -6,6 +6,7 @@ import { StartView } from "./start-view";
 // next.config.ts, this stops working and the date must be made dynamic instead.
 export const revalidate = 3600;
 
-export default async function Page() {
-  return <StartView />;
+export default async function Page({ searchParams }: { searchParams: Promise<{ person?: string }> }) {
+  const { person } = await searchParams;
+  return <StartView personFilter={person === "husband" || person === "wife" ? person : "all"} />;
 }

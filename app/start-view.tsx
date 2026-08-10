@@ -12,12 +12,12 @@ import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 
 const benefits = [
   {
-    title: "입력 대신 업로드 한 번",
-    description: "뱅크샐러드 엑셀 파일을 올리면 거래 내역을 읽고 수입·지출과 카테고리를 자동으로 정리합니다.",
+    title: "수기 작성 없이 자동화",
+    description: "뱅크샐러드 파일을 한 번 올리면 거래 내역과 카테고리를 자동으로 정리합니다.",
   },
   {
-    title: "부부 자산을 하나로 공유",
-    description: "각자의 자산과 소비 내역을 합쳐 우리집 전체 현황과 남편·아내별 흐름을 함께 확인해요.",
+    title: "부부 자산을 하나로 통합",
+    description: "각자의 자산과 소비를 합쳐 우리집 현황과 각자 흐름을 함께 확인합니다.",
   },
   {
     title: "주식 수익률과 포트폴리오 관리",
@@ -67,7 +67,7 @@ function CompositionCard({ title, items }: { title: string; items: { label: stri
   );
 }
 
-export async function StartView({ showHomeLink = false }: { showHomeLink?: boolean }) {
+export async function StartView({ showHomeLink = false, personFilter = "all" }: { showHomeLink?: boolean; personFilter?: "all" | "husband" | "wife" }) {
   const db = getDb();
   const [activeUploads, { transactions }, budgetRows] = await Promise.all([
     db.select().from(uploads).where(eq(uploads.isActive, true)),
@@ -78,11 +78,12 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
   const rawAssets = activeUploadIds.length
     ? await db.select().from(assetItems).where(inArray(assetItems.uploadId, activeUploadIds))
     : [];
-  const assets = rawAssets.filter((item) =>
+  const allAssets = rawAssets.filter((item) =>
     item.side === "asset"
       ? !EXCLUDED_ASSET_CATEGORIES.has(item.category)
       : !EXCLUDED_DEBT_ITEMS.has(`${item.personId}|${item.productName ?? ""}`)
   );
+  const assets = personFilter === "all" ? allAssets : allAssets.filter((item) => item.personId === personFilter);
   const totalAsset = assets.filter((item) => item.side === "asset").reduce((sum, item) => sum + toNumber(item.amount), 0);
   const totalDebt = assets.filter((item) => item.side === "debt").reduce((sum, item) => sum + toNumber(item.amount), 0);
   const netByPerson = new Map<string, number>();
@@ -102,7 +103,7 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
   const assetSlices = chartSlices(assetTotals);
   const sectorSlices = chartSlices(sectorTotals);
 
-  const includedTx = transactions.filter((transaction) => transaction.included);
+  const includedTx = transactions.filter((transaction) => transaction.included && (personFilter === "all" || transaction.personId === personFilter));
   const month = latestMonth(includedTx);
   const monthTx = includedTx.filter((transaction) => monthKeyOf(transaction.txnDate) === month && flowLabel(transaction) === "지출");
   const monthlyExpense = monthTx.reduce((sum, transaction) => sum + Math.abs(toNum(transaction.amount)), 0);
@@ -155,21 +156,15 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
         </Link>
       )}
 
-      <section className="rounded-r4 bg-bg-brand-weak px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
+      <section className="px-5 py-8 text-left sm:px-8 sm:py-10 lg:px-12 lg:py-12">
         <p className="text-sm font-bold text-fg-brand">효율의 끝판왕, 모든 것이 귀찮은 사람을 위한 자산 관리 시스템</p>
         <h1 className="mt-5 text-3xl font-bold leading-tight tracking-[-0.03em] text-fg-neutral sm:text-4xl lg:text-5xl">
-          자산관리, 가계부
-          <br />100% 자동화
+          자산관리, 가계부 100% 자동화
         </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-fg-neutral-muted lg:text-lg lg:leading-8">
-          뱅크샐러드 데이터를 업로드하면 거래를 자동 분류하고, 부부의 소비·자산·투자 현황을 우리집 기준으로 하나로 합쳐줍니다.
-        </p>
       </section>
 
-      <section className="py-10">
-        <p className="text-sm font-bold text-fg-brand">우리집에서 할 수 있는 일</p>
-        <h2 className="mt-2 text-2xl font-bold text-fg-neutral">귀찮은 정리는 자동으로, 중요한 판단은 함께</h2>
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+      <section className="py-8">
+        <div className="grid gap-3 sm:grid-cols-3">
           {benefits.map((benefit) => (
             <Card key={benefit.title} className="p-5 shadow-none">
               <h3 className="text-base font-bold text-fg-neutral">{benefit.title}</h3>
@@ -190,9 +185,8 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
 
         {hasPreviewData ? (
           <div className="mt-6 space-y-6">
-            <Link href="/finance" className="block">
-              <Card className="overflow-hidden p-5 transition-colors hover:bg-bg-layer-default-pressed sm:p-6">
-                <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-bold text-fg-neutral">자산 현황</h3><span className="text-sm text-fg-neutral-muted">자산관리에서 자세히 보기 →</span></div>
+            <Card className="overflow-hidden p-5 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-bold text-fg-neutral">자산 현황(샘플)</h3><div className="inline-flex rounded-r2 bg-bg-neutral-weak p-1 text-[12px] font-semibold">{(["all", "husband", "wife"] as const).map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`rounded-r2 px-3 py-1.5 ${personFilter === person ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}</Link>)}</div></div>
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
                   <SummaryCard label="순자산" value={totalAsset - totalDebt} format="manwon" breakdown={[{ label: "자산", value: totalAsset }]} />
                   <SummaryCard label="총자산" value={totalAsset} format="manwon" />
@@ -203,12 +197,10 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
                 <div className="mt-3">
                   <AllocationCharts assetComposition={assetSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} sectorComposition={sectorSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
                 </div>
-              </Card>
-            </Link>
+            </Card>
 
-            <Link href={`/finance/spending/monthly?month=${month}`} className="block">
-              <Card className="overflow-hidden p-5 transition-colors hover:bg-bg-layer-default-pressed sm:p-6">
-                <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-bold text-fg-neutral">{month} 월별 지출</h3><span className="text-sm text-fg-neutral-muted">가계부에서 자세히 보기 →</span></div>
+            <Card className="overflow-hidden p-5 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-bold text-fg-neutral">월별 지출(샘플)</h3><div className="inline-flex rounded-r2 bg-bg-neutral-weak p-1 text-[12px] font-semibold">{(["all", "husband", "wife"] as const).map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`rounded-r2 px-3 py-1.5 ${personFilter === person ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}</Link>)}</div></div>
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <SummaryCard label="총수입" value={monthlyIncome} format="compactKrw" />
                   <SummaryCard label="총지출" value={monthlyExpense} format="compactKrw" />
@@ -223,8 +215,7 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
                   <CategoryPie title="고정비" data={fixedSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
                   <CategoryPie title="변동비" data={variableSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
                 </div>
-              </Card>
-            </Link>
+            </Card>
           </div>
         ) : (
           <Card className="mt-6 p-6 text-center shadow-none">
@@ -253,23 +244,19 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
         </ol>
       </section>
 
-      <section className="py-10 text-center">
-        <p className="mx-auto max-w-2xl text-xl font-bold leading-8 text-fg-neutral">
-          저는 게으른 사람이라서, 귀찮은 사람을 위한 서비스를 만들었어요.
-        </p>
-        <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-fg-neutral-muted">
-          신혼부부 생활을 시작할 때 가장 어려웠던 건 자산 관리였어요. 선배 열 명에게 물어봐도 열 가지 방법이 있었고, 가계부 앱은 일일이 써야 해서 포기하게 됐습니다.
-        </p>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-fg-neutral-muted">
-          가계부 양식을 찾으러 다니며 “블로그 댓글 입력”, “비공개 댓글입니다”, “마감되었습니다” 같은 장벽도 많이 봤어요. 그래서 필요한 사람이라면 누구나 무료로 쓸 수 있도록 공개하기로 했습니다.
-        </p>
-        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-fg-neutral-muted">
-          엑셀 가계부를 찾다가 직접 만들기 시작했고, 양식을 돈 주고 파는 걸 보고 더 쉽게 쓰도록 웹으로 만들었습니다. 부부가 함께 보고, 함께 관리할 수 있도록요.
-        </p>
-        <p className="mt-4 text-sm font-semibold text-fg-brand">앞으로도 계속 관리하고, 개발자가 꾸준히 업데이트합니다.</p>
-        <Link href="/finance/upload" className="seed-button seed-button-primary mt-6 min-h-12 px-6">
-          파일 업로드하기
-        </Link>
+      <section className="border-t border-stroke-neutral-muted py-10">
+        <Card className="grid gap-5 p-5 shadow-none sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-6">
+          <div>
+            <p className="text-sm font-bold text-fg-brand">무료로 계속 관리합니다</p>
+            <h2 className="mt-2 text-xl font-bold text-fg-neutral">복잡한 부부 자산 관리, 한 번의 업로드로 시작하세요.</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-neutral-muted">
+              직접 쓰던 엑셀 가계부를 더 쉽게 함께 쓰기 위해 만들었습니다. 필요한 기능은 계속 업데이트합니다.
+            </p>
+          </div>
+          <Link href="/finance/upload" className="seed-button seed-button-primary min-h-11 shrink-0 px-5">
+            파일 업로드하기
+          </Link>
+        </Card>
       </section>
     </AppShell>
   );

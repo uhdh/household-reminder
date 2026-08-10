@@ -16,6 +16,12 @@ export const dynamic = "force-dynamic";
 
 const TXN_TYPES = ["수입", "지출", "이체"];
 const KINDS = ["고정비", "변동비", "고정수입", "변동수입"];
+const SETTING_TABS = [
+  { id: "upload", label: "파일 업로드" },
+  { id: "mappings", label: "카테고리 매핑" },
+  { id: "categories", label: "카테고리 · 예산" },
+  { id: "unmapped", label: "미분류 관리" },
+] as const;
 
 function groupByKind(options: { name: string; kind: string }[]): Record<string, string[]> {
   const groups: Record<string, string[]> = {};
@@ -33,7 +39,9 @@ function guessStdCategory(rawCategory: string, rawSubcategory: string, knownName
   return knownNames.has("기타") ? "기타" : (knownNames.values().next().value ?? "기타");
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams;
+  const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
   const db = getDb();
   const [mappings, budgets, { transactions: allTx }] = await Promise.all([
     db.select().from(categoryMappings),
@@ -75,7 +83,22 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="seed-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <nav className="inline-flex max-w-full overflow-x-auto rounded-lg bg-bg-neutral-weak p-1" aria-label="설정 메뉴">
+        {SETTING_TABS.map((item) => (
+          <Link
+            key={item.id}
+            href={`/finance/spending/settings?tab=${item.id}`}
+            aria-current={activeTab === item.id ? "page" : undefined}
+            className={`shrink-0 rounded-md px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+              activeTab === item.id ? "bg-card text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+
+      {activeTab === "upload" && <section className="seed-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-[13px] font-semibold text-ink">파일 업로드</h2>
           <p className="mt-1 text-[12px] text-ink-muted">뱅크샐러드 엑셀 파일로 자산과 거래 내역을 갱신합니다.</p>
@@ -83,9 +106,9 @@ export default async function SettingsPage() {
         <Link href="/finance/upload" className="seed-button seed-button-primary shrink-0">
           업로드 화면 열기
         </Link>
-      </section>
+      </section>}
 
-      {unmapped.length > 0 && (
+      {activeTab === "unmapped" && (unmapped.length > 0 ? (
         <div className="seed-card bg-bg-critical-weak p-4">
           <h2 className="mb-1 text-[13px] font-semibold text-gain">매핑되지 않은 카테고리 ({unmapped.length}건)</h2>
           <p className="mb-3 text-[12px] text-ink-muted">
@@ -135,9 +158,11 @@ export default async function SettingsPage() {
             })}
           </div>
         </div>
-      )}
+      ) : (
+        <div className="seed-card p-4 text-[13px] text-ink-muted">현재 관리할 미분류 항목이 없습니다.</div>
+      ))}
 
-      <div className="seed-card p-4">
+      {activeTab === "mappings" && <div className="seed-card p-4">
         <h2 className="mb-3 text-[13px] font-semibold text-ink">카테고리 매핑</h2>
         <div className="mb-4 overflow-x-auto">
           <table className="w-full text-[12px]">
@@ -216,9 +241,9 @@ export default async function SettingsPage() {
             추가
           </ActionButton>
         </form>
-      </div>
+      </div>}
 
-      <div className="seed-card p-4">
+      {activeTab === "categories" && <div className="seed-card p-4">
         <h2 className="mb-3 text-[13px] font-semibold text-ink">카테고리 성격 · 월 예산</h2>
         <form action={updateBudgetCategoriesAction}>
           <div className="mb-4 overflow-x-auto">
@@ -305,7 +330,7 @@ export default async function SettingsPage() {
             추가
           </ActionButton>
         </form>
-      </div>
+      </div>}
     </div>
   );
 }

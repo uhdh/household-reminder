@@ -29,7 +29,7 @@ export function CategorySelect({
         defaultValue={value ?? UNMAPPED_VALUE}
         onChange={() => formRef.current?.requestSubmit()}
         className={`min-h-8 rounded-r2 px-1.5 py-0.5 text-[12px] ${
-          value ? "text-ink" : "text-gain"
+          value === "자산수정" ? "font-semibold text-fg-brand" : value ? "text-ink" : "text-gain"
         }`}
       >
         <option value={UNMAPPED_VALUE}>미분류</option>

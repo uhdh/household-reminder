@@ -130,6 +130,17 @@ export default async function YearlyPage({
 
   const fixedRows = sortedBudgets.filter((b) => b.kind === "고정비");
   const variableRows = sortedBudgets.filter((b) => b.kind === "변동비");
+  const buildCategorySeries = (rows: typeof fixedRows, prefix: "fixed" | "variable") => {
+    const ranked = rows
+      .map((row) => ({ name: row.name, total: (categoryMonthly.get(row.name) ?? []).reduce((sum, value) => sum + value, 0) }))
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total);
+    const top = ranked.slice(0, 5).map((item) => ({ name: item.name, dataKey: `${prefix}:${item.name}`, sourceNames: [item.name] }));
+    const otherNames = ranked.slice(5).map((item) => item.name);
+    return otherNames.length > 0 ? [...top, { name: "기타", dataKey: `${prefix}:other`, sourceNames: otherNames }] : top;
+  };
+  const fixedCategorySeries = buildCategorySeries(fixedRows, "fixed");
+  const variableCategorySeries = buildCategorySeries(variableRows, "variable");
   const hrefForYear = (value: number) => `/finance/spending/yearly?year=${value}${personFilter === "all" ? "" : `&person=${personFilter}`}`;
   const chartData = MONTH_LABELS.map((monthLabel, index) => ({
     month: monthLabel,
@@ -138,6 +149,8 @@ export default async function YearlyPage({
     fixedExpense: Math.round(fixedExpenseM[index] / 10_000),
     variableExpense: Math.round(variableExpenseM[index] / 10_000),
     savingsRate: totalIncomeM[index] > 0 ? ((totalIncomeM[index] - totalExpenseM[index]) / totalIncomeM[index]) * 100 : null,
+    ...Object.fromEntries(fixedCategorySeries.map(({ dataKey, sourceNames }) => [dataKey, Math.round(sourceNames.reduce((sum, name) => sum + (categoryMonthly.get(name)?.[index] ?? 0), 0) / 10_000)])),
+    ...Object.fromEntries(variableCategorySeries.map(({ dataKey, sourceNames }) => [dataKey, Math.round(sourceNames.reduce((sum, name) => sum + (categoryMonthly.get(name)?.[index] ?? 0), 0) / 10_000)])),
   }));
 
   return (
@@ -162,7 +175,7 @@ export default async function YearlyPage({
         <PersonFilter pathname="/finance/spending/yearly" periodKey="year" periodValue={String(year)} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
-      <YearlyView data={chartData}>
+      <YearlyView data={chartData} fixedCategories={fixedCategorySeries} variableCategories={variableCategorySeries}>
       <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">
         <table className="w-full text-[13px]">
           <thead>

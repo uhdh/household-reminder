@@ -217,7 +217,7 @@ export default async function DashboardPage({
       productName,
       personLabel: existing ? "공동" : (
         displayNameByPerson.get(item.personId) ?? PERSON_LABELS[item.personId as PersonId] ?? item.personId
-      ).charAt(0),
+      ),
       sector: existing?.sector ?? item.sector ?? classifyInvestmentSector(productName),
       costBasis: (existing?.costBasis ?? 0) + costBasis,
       value: (existing?.value ?? 0) + value,
@@ -348,10 +348,8 @@ function HeroRow({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-      <SummaryCard label="순자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }]} />
-      <SummaryCard label="총자산" value={totalAsset} format="manwon" />
-      <SummaryCard label="총부채" value={totalDebt} format="manwon" />
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <SummaryCard label="우리집 자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]} />
       <SummaryCard label={`${husband.label} 순자산`} value={husband.net} format="manwon" />
       <SummaryCard label={`${wife.label} 순자산`} value={wife.net} format="manwon" />
     </div>
@@ -472,7 +470,7 @@ function InvestmentPnlCard({
           <tbody>
             {items.map((i) => (
               <tr key={i.id} className="border-b-[0.8px] border-hairline2 last:border-0">
-                <td className="py-2 pr-2 text-ink-muted">{i.personLabel}</td>
+                <td className={`py-2 pr-2 font-semibold ${i.personLabel === "남편" ? "text-husband" : i.personLabel === "아내" ? "text-wife" : "text-ink-muted"}`}>{i.personLabel}</td>
                 <td className="py-2 pr-3 text-ink">{i.productName}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{formatManwon(i.costBasis)}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-ink">{formatManwon(i.value)}</td>

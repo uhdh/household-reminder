@@ -2,7 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { PieLabelRenderProps } from "recharts";
-import { formatKRW, isLightColor } from "@/lib/finance-format";
+import { formatCompactKRW, formatKRW, formatManwon, isLightColor } from "@/lib/finance-format";
 
 type Datum = { name: string; value: number; fill: string };
 
@@ -50,21 +50,41 @@ function renderLeaderLabel(props: PieLabelRenderProps) {
   );
 }
 
-export function CategoryPie({ title, data }: { title: string; data: Datum[] }) {
+export function CategoryPie({
+  title,
+  data,
+  amountFormat = "krw",
+  showTotal = false,
+}: {
+  title: string;
+  data: Datum[];
+  amountFormat?: "krw" | "manwon";
+  showTotal?: boolean;
+}) {
   if (data.length === 0) {
     return (
       <div className="border-[0.8px] border-hairline bg-card p-4">
-        <h2 className="mb-3 text-[13px] font-semibold text-ink">{title}</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
+        </div>
         <p className="text-[13px] text-ink-muted">이번 달 {title} 내역이 없습니다.</p>
       </div>
     );
   }
 
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
+  const formatAmount = amountFormat === "manwon" ? formatManwon : formatKRW;
 
   return (
     <div className="border-[0.8px] border-hairline bg-card p-4">
-      <h2 className="mb-3 text-[13px] font-semibold text-ink">{title}</h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
+        {showTotal && (
+          <span className="shrink-0 text-[12px] tabular-nums text-ink-muted" title={formatKRW(total)}>
+            {amountFormat === "manwon" ? formatManwon(total) : formatCompactKRW(total)}
+          </span>
+        )}
+      </div>
       <ResponsiveContainer width="100%" height={240}>
         <PieChart margin={{ top: 24, right: 56, bottom: 24, left: 56 }}>
           <Pie
@@ -82,7 +102,7 @@ export function CategoryPie({ title, data }: { title: string; data: Datum[] }) {
               <Cell key={d.name} fill={d.fill} />
             ))}
           </Pie>
-          <Tooltip formatter={(value) => formatKRW(Number(value))} contentStyle={TOOLTIP_STYLE} />
+          <Tooltip formatter={(value) => formatAmount(Number(value))} contentStyle={TOOLTIP_STYLE} />
         </PieChart>
       </ResponsiveContainer>
       <ul className="mt-2 space-y-1.5">
@@ -99,7 +119,7 @@ export function CategoryPie({ title, data }: { title: string; data: Datum[] }) {
                 {pct.toFixed(0)}%
               </span>
               <span className="flex-1 truncate text-ink-muted">{d.name}</span>
-              <span className="shrink-0 text-right tabular-nums text-ink">{formatKRW(d.value)}</span>
+              <span className="shrink-0 text-right tabular-nums text-ink">{formatAmount(d.value)}</span>
             </li>
           );
         })}

@@ -105,6 +105,10 @@ export default async function MonthlyPage({
 
   const fixedRows = sortedBudgets.filter((b) => b.kind === "고정비");
   const variableRows = sortedBudgets.filter((b) => b.kind === "변동비");
+  const fixedBudgetTotal = fixedRows.reduce((sum, budget) => sum + (budget.monthlyBudget === null ? 0 : toNum(budget.monthlyBudget)), 0);
+  const variableBudgetTotal = variableRows.reduce((sum, budget) => sum + (budget.monthlyBudget === null ? 0 : toNum(budget.monthlyBudget)), 0);
+  const fixedUsageRate = fixedBudgetTotal > 0 ? (summary.fixedExpense / fixedBudgetTotal) * 100 : null;
+  const variableUsageRate = variableBudgetTotal > 0 ? (summary.variableExpense / variableBudgetTotal) * 100 : null;
   const knownNames = new Set(sortedBudgets.map((b) => b.name));
   const unmappedTotal = Array.from(categoryTotals.entries())
     .filter(([name]) => !knownNames.has(name))
@@ -161,8 +165,8 @@ export default async function MonthlyPage({
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <CategoryPie title="고정비" data={fixedPieData} />
-        <CategoryPie title="변동비" data={variablePieData} />
+        <CategoryPie title="고정비" data={fixedPieData} amountFormat="manwon" showTotal />
+        <CategoryPie title="변동비" data={variablePieData} amountFormat="manwon" showTotal />
       </div>
 
       <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">
@@ -178,9 +182,11 @@ export default async function MonthlyPage({
           </thead>
           <tbody>
             <tr className="border-b-[0.8px] border-hairline2 bg-canvas">
-              <td colSpan={5} className="px-3 py-1.5 text-[11px] font-semibold text-ink-muted">
-                고정비
-              </td>
+              <td className="px-2 py-1.5 text-[11px] font-semibold text-ink-muted sm:px-3">고정비</td>
+              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink-muted sm:px-3">{fixedBudgetTotal > 0 ? formatKRW(fixedBudgetTotal) : "-"}</td>
+              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink sm:px-3">{formatKRW(summary.fixedExpense)}</td>
+              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink-muted sm:px-3">{fixedUsageRate === null ? "-" : `${fixedUsageRate.toFixed(0)}%`}</td>
+              <td className="px-2 py-1.5 sm:px-3" />
             </tr>
             {fixedRows.map((b) => (
               <CategoryRow
@@ -194,9 +200,11 @@ export default async function MonthlyPage({
               />
             ))}
             <tr className="border-b-[0.8px] border-hairline2 bg-canvas">
-              <td colSpan={5} className="px-3 py-1.5 text-[11px] font-semibold text-ink-muted">
-                변동비
-              </td>
+              <td className="px-2 py-1.5 text-[11px] font-semibold text-ink-muted sm:px-3">변동비</td>
+              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink-muted sm:px-3">{variableBudgetTotal > 0 ? formatKRW(variableBudgetTotal) : "-"}</td>
+              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink sm:px-3">{formatKRW(summary.variableExpense)}</td>
+              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink-muted sm:px-3">{variableUsageRate === null ? "-" : `${variableUsageRate.toFixed(0)}%`}</td>
+              <td className="px-2 py-1.5 sm:px-3" />
             </tr>
             {variableRows.map((b) => (
               <CategoryRow

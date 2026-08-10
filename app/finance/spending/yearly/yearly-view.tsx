@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Bar, BarChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type YearlyDatum = {
   month: string;
@@ -10,6 +10,23 @@ type YearlyDatum = {
   fixedExpense: number;
   variableExpense: number;
   savingsRate: number | null;
+  [key: string]: string | number | null;
+};
+
+type CategorySeries = { name: string; dataKey: string; sourceNames: string[] };
+
+const CATEGORY_COLORS = [
+  "#2E7DD7", "#F36B2A", "#17A875", "#F2A900", "#DD6B9A", "#7357D6", "#0284C7", "#A16207",
+];
+
+const formatManwonLabel = (value: unknown) => {
+  const amount = Number(value);
+  return amount > 0 ? `${amount.toLocaleString("ko-KR")}만` : "";
+};
+
+const formatRateLabel = (value: unknown) => {
+  const rate = Number(value);
+  return Number.isFinite(rate) ? `${rate >= 0 ? "+" : ""}${rate.toFixed(1)}%` : "";
 };
 
 const tooltipStyle = {
@@ -20,7 +37,17 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
-export function YearlyView({ data, children }: { data: YearlyDatum[]; children: ReactNode }) {
+export function YearlyView({
+  data,
+  fixedCategories,
+  variableCategories,
+  children,
+}: {
+  data: YearlyDatum[];
+  fixedCategories: CategorySeries[];
+  variableCategories: CategorySeries[];
+  children: ReactNode;
+}) {
   const [view, setView] = useState<"table" | "chart">("chart");
   const fixedTotal = data.reduce((sum, item) => sum + item.fixedExpense, 0);
   const variableTotal = data.reduce((sum, item) => sum + item.variableExpense, 0);
@@ -33,7 +60,7 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="inline-flex rounded-lg bg-bg-neutral-weak p-1" aria-label="연지출 보기 방식">
-          {(["table", "chart"] as const).map((value) => (
+          {(["chart", "table"] as const).map((value) => (
             <button
               key={value}
               type="button"
@@ -61,7 +88,7 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
           </div>
           <div className="h-[360px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 8, right: 18, bottom: 4, left: 0 }}>
+              <BarChart data={data} margin={{ top: 30, right: 18, bottom: 4, left: 0 }}>
                 <CartesianGrid vertical={false} stroke="var(--finance-hairline2)" />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
                 <YAxis yAxisId="amount" axisLine={false} tickLine={false} width={52} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
@@ -71,9 +98,13 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
                   formatter={(value, name) => [String(name) === "저축률" ? `${Number(value).toFixed(1)}%` : `${Number(value).toLocaleString("ko-KR")}만원`, name]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
-                <Bar yAxisId="amount" dataKey="income" name="수입" fill="var(--seed-color-bg-informative-solid)" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="amount" dataKey="expense" name="지출" fill="var(--seed-color-bg-warning-solid)" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="rate" type="monotone" dataKey="savingsRate" name="저축률" stroke="var(--seed-color-fg-positive)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--seed-color-fg-positive)" }} activeDot={{ r: 5 }} connectNulls />
+                <Bar yAxisId="amount" dataKey="income" name="수입" fill="var(--seed-color-bg-informative-solid)" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="income" position="top" formatter={formatManwonLabel} className="fill-ink-muted" fontSize={10} />
+                </Bar>
+                <Bar yAxisId="amount" dataKey="expense" name="지출" fill="var(--seed-color-bg-brand-solid)" radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="expense" position="top" formatter={formatManwonLabel} className="fill-fg-brand" fontSize={10} />
+                </Bar>
+                <Line yAxisId="rate" type="monotone" dataKey="savingsRate" name="저축률" stroke="var(--seed-color-fg-positive)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--seed-color-fg-positive)" }} activeDot={{ r: 5 }} label={{ position: "top", offset: 14, formatter: formatRateLabel, fill: "var(--seed-color-fg-positive)", fontSize: 10 }} connectNulls />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -100,8 +131,8 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
         </div>
         <div className="border-[0.8px] border-hairline bg-card px-2 py-4 sm:p-5">
           <div className="mb-4">
-            <h2 className="text-[14px] font-semibold text-ink">월별 고정비 · 변동비</h2>
-            <p className="mt-1 text-[12px] text-ink-muted">막대 전체는 월 지출이며, 색상별 영역은 지출 구조를 나타냅니다.</p>
+            <h2 className="text-[14px] font-semibold text-ink">월별 고정비 카테고리</h2>
+            <p className="mt-1 text-[12px] text-ink-muted">월별 고정비를 카테고리별로 비교합니다.</p>
           </div>
           <div className="h-[360px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -114,8 +145,29 @@ export function YearlyView({ data, children }: { data: YearlyDatum[]; children: 
                   formatter={(value) => [`${Number(value).toLocaleString("ko-KR")}만원`]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
-                <Bar dataKey="fixedExpense" name="고정비" stackId="expense" fill="var(--seed-color-bg-informative-solid)" />
-                <Bar dataKey="variableExpense" name="변동비" stackId="expense" fill="var(--seed-color-bg-brand-solid)" radius={[4, 4, 0, 0]} />
+                {fixedCategories.map((category, index) => (
+                  <Bar key={category.dataKey} dataKey={category.dataKey} name={category.name} stackId="fixed" fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} radius={index === fixedCategories.length - 1 ? [4, 4, 0, 0] : undefined} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="border-[0.8px] border-hairline bg-card px-2 py-4 sm:p-5">
+          <div className="mb-4">
+            <h2 className="text-[14px] font-semibold text-ink">월별 변동비 카테고리</h2>
+            <p className="mt-1 text-[12px] text-ink-muted">월별 변동비를 카테고리별로 비교합니다.</p>
+          </div>
+          <div className="h-[360px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+                <CartesianGrid vertical={false} stroke="var(--finance-hairline2)" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
+                <YAxis axisLine={false} tickLine={false} width={52} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(value) => [`${Number(value).toLocaleString("ko-KR")}만원`]} />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+                {variableCategories.map((category, index) => (
+                  <Bar key={category.dataKey} dataKey={category.dataKey} name={category.name} stackId="variable" fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} radius={index === variableCategories.length - 1 ? [4, 4, 0, 0] : undefined} />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </div>

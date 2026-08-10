@@ -8,7 +8,7 @@ type CategoryDatum = { name: string; value: number; fill: string };
 type TreemapDatum = { name: string; value: number; fill: string; returnPct: number | null; sharePct: number };
 
 function AllocationCard({ title, data }: { title: string; data: CategoryDatum[] }) {
-  return <CategoryPie title={title} data={data} />;
+  return <CategoryPie title={title} data={data} amountFormat="manwon" />;
 }
 
 export function AllocationCharts({

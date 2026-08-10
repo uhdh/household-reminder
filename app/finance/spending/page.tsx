@@ -128,7 +128,7 @@ export default async function SpendingPage({
           </SelectInput>
         </label>
         <label className="min-w-32 flex-1 text-[11px] font-semibold text-ink-muted sm:flex-none">
-          적용 카테고리
+          카테고리
           <SelectInput name="category" defaultValue={categoryFilter} className="mt-1 min-h-9 w-full px-2 py-1 text-[12px]">
             <option value="all">전체</option>
             {categoryOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}
@@ -167,10 +167,10 @@ export default async function SpendingPage({
             <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">날짜</th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">구분</th>
+              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">카테고리</th>
+              <th className="hidden whitespace-nowrap px-3 py-2 text-[11px] font-semibold lg:table-cell">대분류</th>
               <th className="hidden whitespace-nowrap px-3 py-2 text-[11px] font-semibold sm:table-cell">결제한 사람</th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">사용 대상</th>
-              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">적용 카테고리</th>
-              <th className="hidden whitespace-nowrap px-3 py-2 text-[11px] font-semibold lg:table-cell">원본 대분류</th>
               <th className="hidden whitespace-nowrap px-3 py-2 text-[11px] font-semibold md:table-cell">결제수단</th>
               <th className="hidden px-3 py-2 text-[11px] font-semibold md:table-cell">메모</th>
               <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">금액</th>
@@ -192,17 +192,17 @@ export default async function SpendingPage({
                   <td className="whitespace-nowrap px-2 py-2 sm:px-3">
                     <span className={flow === "입금" ? "text-legend1" : "text-ink"}>{flow}</span>
                   </td>
-                  <td className="hidden whitespace-nowrap px-3 py-2 text-ink-muted sm:table-cell">
-                    {displayNameByPerson.get(t.personId) ?? PERSON_LABELS[t.personId as PersonId] ?? t.personId}
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-2 sm:px-3">
-                    <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} />
-                  </td>
                   <td className="whitespace-nowrap px-2 py-2 sm:px-3">
                     <CategorySelect txnId={t.id} value={t.stdCategory} options={categoryOptions} returnTo={returnTo} />
                   </td>
                   <td className="hidden whitespace-nowrap px-3 py-2 text-ink-muted lg:table-cell">
                     {t.category ?? "-"}
+                  </td>
+                  <td className="hidden whitespace-nowrap px-3 py-2 text-ink-muted sm:table-cell">
+                    {displayNameByPerson.get(t.personId) ?? PERSON_LABELS[t.personId as PersonId] ?? t.personId}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-2 sm:px-3">
+                    <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} />
                   </td>
                   <td className="hidden whitespace-nowrap px-3 py-2 text-ink-muted md:table-cell">
                     {t.paymentMethod ?? "-"}
