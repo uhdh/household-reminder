@@ -22,7 +22,7 @@ export function SpendingNav() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={`shrink-0 rounded-full px-3 py-2 text-[12px] font-semibold transition-colors ${
+            className={`shrink-0 rounded-r2 px-3 py-2 text-[12px] font-semibold transition-colors ${
               active ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-fg-neutral-muted hover:bg-bg-neutral-weak hover:text-fg-neutral"
             }`}
           >

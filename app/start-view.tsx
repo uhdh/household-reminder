@@ -12,17 +12,14 @@ import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 
 const benefits = [
   {
-    icon: "⚡",
     title: "입력 대신 업로드 한 번",
     description: "뱅크샐러드 엑셀 파일을 올리면 거래 내역을 읽고 수입·지출과 카테고리를 자동으로 정리합니다.",
   },
   {
-    icon: "💑",
     title: "부부 자산을 하나로 공유",
     description: "각자의 자산과 소비 내역을 합쳐 우리집 전체 현황과 남편·아내별 흐름을 함께 확인해요.",
   },
   {
-    icon: "📈",
     title: "주식 수익률과 포트폴리오 관리",
     description: "보유 자산의 수익률, 자산 구성, 섹터별 평가금액까지 한 화면에서 살펴볼 수 있어요.",
   },
@@ -175,10 +172,7 @@ export async function StartView({ showHomeLink = false }: { showHomeLink?: boole
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           {benefits.map((benefit) => (
             <Card key={benefit.title} className="p-5 shadow-none">
-              <span className="flex h-11 w-11 items-center justify-center rounded-r3 bg-bg-neutral-weak text-2xl" aria-hidden>
-                {benefit.icon}
-              </span>
-              <h3 className="mt-4 text-base font-bold text-fg-neutral">{benefit.title}</h3>
+              <h3 className="text-base font-bold text-fg-neutral">{benefit.title}</h3>
               <p className="mt-2 text-sm leading-6 text-fg-neutral-muted">{benefit.description}</p>
             </Card>
           ))}
