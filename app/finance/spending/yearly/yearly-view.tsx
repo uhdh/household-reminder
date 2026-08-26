@@ -24,6 +24,18 @@ const formatManwonLabel = (value: unknown) => {
   return amount > 0 ? `${amount.toLocaleString("ko-KR")}만` : "";
 };
 
+/** 스택 안에 넣기엔 너무 작은 값은 겹쳐 보여서 라벨을 생략한다. */
+const formatInsideLabel = (value: unknown) => {
+  const amount = Number(value);
+  return amount >= 10 ? `${amount.toLocaleString("ko-KR")}` : "";
+};
+
+/** 범례를 막대 쌓기 순서(=색상 배정 순서)와 똑같이 정렬해서, 그래프 색과 범례 순서가 어긋나지 않게 한다. */
+function legendItemSorter(series: CategorySeries[]) {
+  const order = new Map(series.map((category, index) => [category.dataKey, index]));
+  return (item: { dataKey?: unknown }) => order.get(item.dataKey as string) ?? series.length;
+}
+
 const formatRateLabel = (value: unknown) => {
   const rate = Number(value);
   return Number.isFinite(rate) ? `${rate >= 0 ? "+" : ""}${rate.toFixed(1)}%` : "";
@@ -41,11 +53,13 @@ export function YearlyView({
   data,
   fixedCategories,
   variableCategories,
+  annualCategory,
   children,
 }: {
   data: YearlyDatum[];
   fixedCategories: CategorySeries[];
   variableCategories: CategorySeries[];
+  annualCategory: { name: string; values: number[] } | null;
   children: ReactNode;
 }) {
   const [view, setView] = useState<"table" | "chart">("chart");
@@ -144,9 +158,11 @@ export function YearlyView({
                   contentStyle={tooltipStyle}
                   formatter={(value) => [`${Number(value).toLocaleString("ko-KR")}만원`]}
                 />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} itemSorter={legendItemSorter(fixedCategories)} />
                 {fixedCategories.map((category, index) => (
-                  <Bar key={category.dataKey} dataKey={category.dataKey} name={category.name} stackId="fixed" fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} radius={index === fixedCategories.length - 1 ? [4, 4, 0, 0] : undefined} />
+                  <Bar key={category.dataKey} dataKey={category.dataKey} name={category.name} stackId="fixed" fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} radius={index === fixedCategories.length - 1 ? [4, 4, 0, 0] : undefined}>
+                    <LabelList dataKey={category.dataKey} position="inside" formatter={formatInsideLabel} fill="#fff" fontSize={10} />
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -164,14 +180,46 @@ export function YearlyView({
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
                 <YAxis axisLine={false} tickLine={false} width={52} tick={{ fontSize: 11, fill: "var(--finance-ink-muted)" }} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(value) => [`${Number(value).toLocaleString("ko-KR")}만원`]} />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} itemSorter={legendItemSorter(variableCategories)} />
                 {variableCategories.map((category, index) => (
-                  <Bar key={category.dataKey} dataKey={category.dataKey} name={category.name} stackId="variable" fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} radius={index === variableCategories.length - 1 ? [4, 4, 0, 0] : undefined} />
+                  <Bar key={category.dataKey} dataKey={category.dataKey} name={category.name} stackId="variable" fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} radius={index === variableCategories.length - 1 ? [4, 4, 0, 0] : undefined}>
+                    <LabelList dataKey={category.dataKey} position="inside" formatter={formatInsideLabel} fill="#fff" fontSize={10} />
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
+        {annualCategory && (
+          <div className="overflow-x-auto border-[0.8px] border-hairline bg-card px-2 py-4 sm:p-5">
+            <div className="mb-3">
+              <h2 className="text-[14px] font-semibold text-ink">{annualCategory.name}</h2>
+              <p className="mt-1 text-[12px] text-ink-muted">한 달에 몰려서 매달 비교를 방해하기 때문에 그래프에서 빼고 표로만 보여줍니다.</p>
+            </div>
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b-[0.8px] border-hairline2 text-left text-ink-muted">
+                  <th className="whitespace-nowrap py-1.5 pr-3 text-[11px] font-semibold">합계</th>
+                  {data.map((d) => (
+                    <th key={d.month} className="whitespace-nowrap px-2 py-1.5 text-right text-[11px] font-semibold">{d.month}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="whitespace-nowrap py-1.5 pr-3 font-semibold tabular-nums text-ink">
+                    {annualCategory.values.reduce((sum, v) => sum + v, 0).toLocaleString("ko-KR")}만원
+                  </td>
+                  {annualCategory.values.map((v, i) => (
+                    <td key={i} className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-ink-muted">
+                      {v > 0 ? `${v.toLocaleString("ko-KR")}만` : "-"}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
         </div>
       )}
     </section>

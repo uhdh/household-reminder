@@ -128,10 +128,12 @@ export default async function YearlyPage({
 
   const divisor = monthsPresent.size > 0 ? Math.max(...monthsPresent) : 1;
 
+  const ANNUAL_CATEGORY = "연간비용";
   const fixedRows = sortedBudgets.filter((b) => b.kind === "고정비");
   const variableRows = sortedBudgets.filter((b) => b.kind === "변동비");
   const buildCategorySeries = (rows: typeof fixedRows, prefix: "fixed" | "variable") => {
     const ranked = rows
+      .filter((row) => row.name !== ANNUAL_CATEGORY)
       .map((row) => ({ name: row.name, total: (categoryMonthly.get(row.name) ?? []).reduce((sum, value) => sum + value, 0) }))
       .filter((item) => item.total > 0)
       .sort((a, b) => b.total - a.total);
@@ -141,6 +143,10 @@ export default async function YearlyPage({
   };
   const fixedCategorySeries = buildCategorySeries(fixedRows, "fixed");
   const variableCategorySeries = buildCategorySeries(variableRows, "variable");
+  const annualCategoryValues = categoryMonthly.get(ANNUAL_CATEGORY);
+  const annualCategory = annualCategoryValues
+    ? { name: ANNUAL_CATEGORY, values: annualCategoryValues.map((v) => Math.round(v / 10_000)) }
+    : null;
   const hrefForYear = (value: number) => `/finance/spending/yearly?year=${value}${personFilter === "all" ? "" : `&person=${personFilter}`}`;
   const chartData = MONTH_LABELS.map((monthLabel, index) => ({
     month: monthLabel,
@@ -175,7 +181,7 @@ export default async function YearlyPage({
         <PersonFilter pathname="/finance/spending/yearly" periodKey="year" periodValue={String(year)} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
-      <YearlyView data={chartData} fixedCategories={fixedCategorySeries} variableCategories={variableCategorySeries}>
+      <YearlyView data={chartData} fixedCategories={fixedCategorySeries} variableCategories={variableCategorySeries} annualCategory={annualCategory}>
       <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">
         <table className="w-full text-[13px]">
           <thead>
