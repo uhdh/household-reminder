@@ -168,13 +168,9 @@ export default async function SpendingPage({
           <thead>
             <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">날짜</th>
-              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">구분</th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">카테고리</th>
-              <th className="hidden whitespace-nowrap px-3 py-2 text-[11px] font-semibold lg:table-cell">대분류</th>
-              <th className="hidden whitespace-nowrap px-3 py-2 text-[11px] font-semibold sm:table-cell">결제한 사람</th>
-              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">사용 대상</th>
-              <th className="hidden whitespace-nowrap px-3 py-2 text-[11px] font-semibold md:table-cell">결제수단</th>
-              <th className="hidden px-3 py-2 text-[11px] font-semibold md:table-cell">메모</th>
+              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">결제 · 사용</th>
+              <th className="px-3 py-2 text-[11px] font-semibold">메모</th>
               <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">금액</th>
               <th className="w-12 px-2 py-2 text-right text-[11px] font-semibold sm:px-3"><span className="sr-only">관리</span></th>
             </tr>
@@ -182,40 +178,51 @@ export default async function SpendingPage({
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-ink-muted">
+                <td colSpan={6} className="px-3 py-8 text-center text-ink-muted">
                   해당 월에 표시할 거래가 없습니다.
                 </td>
               </tr>
             )}
             {filtered.map((t) => {
               const flow = flowLabel(t);
+              const rawCategory = t.category ?? "미분류";
+              const displayedCategory = t.stdCategory ?? "미분류";
+              const payerLabel = displayNameByPerson.get(t.personId) ?? PERSON_LABELS[t.personId as PersonId] ?? t.personId;
+              const amount = toNum(t.amount);
               return (
                 <tr key={t.id} className="border-b-[0.8px] border-hairline2 last:border-0">
                   <td className="whitespace-nowrap px-2 py-2 text-ink-muted sm:px-3">{t.txnDate.slice(5)}</td>
                   <td className="whitespace-nowrap px-2 py-2 sm:px-3">
-                    <span className={flow === "입금" ? "text-legend1" : "text-ink"}>{flow}</span>
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-2 sm:px-3">
-                    <div className="flex items-center gap-1.5">
-                      <CategoryIcon name={t.stdCategory} className="shrink-0 text-ink-muted" />
-                      <CategorySelect txnId={t.id} value={t.stdCategory} options={categoryOptions} returnTo={returnTo} />
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <CategoryIcon name={t.stdCategory} className="shrink-0 text-ink-muted" />
+                        <CategorySelect txnId={t.id} value={t.stdCategory} options={categoryOptions} returnTo={returnTo} />
+                      </div>
+                      {rawCategory !== displayedCategory && <span className="text-[10px] text-ink-muted">원본: {rawCategory}</span>}
                     </div>
                   </td>
-                  <td className="hidden whitespace-nowrap px-3 py-2 text-ink-muted lg:table-cell">
-                    {t.category ?? "-"}
-                  </td>
-                  <td className="hidden whitespace-nowrap px-3 py-2 text-ink-muted sm:table-cell">
-                    {displayNameByPerson.get(t.personId) ?? PERSON_LABELS[t.personId as PersonId] ?? t.personId}
-                  </td>
                   <td className="whitespace-nowrap px-2 py-2 sm:px-3">
-                    <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} />
+                    <div className="flex items-center gap-1 text-[12px]">
+                      {t.personId !== t.beneficiary && (
+                        <span className="text-ink-muted">
+                          {payerLabel}
+                          <span className="mx-1 text-ink-muted/60">→</span>
+                        </span>
+                      )}
+                      <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} />
+                    </div>
                   </td>
-                  <td className="hidden whitespace-nowrap px-3 py-2 text-ink-muted md:table-cell">
-                    {t.paymentMethod ?? "-"}
+                  <td className="px-3 py-2">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-ink-muted">{t.description ?? "-"}</span>
+                      {t.paymentMethod && <span className="text-[10px] text-ink-muted/70">{t.paymentMethod}</span>}
+                    </div>
                   </td>
-                  <td className="hidden px-3 py-2 text-ink-muted md:table-cell">{t.description ?? "-"}</td>
                   <td className="whitespace-nowrap px-2 py-2 text-right font-semibold tabular-nums sm:px-3">
-                    {formatKRW(Math.abs(toNum(t.amount)))}
+                    <span className={flow === "입금" ? "text-fg-positive" : "text-ink"}>
+                      {flow === "입금" ? "+" : "-"}
+                      {formatKRW(Math.abs(amount))}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-2 py-2 text-right sm:px-3">
                     <TransactionDeleteButton txnId={t.id} returnTo={returnTo} />

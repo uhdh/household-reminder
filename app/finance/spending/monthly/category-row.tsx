@@ -37,15 +37,26 @@ export function UsageAmount({ actual, budget }: { actual: number; budget: number
   );
 }
 
-export function UsageBar({ actual, budget }: { actual: number; budget: number | null }) {
+/** 막대 앞 GAUGE_SPLIT%는 0~100% 사용률 구간, 뒤 나머지는 100%를 넘긴 초과분을 scaleMax 기준으로 다시 늘려 보여주는 구간. */
+const GAUGE_SPLIT = 60;
+
+function gaugeWidth(pct: number, scaleMax: number): number {
+  if (pct <= 100) return (pct / 100) * GAUGE_SPLIT;
+  const overRange = Math.max(scaleMax - 100, 1);
+  const over = Math.min(pct - 100, overRange);
+  return GAUGE_SPLIT + (over / overRange) * (100 - GAUGE_SPLIT);
+}
+
+export function UsageBar({ actual, budget, scaleMax }: { actual: number; budget: number | null; scaleMax: number }) {
   const usagePct = usagePctOf(actual, budget);
   if (usagePct === null) return null;
   return (
-    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg-neutral-weak">
+    <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg-neutral-weak">
       <div
         className={`h-full rounded-full ${USAGE_COLORS[usageStatus(usagePct)].fill}`}
-        style={{ width: `${Math.min(usagePct, 100)}%` }}
+        style={{ width: `${gaugeWidth(usagePct, scaleMax)}%` }}
       />
+      <div className="absolute -top-0.5 -bottom-0.5 w-px bg-ink-muted/40" style={{ left: `${GAUGE_SPLIT}%` }} />
     </div>
   );
 }
@@ -89,6 +100,7 @@ export function CategoryRow({
   paidBy,
   beneficiaries,
   hidePayerBreakdown = false,
+  scaleMax,
 }: {
   name: string;
   budget: number | null;
@@ -96,6 +108,7 @@ export function CategoryRow({
   paidBy: BreakdownItem[];
   beneficiaries: BreakdownItem[];
   hidePayerBreakdown?: boolean;
+  scaleMax: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (actual === 0 && budget === null) return null;
@@ -121,7 +134,7 @@ export function CategoryRow({
         <UsageAmount actual={actual} budget={budget} />
       </button>
       {hasBudget ? (
-        <UsageBar actual={actual} budget={budget} />
+        <UsageBar actual={actual} budget={budget} scaleMax={scaleMax} />
       ) : (
         <span className="mt-1.5 inline-block rounded-full bg-bg-neutral-weak px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
           예산 미설정

@@ -113,6 +113,13 @@ export default async function MonthlyPage({
     .reduce((s, [, v]) => s + v, 0);
   const hrefForMonth = (value: string) => `/finance/spending/monthly?month=${value}${personFilter === "all" ? "" : `&person=${personFilter}`}`;
 
+  // 이번 달 가장 심한 초과율에 맞춰 초과 구간 게이지 스케일을 자동으로 잡는다 (최소 200%).
+  const usagePercents = [...fixedRows, ...variableRows]
+    .map((b) => (b.monthlyBudget !== null && toNum(b.monthlyBudget) > 0 ? ((categoryTotals.get(b.name) ?? 0) / toNum(b.monthlyBudget)) * 100 : null))
+    .filter((pct): pct is number => pct !== null);
+  const maxUsagePercent = usagePercents.length > 0 ? Math.max(...usagePercents) : 100;
+  const scaleMax = Math.max(200, Math.ceil(maxUsagePercent / 50) * 50);
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -185,6 +192,7 @@ export default async function MonthlyPage({
                 paidBy={toBreakdown(categoryByPerson.get(b.name) ?? {}, personLabelOf)}
                 beneficiaries={toBreakdown(categoryByBeneficiary.get(b.name) ?? {}, benLabelOf)}
                 hidePayerBreakdown={personFilter !== "all"}
+                scaleMax={scaleMax}
               />
             ))}
           </ul>
@@ -206,6 +214,7 @@ export default async function MonthlyPage({
                 paidBy={toBreakdown(categoryByPerson.get(b.name) ?? {}, personLabelOf)}
                 beneficiaries={toBreakdown(categoryByBeneficiary.get(b.name) ?? {}, benLabelOf)}
                 hidePayerBreakdown={personFilter !== "all"}
+                scaleMax={scaleMax}
               />
             ))}
             {unmappedTotal > 0 && (
@@ -216,6 +225,7 @@ export default async function MonthlyPage({
                 paidBy={toBreakdown(categoryByPerson.get(UNMAPPED) ?? {}, personLabelOf)}
                 beneficiaries={toBreakdown(categoryByBeneficiary.get(UNMAPPED) ?? {}, benLabelOf)}
                 hidePayerBreakdown={personFilter !== "all"}
+                scaleMax={scaleMax}
               />
             )}
           </ul>

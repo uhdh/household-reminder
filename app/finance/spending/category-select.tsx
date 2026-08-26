@@ -19,6 +19,9 @@ export function CategorySelect({
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const grouped = groupByKind(options);
+  // 삭제된 카테고리로 지정된 채 남아있는 거래는 옵션 목록에 없어도 실제 값 그대로 보여준다.
+  // (없애면 select가 첫 옵션인 "미분류"로 조용히 바뀌어 보여서, 실제로는 매핑돼 있는데 미분류처럼 보임)
+  const isOrphaned = !!value && value !== "미분류" && !options.some((o) => o.name === value);
 
   return (
     <form ref={formRef} action={updateTransactionCategoryAction}>
@@ -33,6 +36,7 @@ export function CategorySelect({
         }`}
       >
         <option value={UNMAPPED_VALUE}>미분류</option>
+        {isOrphaned && <option value={value!}>{value} (삭제된 카테고리)</option>}
         {Object.entries(grouped).map(([kind, names]) => (
           <optgroup key={kind} label={kind}>
             {names.map((name) => (
