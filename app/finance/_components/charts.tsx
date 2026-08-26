@@ -1,7 +1,7 @@
 "use client";
 
 import { ResponsiveContainer, Treemap } from "recharts";
-import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL } from "@/lib/finance-format";
+import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL, isLightColor } from "@/lib/finance-format";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 
 type CategoryDatum = { name: string; value: number; fill: string };
@@ -53,12 +53,8 @@ function HeatmapCell(props: unknown) {
   if (!fill || !name) {
     return <rect x={x} y={y} width={width} height={height} fill="none" />;
   }
-  const statusColor =
-    returnPct === null || returnPct === undefined || returnPct === 0
-      ? HEATMAP_NEUTRAL
-      : returnPct > 0
-        ? HEATMAP_GAIN
-        : HEATMAP_LOSS;
+  const textColor = isLightColor(fill) ? "#0B0B0B" : "#F7F7F5";
+  const subTextColor = isLightColor(fill) ? "rgba(11,11,11,0.72)" : "rgba(247,247,245,0.82)";
   const padding = 8;
   const clipId = `heatmap-cell-clip-${index}`;
   const label = truncateToWidth(name, width - padding * 2);
@@ -76,37 +72,22 @@ function HeatmapCell(props: unknown) {
         y={y}
         width={width}
         height={height}
-        style={{ fill: "var(--seed-color-bg-neutral-weak)", stroke: "var(--finance-canvas)", strokeWidth: 2 }}
+        style={{ fill, stroke: "var(--finance-canvas)", strokeWidth: 2 }}
       />
       <title>{`${name} · ${sharePct.toFixed(0)}%${returnLabel ? ` · 수익률 ${returnLabel}` : ""}`}</title>
       <clipPath id={clipId}>
         <rect x={x} y={y} width={width} height={height} />
       </clipPath>
       <g clipPath={`url(#${clipId})`}>
-        <rect x={x + 2} y={y + 2} width={Math.max(0, width - 4)} height={4} fill={statusColor} />
         {showLabel && (
-          <text
-            x={x + padding}
-            y={y + 22}
-            fontSize={12}
-            fontWeight={700}
-            stroke="none"
-            className="fill-[#0B0B0B] dark:fill-[#F7F7F5]"
-          >
+          <text x={x + padding} y={y + 20} fontSize={12} fontWeight={700} stroke="none" fill={textColor}>
             {label}
           </text>
         )}
         {showValue && (
-          <text
-            x={x + padding}
-            y={y + 39}
-            fontSize={11}
-            fontWeight={600}
-            stroke="none"
-            className="fill-[#57574F] dark:fill-[#D6D4CB]"
-          >
+          <text x={x + padding} y={y + 37} fontSize={11} fontWeight={600} stroke="none" fill={subTextColor}>
             <tspan>{shareLabel}</tspan>
-            {returnLabel && width > 65 && <tspan fill={statusColor}>{` · ${returnLabel}`}</tspan>}
+            {returnLabel && width > 65 && <tspan>{` · ${returnLabel}`}</tspan>}
           </text>
         )}
       </g>
