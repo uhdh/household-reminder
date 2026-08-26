@@ -16,6 +16,7 @@ import {
 import { formatKRW } from "@/lib/finance-format";
 import { ActionButton, SelectInput, TextInput } from "@/components/ui";
 import { BeneficiarySelect } from "./beneficiary-select";
+import { CategoryIcon } from "./category-icon";
 import { CategorySelect } from "./category-select";
 import { PersonFilter } from "./person-filter";
 import { ManualTransactionForm } from "./manual-transaction-form";
@@ -195,7 +196,10 @@ export default async function SpendingPage({
                     <span className={flow === "입금" ? "text-legend1" : "text-ink"}>{flow}</span>
                   </td>
                   <td className="whitespace-nowrap px-2 py-2 sm:px-3">
-                    <CategorySelect txnId={t.id} value={t.stdCategory} options={categoryOptions} returnTo={returnTo} />
+                    <div className="flex items-center gap-1.5">
+                      <CategoryIcon name={t.stdCategory} className="shrink-0 text-ink-muted" />
+                      <CategorySelect txnId={t.id} value={t.stdCategory} options={categoryOptions} returnTo={returnTo} />
+                    </div>
                   </td>
                   <td className="hidden whitespace-nowrap px-3 py-2 text-ink-muted lg:table-cell">
                     {t.category ?? "-"}
