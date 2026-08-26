@@ -13,7 +13,7 @@ import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 const benefits = [
   {
     title: "수기 작성 없이 자동화",
-    description: "뱅크샐러드 파일을 한 번 올리면 거래 내역과 카테고리를 자동으로 정리합니다.",
+    description: "멋진 자산 현황, 가계부가 알아서 만들어져요.",
   },
   {
     title: "부부 자산을 하나로 통합",
@@ -24,12 +24,6 @@ const benefits = [
     description: "보유 자산의 수익률, 자산 구성, 섹터별 평가금액까지 한 화면에서 살펴볼 수 있어요.",
   },
 ];
-
-const steps = [
-  ["1", "데이터 받기", "뱅크샐러드에서 자산·가계부 엑셀 파일을 내려받아요."],
-  ["2", "파일 업로드", "남편과 아내의 파일을 각각 우리집에 올려요."],
-  ["3", "자동 정리 확인", "합쳐진 자산·소비·포트폴리오 현황을 바로 확인해요."],
-] as const;
 
 const EXCLUDED_ASSET_CATEGORIES = new Set(["부동산", "동산", "전자금융 자산", "보험 자산"]);
 const EXCLUDED_DEBT_ITEMS = new Set(["husband|분양주택입주잔금대출"]);
@@ -180,7 +174,6 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
             <p className="text-sm font-bold text-fg-brand">우리집 실제 미리보기</p>
             <h2 className="mt-2 text-2xl font-bold text-fg-neutral">업로드하면 이렇게 한눈에 보여요</h2>
           </div>
-          {hasPreviewData && <span className="text-sm text-fg-neutral-muted">현재 업로드된 데이터 기준</span>}
         </div>
 
         {hasPreviewData ? (
@@ -204,7 +197,7 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <SummaryCard label="총수입" value={monthlyIncome} format="compactKrw" />
                   <SummaryCard label="총지출" value={monthlyExpense} format="compactKrw" />
-                  <SummaryCard label="당월 잔고" value={monthlyBalance} format="compactKrw" />
+                  <SummaryCard label="당월 저축" value={monthlyBalance} format="compactKrw" />
                   <SummaryCard label="저축률" value={savingsRate} format="signedPct" />
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -226,38 +219,6 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
         )}
       </section>
 
-      <section className="border-y border-stroke-neutral-muted py-10">
-        <p className="text-sm font-bold text-fg-brand">사용 방법</p>
-        <h2 className="mt-2 text-2xl font-bold text-fg-neutral">파일만 올리면 세 단계로 끝나요</h2>
-        <ol className="mt-6 grid gap-5 sm:grid-cols-3">
-          {steps.map(([number, title, description]) => (
-            <li key={number} className="flex gap-3 sm:block">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bg-brand-solid text-sm font-bold text-fg-neutral-inverted">
-                {number}
-              </span>
-              <div className="sm:mt-3">
-                <h3 className="font-bold text-fg-neutral">{title}</h3>
-                <p className="mt-1 text-sm leading-6 text-fg-neutral-muted">{description}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <section className="border-t border-stroke-neutral-muted py-10">
-        <Card className="grid gap-5 p-5 shadow-none sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-6">
-          <div>
-            <p className="text-sm font-bold text-fg-brand">무료로 계속 관리합니다</p>
-            <h2 className="mt-2 text-xl font-bold text-fg-neutral">복잡한 부부 자산 관리, 한 번의 업로드로 시작하세요.</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-neutral-muted">
-              직접 쓰던 엑셀 가계부를 더 쉽게 함께 쓰기 위해 만들었습니다. 필요한 기능은 계속 업데이트합니다.
-            </p>
-          </div>
-          <Link href="/finance/upload" className="seed-button seed-button-primary min-h-11 shrink-0 px-5">
-            파일 업로드하기
-          </Link>
-        </Card>
-      </section>
     </AppShell>
   );
 }

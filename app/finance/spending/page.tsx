@@ -19,6 +19,7 @@ import { BeneficiarySelect } from "./beneficiary-select";
 import { CategorySelect } from "./category-select";
 import { PersonFilter } from "./person-filter";
 import { ManualTransactionForm } from "./manual-transaction-form";
+import { TransactionDeleteButton } from "./transaction-delete-button";
 
 export const dynamic = "force-dynamic";
 
@@ -174,12 +175,13 @@ export default async function SpendingPage({
               <th className="hidden whitespace-nowrap px-3 py-2 text-[11px] font-semibold md:table-cell">결제수단</th>
               <th className="hidden px-3 py-2 text-[11px] font-semibold md:table-cell">메모</th>
               <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">금액</th>
+              <th className="w-12 px-2 py-2 text-right text-[11px] font-semibold sm:px-3"><span className="sr-only">관리</span></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-ink-muted">
+                <td colSpan={10} className="px-3 py-8 text-center text-ink-muted">
                   해당 월에 표시할 거래가 없습니다.
                 </td>
               </tr>
@@ -210,6 +212,9 @@ export default async function SpendingPage({
                   <td className="hidden px-3 py-2 text-ink-muted md:table-cell">{t.description ?? "-"}</td>
                   <td className="whitespace-nowrap px-2 py-2 text-right font-semibold tabular-nums sm:px-3">
                     {formatKRW(Math.abs(toNum(t.amount)))}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-2 text-right sm:px-3">
+                    <TransactionDeleteButton txnId={t.id} returnTo={returnTo} />
                   </td>
                 </tr>
               );

@@ -139,7 +139,7 @@ export default async function MonthlyPage({
       <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SummaryCard label="총수입" value={summary.totalIncome} format="compactKrw" />
         <SummaryCard label="총지출" value={summary.totalExpense} format="compactKrw" />
-        <SummaryCard label="당월 잔고" value={summary.balance} format="compactKrw" />
+        <SummaryCard label="당월 저축" value={summary.balance} format="compactKrw" />
         <SummaryCard
           label="저축률"
           value={summary.savingsRate}

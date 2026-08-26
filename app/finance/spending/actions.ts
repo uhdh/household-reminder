@@ -66,6 +66,32 @@ export async function updateBeneficiaryAction(formData: FormData) {
   redirect(returnTo);
 }
 
+export async function deleteTransactionAction(formData: FormData) {
+  const txnId = String(formData.get("txnId") ?? "");
+  const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
+
+  if (txnId) {
+    const db = getDb();
+    const [transaction] = await db
+      .select({ uploadId: transactions.uploadId })
+      .from(transactions)
+      .where(eq(transactions.id, txnId))
+      .limit(1);
+
+    if (transaction) {
+      const [upload] = await db
+        .select({ id: uploads.id })
+        .from(uploads)
+        .where(and(eq(uploads.id, transaction.uploadId), eq(uploads.isActive, true)))
+        .limit(1);
+
+      if (upload) await db.delete(transactions).where(eq(transactions.id, txnId));
+    }
+  }
+
+  redirect(returnTo);
+}
+
 const UNMAPPED_VALUE = "__미분류__";
 
 export async function updateTransactionCategoryAction(formData: FormData) {
