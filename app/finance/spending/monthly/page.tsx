@@ -18,7 +18,7 @@ import { buildCategoryColorMap, formatCompactKRW, formatKRW, topNWithOther } fro
 import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { CategoryPie } from "./chart";
 import { PersonFilter } from "../person-filter";
-import { CategoryRow, type BreakdownItem } from "./category-row";
+import { CategoryRow, UsageAmount, type BreakdownItem } from "./category-row";
 
 export const dynamic = "force-dynamic";
 
@@ -107,8 +107,6 @@ export default async function MonthlyPage({
   const variableRows = sortedBudgets.filter((b) => b.kind === "변동비");
   const fixedBudgetTotal = fixedRows.reduce((sum, budget) => sum + (budget.monthlyBudget === null ? 0 : toNum(budget.monthlyBudget)), 0);
   const variableBudgetTotal = variableRows.reduce((sum, budget) => sum + (budget.monthlyBudget === null ? 0 : toNum(budget.monthlyBudget)), 0);
-  const fixedUsageRate = fixedBudgetTotal > 0 ? (summary.fixedExpense / fixedBudgetTotal) * 100 : null;
-  const variableUsageRate = variableBudgetTotal > 0 ? (summary.variableExpense / variableBudgetTotal) * 100 : null;
   const knownNames = new Set(sortedBudgets.map((b) => b.name));
   const unmappedTotal = Array.from(categoryTotals.entries())
     .filter(([name]) => !knownNames.has(name))
@@ -169,25 +167,15 @@ export default async function MonthlyPage({
         <CategoryPie title="변동비" data={variablePieData} amountFormat="manwon" showTotal />
       </div>
 
-      <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">
-        <table className="w-full text-[13px]">
-          <thead>
-            <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
-              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">구분</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">예산</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">합계</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">사용률</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">상세</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b-[0.8px] border-hairline2 bg-canvas">
-              <td className="px-2 py-1.5 text-[11px] font-semibold text-ink-muted sm:px-3">고정비</td>
-              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink-muted sm:px-3">{fixedBudgetTotal > 0 ? formatKRW(fixedBudgetTotal) : "-"}</td>
-              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink sm:px-3">{formatKRW(summary.fixedExpense)}</td>
-              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink-muted sm:px-3">{fixedUsageRate === null ? "-" : `${fixedUsageRate.toFixed(0)}%`}</td>
-              <td className="px-2 py-1.5 sm:px-3" />
-            </tr>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="border-[0.8px] border-hairline bg-card">
+          <ul className="text-[13px]">
+            <li className="border-b-[0.8px] border-hairline2 bg-canvas px-2 py-2 sm:px-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[11px] font-semibold text-ink-muted">고정비</span>
+                <UsageAmount actual={summary.fixedExpense} budget={fixedBudgetTotal} />
+              </div>
+            </li>
             {fixedRows.map((b) => (
               <CategoryRow
                 key={b.name}
@@ -199,13 +187,16 @@ export default async function MonthlyPage({
                 hidePayerBreakdown={personFilter !== "all"}
               />
             ))}
-            <tr className="border-b-[0.8px] border-hairline2 bg-canvas">
-              <td className="px-2 py-1.5 text-[11px] font-semibold text-ink-muted sm:px-3">변동비</td>
-              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink-muted sm:px-3">{variableBudgetTotal > 0 ? formatKRW(variableBudgetTotal) : "-"}</td>
-              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink sm:px-3">{formatKRW(summary.variableExpense)}</td>
-              <td className="px-2 py-1.5 text-right text-[11px] font-semibold tabular-nums text-ink-muted sm:px-3">{variableUsageRate === null ? "-" : `${variableUsageRate.toFixed(0)}%`}</td>
-              <td className="px-2 py-1.5 sm:px-3" />
-            </tr>
+          </ul>
+        </div>
+        <div className="border-[0.8px] border-hairline bg-card">
+          <ul className="text-[13px]">
+            <li className="border-b-[0.8px] border-hairline2 bg-canvas px-2 py-2 sm:px-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[11px] font-semibold text-ink-muted">변동비</span>
+                <UsageAmount actual={summary.variableExpense} budget={variableBudgetTotal} />
+              </div>
+            </li>
             {variableRows.map((b) => (
               <CategoryRow
                 key={b.name}
@@ -227,8 +218,8 @@ export default async function MonthlyPage({
                 hidePayerBreakdown={personFilter !== "all"}
               />
             )}
-          </tbody>
-        </table>
+          </ul>
+        </div>
       </div>
     </div>
   );
