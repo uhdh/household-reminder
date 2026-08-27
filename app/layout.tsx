@@ -12,8 +12,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "우리집",
-  description: "부부의 자산·가계부·생활 관리를 함께하는 우리집",
+  title: "가계부탁",
+  description: "각자 올리면 알아서 합쳐지는 부부 자산·가계부·투자 자동화 서비스",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -23,11 +23,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <div className="flex items-center justify-between gap-3 px-3 py-2 sm:px-4">
           <Link
             href="/"
-            aria-label="우리집 홈으로 이동"
+            aria-label="가계부탁 홈으로 이동"
             className="flex shrink-0 items-center gap-2 rounded-r2 px-1.5 py-1 text-sm font-bold text-fg-neutral hover:bg-bg-layer-default-pressed"
           >
             <Image src="/icon.svg" alt="" width={28} height={28} priority />
-            <span>우리집</span>
+            <span>가계부탁</span>
           </Link>
           <div className="flex min-w-0 items-center gap-2">
             <ThemeToggle />

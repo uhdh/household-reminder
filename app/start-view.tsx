@@ -9,19 +9,23 @@ import { flowLabel, getActiveTransactions, latestMonth, monthKeyOf, toNum } from
 import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { AllocationCharts } from "@/app/finance/_components/charts";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
+import { BrandHero } from "@/app/brand-hero";
 
 const benefits = [
   {
+    tag: "입력 0",
     title: "수기 작성 없이 자동화",
-    description: "멋진 자산 현황, 가계부가 알아서 만들어져요.",
+    description: "뱅크샐러드 파일을 한 번 올리면 거래와 카테고리를 알아서 정리해요.",
   },
   {
-    title: "부부 자산을 하나로 통합",
-    description: "각자의 자산과 소비를 합쳐 우리집 현황과 각자 흐름을 함께 확인합니다.",
+    tag: "각자 → 함께",
+    title: "따로 관리하고, 같이 확인",
+    description: "각자의 소비와 자산은 그대로 두고 부부 전체 현황만 한 화면에 합쳐요.",
   },
   {
-    title: "주식 수익률과 포트폴리오 관리",
-    description: "보유 자산의 수익률, 자산 구성, 섹터별 평가금액까지 한 화면에서 살펴볼 수 있어요.",
+    tag: "소비 + 투자",
+    title: "투자 내역까지 투명하게",
+    description: "가계부뿐 아니라 주식 수익률과 포트폴리오도 함께 공개하고 관리해요.",
   },
 ];
 
@@ -52,10 +56,10 @@ function CompositionCard({ title, items }: { title: string; items: { label: stri
         <span className="text-[12px] tabular-nums text-ink-muted">{formatManwon(total)}</span>
       </div>
       <div className="mb-4 flex h-2 overflow-hidden rounded-full bg-bg-neutral-weak" aria-hidden="true">
-        {items.map((item) => <span key={item.label} className={item.color} style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }} />)}
+        {items.map((item, index) => <span key={`${item.label}-${index}`} className={item.color} style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }} />)}
       </div>
       <ul className="space-y-3">
-        {items.map((item) => <li key={item.label} className="flex items-center gap-2 text-[12px]"><span className={`h-2.5 w-2.5 rounded-full ${item.color}`} /><span className="flex-1 text-ink-muted">{item.label}</span><span className="font-semibold tabular-nums text-ink">{formatManwon(item.value)}</span><span className="w-10 text-right tabular-nums text-ink-muted">{total > 0 ? ((item.value / total) * 100).toFixed(0) : 0}%</span></li>)}
+        {items.map((item, index) => <li key={`${item.label}-${index}`} className="flex items-center gap-2 text-[12px]"><span className={`h-2.5 w-2.5 rounded-full ${item.color}`} /><span className="flex-1 text-ink-muted">{item.label}</span><span className="font-semibold tabular-nums text-ink">{formatManwon(item.value)}</span><span className="w-10 text-right tabular-nums text-ink-muted">{total > 0 ? ((item.value / total) * 100).toFixed(0) : 0}%</span></li>)}
       </ul>
     </section>
   );
@@ -150,18 +154,14 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
         </Link>
       )}
 
-      <section className="px-5 py-8 text-left sm:px-8 sm:py-10 lg:px-12 lg:py-12">
-        <p className="text-sm font-bold text-fg-brand">효율의 끝판왕, 모든 것이 귀찮은 사람을 위한 자산 관리 시스템</p>
-        <h1 className="mt-5 text-3xl font-bold leading-tight tracking-[-0.03em] text-fg-neutral sm:text-4xl lg:text-5xl">
-          자산관리, 가계부 100% 자동화
-        </h1>
-      </section>
+      <BrandHero />
 
-      <section className="py-8">
+      <section className="py-6 sm:py-8" aria-label="가계부탁의 주요 기능">
         <div className="grid gap-3 sm:grid-cols-3">
           {benefits.map((benefit) => (
             <Card key={benefit.title} className="p-5 shadow-none">
-              <h3 className="text-base font-bold text-fg-neutral">{benefit.title}</h3>
+              <span className="inline-flex rounded-full bg-bg-brand-weak px-2.5 py-1 text-xs font-bold text-fg-brand">{benefit.tag}</span>
+              <h3 className="mt-4 text-base font-bold text-fg-neutral">{benefit.title}</h3>
               <p className="mt-2 text-sm leading-6 text-fg-neutral-muted">{benefit.description}</p>
             </Card>
           ))}
@@ -171,8 +171,8 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
       <section className="border-y border-stroke-neutral-muted py-10">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm font-bold text-fg-brand">우리집 실제 미리보기</p>
-            <h2 className="mt-2 text-2xl font-bold text-fg-neutral">업로드하면 이렇게 한눈에 보여요</h2>
+            <p className="text-sm font-bold text-fg-brand">가계부탁이 만든 결과</p>
+            <h2 className="mt-2 text-2xl font-bold text-fg-neutral">입력은 한 번, 이후에는 확인만 하세요</h2>
           </div>
         </div>
 
@@ -213,7 +213,7 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
         ) : (
           <Card className="mt-6 p-6 text-center shadow-none">
             <p className="font-bold text-fg-neutral">아직 보여드릴 데이터가 없어요</p>
-            <p className="mt-2 text-sm text-fg-neutral-muted">뱅크샐러드 파일을 업로드하면 우리집 실제 자산과 지출 현황을 이곳에서 미리 볼 수 있어요.</p>
+            <p className="mt-2 text-sm text-fg-neutral-muted">뱅크샐러드 파일을 업로드하면 가계부탁이 자산과 지출 현황을 자동으로 정리해요.</p>
             <Link href="/finance/upload" className="seed-button seed-button-primary mt-5">파일 업로드하기</Link>
           </Card>
         )}
