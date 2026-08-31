@@ -27,6 +27,7 @@ export default defineConfig({
     "allocation_targets",
     "transactions",
     "category_mappings",
+    "category_rules",
     "budget_categories",
   ],
   dialect: "postgresql",

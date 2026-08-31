@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { formatKRW } from "@/lib/finance-format";
 
-export type BreakdownItem = {
-  label: string;
-  value: number;
+export type CategoryTransaction = {
+  id: string;
+  description: string | null;
+  amount: number;
 };
 
 type UsageStatus = "good" | "warn" | "over";
@@ -61,53 +62,17 @@ export function UsageBar({ actual, budget, scaleMax }: { actual: number; budget:
   );
 }
 
-function Breakdown({ title, items }: { title: string; items: BreakdownItem[] }) {
-  const total = items.reduce((sum, item) => sum + item.value, 0);
-
-  return (
-    <div className="min-w-0 flex-1">
-      <p className="mb-2 text-[11px] font-semibold text-ink-muted">{title}</p>
-      {items.length > 0 ? (
-        <ul className="space-y-2">
-          {items.map((item) => {
-            const percent = total > 0 ? (item.value / total) * 100 : 0;
-            return (
-              <li key={item.label}>
-                <div className="mb-1 flex items-center justify-between gap-3 text-[12px]">
-                  <span className="text-ink">{item.label}</span>
-                  <span className="tabular-nums text-ink-muted">
-                    {formatKRW(item.value)} · {percent.toFixed(0)}%
-                  </span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-bg-neutral-weak">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="text-[12px] text-ink-muted">내역 없음</p>
-      )}
-    </div>
-  );
-}
-
 export function CategoryRow({
   name,
   budget,
   actual,
-  paidBy,
-  beneficiaries,
-  hidePayerBreakdown = false,
+  transactions,
   scaleMax,
 }: {
   name: string;
   budget: number | null;
   actual: number;
-  paidBy: BreakdownItem[];
-  beneficiaries: BreakdownItem[];
-  hidePayerBreakdown?: boolean;
+  transactions: CategoryTransaction[];
   scaleMax: number;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -141,10 +106,14 @@ export function CategoryRow({
         </span>
       )}
       {expanded && (
-        <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:gap-8">
-          {!hidePayerBreakdown && <Breakdown title="결제한 사람" items={paidBy} />}
-          <Breakdown title="사용 대상" items={beneficiaries} />
-        </div>
+        <ul className="mt-3 divide-y divide-hairline2 border-t border-hairline2 text-[12px]">
+          {transactions.length > 0 ? transactions.map((transaction) => (
+            <li key={transaction.id} className="flex items-center justify-between gap-3 py-2">
+              <span className="min-w-0 truncate text-ink-muted">{transaction.description || "메모 없음"}</span>
+              <span className="shrink-0 font-semibold tabular-nums text-ink">{formatKRW(transaction.amount)}</span>
+            </li>
+          )) : <li className="py-2 text-ink-muted">내역 없음</li>}
+        </ul>
       )}
     </li>
   );

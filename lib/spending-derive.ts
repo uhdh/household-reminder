@@ -7,6 +7,12 @@ export type CategoryMapping = {
   stdCategory: string;
 };
 
+export type CategoryRule = {
+  txnType: string;
+  paymentMethod: string;
+  stdCategory: string;
+};
+
 export type DerivedResult = {
   stdCategory: string | null;
   included: boolean;
@@ -34,6 +40,14 @@ function mapKey(txnType: string, rawCategory: string, rawSubcategory: string) {
   return `${txnType}|${rawCategory}|${rawSubcategory}`;
 }
 
+function ruleKey(txnType: string, paymentMethod: string) {
+  return `${txnType}|${paymentMethod}`;
+}
+
+export function buildRuleIndex(rules: CategoryRule[]): Map<string, string> {
+  return new Map(rules.map((rule) => [ruleKey(rule.txnType, rule.paymentMethod), rule.stdCategory]));
+}
+
 export function buildMappingIndex(mappings: CategoryMapping[]): Map<string, string> {
   const idx = new Map<string, string>();
   for (const m of mappings) {
@@ -44,8 +58,11 @@ export function buildMappingIndex(mappings: CategoryMapping[]): Map<string, stri
 
 export function mapStdCategory(
   txn: ParsedTransaction,
-  mappingIndex: Map<string, string>
+  mappingIndex: Map<string, string>,
+  ruleIndex: Map<string, string> = new Map()
 ): string | null {
+  const ruleCategory = ruleIndex.get(ruleKey(txn.txnType, txn.paymentMethod ?? ""));
+  if (ruleCategory) return ruleCategory;
   const description = txn.description ?? "";
   if (INSURANCE_KEYWORDS.some((kw) => description.includes(kw))) return "보험";
   if (txn.txnType === "수입" && SALARY_KEYWORDS.some((kw) => description.includes(kw))) return "월급";
@@ -157,13 +174,14 @@ export function computeIncluded(
 
 export function deriveTransactionFields(
   transactions: ParsedTransaction[],
-  mappingIndex: Map<string, string>
+  mappingIndex: Map<string, string>,
+  ruleIndex: Map<string, string> = new Map()
 ): DerivedResult[] {
   const matched = matchSelfTransferPairs(transactions);
   return transactions.map((txn, i) => {
     const isTransferCand = isTransferCandidate(txn);
     const isMatchedPair = matched[i];
-    const stdCategory = mapStdCategory(txn, mappingIndex);
+    const stdCategory = mapStdCategory(txn, mappingIndex, ruleIndex);
     return {
       stdCategory,
       included: stdCategory !== "자산수정" && computeIncluded(txn, isTransferCand, isMatchedPair),

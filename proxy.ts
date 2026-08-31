@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { shouldProtectFinanceRequest } from "@/lib/finance-viewer";
 
 const isProtectedRoute = createRouteMatcher([
   "/cleaning(.*)",
@@ -12,7 +13,12 @@ export default clerkMiddleware(async (auth, request) => {
   // layout.tsx/auth-controls.tsx already skip Clerk UI when no publishable key is configured
   // (e.g. local dev without Clerk set up); mirror that here so those environments aren't 500s.
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return;
-  if (isProtectedRoute(request)) await auth.protect();
+  if (
+    isProtectedRoute(request) &&
+    shouldProtectFinanceRequest({ pathname: request.nextUrl.pathname, method: request.method })
+  ) {
+    await auth.protect();
+  }
 });
 
 export const config = {

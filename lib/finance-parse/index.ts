@@ -9,6 +9,17 @@ export * from "./types";
 
 const FILENAME_PERIOD_RE = /(\d{4}-\d{2}-\d{2})~(\d{4}-\d{2}-\d{2})/;
 
+export function transactionDateRange(transactions: { txnDate: string }[]): { start: string; end: string } | null {
+  if (transactions.length === 0) return null;
+  let start = transactions[0].txnDate;
+  let end = start;
+  for (const transaction of transactions) {
+    if (transaction.txnDate < start) start = transaction.txnDate;
+    if (transaction.txnDate > end) end = transaction.txnDate;
+  }
+  return { start, end };
+}
+
 export async function parseUploadFile(
   buffer: ArrayBuffer,
   filename: string,
@@ -55,14 +66,9 @@ export async function parseUploadFile(
   }
 
   const nameMatch = filename.match(FILENAME_PERIOD_RE);
-  let periodStart = nameMatch ? nameMatch[1] : null;
-  let periodEnd = nameMatch ? nameMatch[2] : null;
-
-  if (!periodStart || !periodEnd) {
-    const dates = transactions.map((t) => t.txnDate).sort();
-    periodStart = periodStart ?? dates[0] ?? null;
-    periodEnd = periodEnd ?? dates[dates.length - 1] ?? null;
-  }
+  const actualRange = transactionDateRange(transactions);
+  const periodStart = actualRange?.start ?? (nameMatch ? nameMatch[1] : null);
+  const periodEnd = actualRange?.end ?? (nameMatch ? nameMatch[2] : null);
 
   return {
     customerName,

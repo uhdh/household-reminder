@@ -81,6 +81,17 @@ export const categoryMappings = pgTable(
   (table) => [unique().on(table.txnType, table.rawCategory, table.rawSubcategory)]
 );
 
+export const categoryRules = pgTable(
+  "category_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    txnType: text("txn_type").notNull(),
+    paymentMethod: text("payment_method").notNull(),
+    stdCategory: text("std_category").notNull(),
+  },
+  (table) => [unique().on(table.txnType, table.paymentMethod)]
+);
+
 // 표준카테고리별 성격(고정비/변동비/고정수입/변동수입)과 월 예산 목표. 수기로 관리한다.
 export const budgetCategories = pgTable("budget_categories", {
   id: uuid("id").primaryKey().defaultRandom(),

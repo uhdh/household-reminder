@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { ParsedTransaction } from "@/lib/finance-parse/types";
-import { deriveTransactionFields, mapStdCategory, matchSelfTransferPairs } from "@/lib/spending-derive";
+import { buildRuleIndex, deriveTransactionFields, mapStdCategory, matchSelfTransferPairs } from "@/lib/spending-derive";
 
 function transaction(overrides: Partial<ParsedTransaction>): ParsedTransaction {
   return {
@@ -49,6 +49,21 @@ describe("matchSelfTransferPairs", () => {
 });
 
 describe("mapStdCategory", () => {
+  test("결제수단 사용자 규칙을 원본 카테고리 매핑보다 우선한다", () => {
+    const row = transaction({
+      txnType: "지출",
+      category: "여행/숙박",
+      subcategory: "미분류",
+      paymentMethod: "MG생활비통장",
+    });
+    const mappings = new Map([["지출|여행/숙박|미분류", "여행"]]);
+    const rules = buildRuleIndex([
+      { txnType: "지출", paymentMethod: "MG생활비통장", stdCategory: "대출원리금" },
+    ]);
+
+    expect(mapStdCategory(row, mappings, rules)).toBe("대출원리금");
+  });
+
   test("수입 설명에 급여가 있으면 원본 금융수입보다 월급을 우선한다", () => {
     const row = transaction({ description: "SK텔레콤급여", amount: 5_772_867 });
     const mappings = new Map([["수입|금융수입|미분류", "금융수입"]]);

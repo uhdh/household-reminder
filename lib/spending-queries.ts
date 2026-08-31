@@ -1,4 +1,3 @@
-import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { transactions, uploads } from "@/lib/finance-db";
 
@@ -22,21 +21,29 @@ export function isBeneficiary(value: string | undefined | null): value is Benefi
 
 export type Txn = typeof transactions.$inferSelect;
 
-/** 현재 활성 업로드(사람별 최신 스냅샷)에 속한 거래 전체를 가져온다. */
+/** 모든 업로드에서 누적된 거래 전체를 가져온다. 자산만 최신 업로드 스냅샷을 사용한다. */
 export async function getActiveTransactions(): Promise<{
   transactions: Txn[];
   displayNameByPerson: Map<string, string>;
 }> {
   const db = getDb();
-  const activeUploads = await db.select().from(uploads).where(eq(uploads.isActive, true));
   const displayNameByPerson = new Map<string, string>(PERSON_IDS.map((id) => [id, PERSON_LABELS[id]]));
-  const activeUploadIds = activeUploads.map((u) => u.id);
-  if (activeUploadIds.length === 0) {
-    return { transactions: [], displayNameByPerson };
+  const [rows, uploadRows] = await Promise.all([db.select().from(transactions), db.select().from(uploads)]);
+  const uploadById = new Map(uploadRows.map((upload) => [upload.id, upload]));
+  const latestUploadByDate = new Map<string, string>();
+
+  for (const row of rows) {
+    const key = `${row.personId}|${row.txnDate}`;
+    const currentId = latestUploadByDate.get(key);
+    const candidate = uploadById.get(row.uploadId);
+    const current = currentId ? uploadById.get(currentId) : null;
+    if (!current || (candidate && candidate.uploadedAt > current.uploadedAt)) latestUploadByDate.set(key, row.uploadId);
   }
 
-  const rows = await db.select().from(transactions).where(inArray(transactions.uploadId, activeUploadIds));
-  return { transactions: rows, displayNameByPerson };
+  return {
+    transactions: rows.filter((row) => latestUploadByDate.get(`${row.personId}|${row.txnDate}`) === row.uploadId),
+    displayNameByPerson,
+  };
 }
 
 export function beneficiaryLabel(value: string, displayNameByPerson: Map<string, string>): string {
@@ -87,7 +94,10 @@ export function shiftMonth(month: string, delta: number): string {
  * 원본 엑셀 L열(타입변환)과 동치: included=true인 거래만 대상으로 하므로
  * 이체 타입은 저축/투자(입금 취급) 또는 현금(지출 취급)만 남는다.
  */
-export function flowLabel(txn: { txnType: string; category: string | null }): "입금" | "지출" {
+export function flowLabel(txn: { txnType: string; category: string | null; amount: string | number }): "입금" | "지출" {
+  const amount = toNum(txn.amount);
+  if (amount > 0) return "입금";
+  if (amount < 0) return "지출";
   if (txn.txnType === "수입") return "입금";
   if (txn.txnType === "이체") return txn.category === "현금" ? "지출" : "입금";
   return "지출";

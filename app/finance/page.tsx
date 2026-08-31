@@ -11,6 +11,8 @@ import { DashboardCharts } from "./_components/charts";
 import { TargetAllocationCard } from "./_components/target-allocation";
 import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
 import { AppShell } from "@/components/ui";
+import { DemoFinanceDashboard } from "./_components/demo-pages";
+import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +62,10 @@ export default async function DashboardPage({
 }) {
   const { person } = await searchParams;
   const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
+
+  if (await isFinanceDemoMode()) {
+    return <DemoFinanceDashboard personFilter={personFilter} />;
+  }
 
   const db = getDb();
 

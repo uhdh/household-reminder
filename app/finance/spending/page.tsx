@@ -21,6 +21,9 @@ import { CategorySelect } from "./category-select";
 import { PersonFilter } from "./person-filter";
 import { ManualTransactionForm } from "./manual-transaction-form";
 import { TransactionDeleteButton } from "./transaction-delete-button";
+import { SelectAllTransactions, TransactionBulkDeleteForm, TransactionCheckbox } from "./transaction-bulk-delete";
+import { DemoTransactionList } from "@/app/finance/_components/demo-pages";
+import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +43,10 @@ export default async function SpendingPage({
   const { month: monthParam, person, addError, flow, beneficiary, category, q } = await searchParams;
   const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
 
+  if (await isFinanceDemoMode()) {
+    return <DemoTransactionList personFilter={personFilter} />;
+  }
+
   const db = getDb();
   const [{ transactions: allTx, displayNameByPerson }, budgetRows] = await Promise.all([
     getActiveTransactions(),
@@ -53,7 +60,7 @@ export default async function SpendingPage({
   const categoryFilter = categoryOptions.some((option) => option.name === category) ? category! : "all";
   const query = q?.trim().slice(0, 50) ?? "";
   // 자산수정은 집계에서는 제외하지만, 사용자가 다른 카테고리로 변경할 수 있도록
-  // 지출 내역 화면에는 계속 노출한다.
+  // 세부 내역 화면에는 계속 노출한다.
   const visibleTx = allTx.filter((t) => t.included || t.stdCategory === "자산수정");
 
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(visibleTx);
@@ -163,10 +170,12 @@ export default async function SpendingPage({
         returnTo={returnTo}
       />
 
+      <TransactionBulkDeleteForm transactionIds={filtered.map((transaction) => transaction.id)} returnTo={returnTo}>
       <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
+              <th className="w-9 px-2 py-2 text-center"><SelectAllTransactions /></th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">날짜</th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">카테고리</th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">결제 · 사용</th>
@@ -178,7 +187,7 @@ export default async function SpendingPage({
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-ink-muted">
+                <td colSpan={7} className="px-3 py-8 text-center text-ink-muted">
                   해당 월에 표시할 거래가 없습니다.
                 </td>
               </tr>
@@ -191,6 +200,7 @@ export default async function SpendingPage({
               const amount = toNum(t.amount);
               return (
                 <tr key={t.id} className="border-b-[0.8px] border-hairline2 last:border-0">
+                  <td className="px-2 py-2 text-center"><TransactionCheckbox transactionId={t.id} /></td>
                   <td className="whitespace-nowrap px-2 py-2 text-ink-muted sm:px-3">{t.txnDate.slice(5)}</td>
                   <td className="whitespace-nowrap px-2 py-2 sm:px-3">
                     <div className="flex flex-col gap-0.5">
@@ -233,6 +243,7 @@ export default async function SpendingPage({
           </tbody>
         </table>
       </div>
+      </TransactionBulkDeleteForm>
     </div>
   );
 }

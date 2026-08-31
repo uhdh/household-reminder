@@ -98,18 +98,18 @@ export function CategoryPie({
             label={renderLeaderLabel}
             labelLine={false}
           >
-            {data.map((d) => (
-              <Cell key={d.name} fill={d.fill} />
+            {data.map((d, index) => (
+              <Cell key={`${d.name}-${index}`} fill={d.fill} />
             ))}
           </Pie>
           <Tooltip formatter={(value) => formatAmount(Number(value))} contentStyle={TOOLTIP_STYLE} />
         </PieChart>
       </ResponsiveContainer>
       <ul className="mt-2 space-y-1.5">
-        {data.map((d) => {
+        {data.map((d, index) => {
           const pct = (d.value / total) * 100;
           return (
-            <li key={d.name} className="flex items-center gap-2 text-[12px]">
+            <li key={`${d.name}-${index}`} className="flex items-center gap-2 text-[12px]">
               <span
                 className={`w-10 shrink-0 rounded px-1.5 py-0.5 text-center text-[11px] font-semibold ${
                   isLightColor(d.fill) ? "text-[#0B0B0B]" : "text-white"

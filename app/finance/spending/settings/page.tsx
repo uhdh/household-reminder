@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { budgetCategories, categoryMappings } from "@/lib/finance-db";
+import { budgetCategories, categoryMappings, categoryRules } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
 import { getActiveTransactions, toNum } from "@/lib/spending-queries";
 import { ActionButton, SelectInput, TextInput } from "@/components/ui";
@@ -8,9 +8,12 @@ import {
   addBudgetCategoryAction,
   deleteBudgetCategoryAction,
   deleteCategoryMappingAction,
+  deleteCategoryRuleAction,
   updateBudgetCategoriesAction,
   upsertCategoryMappingAction,
+  upsertCategoryRuleAction,
 } from "./actions";
+import { UploadForm } from "@/app/finance/upload/upload-form";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +22,7 @@ const KINDS = ["고정비", "변동비", "고정수입", "변동수입"];
 const SETTING_TABS = [
   { id: "upload", label: "파일 업로드" },
   { id: "mappings", label: "카테고리 매핑" },
+  { id: "rules", label: "사용자 규칙" },
   { id: "categories", label: "카테고리 · 예산" },
   { id: "unmapped", label: "미분류 관리" },
 ] as const;
@@ -39,12 +43,13 @@ function guessStdCategory(rawCategory: string, rawSubcategory: string, knownName
   return knownNames.has("기타") ? "기타" : (knownNames.values().next().value ?? "기타");
 }
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const { tab } = await searchParams;
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string }> }) {
+  const { tab, error, success } = await searchParams;
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
   const db = getDb();
-  const [mappings, budgets, { transactions: allTx }] = await Promise.all([
+  const [mappings, rules, budgets, { transactions: allTx }] = await Promise.all([
     db.select().from(categoryMappings),
+    db.select().from(categoryRules),
     db.select().from(budgetCategories),
     getActiveTransactions(),
   ]);
@@ -98,15 +103,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         ))}
       </nav>
 
-      {activeTab === "upload" && <section className="seed-card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-[13px] font-semibold text-ink">파일 업로드</h2>
-          <p className="mt-1 text-[12px] text-ink-muted">뱅크샐러드 엑셀 파일로 자산과 거래 내역을 갱신합니다.</p>
-        </div>
-        <Link href="/finance/upload" className="seed-button seed-button-primary shrink-0">
-          업로드 화면 열기
-        </Link>
-      </section>}
+      {activeTab === "upload" && <UploadForm error={error} success={success} />}
 
       {activeTab === "unmapped" && (unmapped.length > 0 ? (
         <div className="seed-card bg-bg-critical-weak p-4">
@@ -240,6 +237,54 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <ActionButton type="submit" className="min-h-9 px-3 py-1">
             추가
           </ActionButton>
+        </form>
+      </div>}
+
+      {activeTab === "rules" && <div className="seed-card p-4">
+        <h2 className="mb-1 text-[13px] font-semibold text-ink">사용자 규칙</h2>
+        <p className="mb-3 text-[12px] text-ink-muted">결제수단/계좌가 정확히 일치하는 거래에 카테고리를 우선 적용합니다.</p>
+        <div className="mb-4 overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
+                <th className="px-2 py-1.5 font-semibold">구분</th>
+                <th className="px-2 py-1.5 font-semibold">결제수단/계좌</th>
+                <th className="px-2 py-1.5 font-semibold">적용 카테고리</th>
+                <th className="px-2 py-1.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {rules.map((rule) => (
+                <tr key={rule.id} className="border-b-[0.8px] border-hairline2 last:border-0">
+                  <td className="px-2 py-1.5 text-ink-muted">{rule.txnType}</td>
+                  <td className="px-2 py-1.5 text-ink-muted">{rule.paymentMethod}</td>
+                  <td className="px-2 py-1.5 text-ink">{rule.stdCategory}</td>
+                  <td className="px-2 py-1.5">
+                    <form action={deleteCategoryRuleAction}>
+                      <input type="hidden" name="id" value={rule.id} />
+                      <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">삭제</ActionButton>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <h3 className="mb-2 text-[12px] font-semibold text-ink-muted">새 규칙 추가</h3>
+        <form action={upsertCategoryRuleAction} className="flex flex-wrap items-center gap-2 text-[12px]">
+          <SelectInput name="txnType" required defaultValue="지출" className="min-h-9 w-auto px-2 py-1">
+            {TXN_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+          </SelectInput>
+          <TextInput name="paymentMethod" placeholder="결제수단/계좌" required className="min-h-9 w-auto px-2 py-1" />
+          <span className="text-ink-muted">→</span>
+          <SelectInput name="stdCategory" required className="min-h-9 w-auto px-2 py-1">
+            {Object.entries(groupByKind(categoryOptions)).map(([kind, names]) => (
+              <optgroup key={kind} label={kind}>
+                {names.map((name) => <option key={name} value={name}>{name}</option>)}
+              </optgroup>
+            ))}
+          </SelectInput>
+          <ActionButton type="submit" className="min-h-9 px-3 py-1">추가</ActionButton>
         </form>
       </div>}
 

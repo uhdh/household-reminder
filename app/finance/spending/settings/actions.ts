@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { budgetCategories, categoryMappings, transactions } from "@/lib/finance-db";
+import { budgetCategories, categoryMappings, categoryRules, transactions } from "@/lib/finance-db";
 
 const VALID_TXN_TYPES = new Set(["수입", "지출", "이체"]);
 const VALID_KINDS = new Set(["고정비", "변동비", "고정수입", "변동수입"]);
@@ -50,6 +50,35 @@ export async function deleteCategoryMappingAction(formData: FormData) {
     await db.delete(categoryMappings).where(eq(categoryMappings.id, id));
   }
   redirect("/finance/spending/settings");
+}
+
+export async function upsertCategoryRuleAction(formData: FormData) {
+  const txnType = String(formData.get("txnType") ?? "").trim();
+  const paymentMethod = String(formData.get("paymentMethod") ?? "").trim();
+  const stdCategory = String(formData.get("stdCategory") ?? "").trim();
+
+  if (VALID_TXN_TYPES.has(txnType) && paymentMethod && stdCategory) {
+    const db = getDb();
+    await db
+      .insert(categoryRules)
+      .values({ txnType, paymentMethod, stdCategory })
+      .onConflictDoUpdate({
+        target: [categoryRules.txnType, categoryRules.paymentMethod],
+        set: { stdCategory },
+      });
+    await db
+      .update(transactions)
+      .set({ stdCategory })
+      .where(and(eq(transactions.txnType, txnType), eq(transactions.paymentMethod, paymentMethod)));
+  }
+
+  redirect("/finance/spending/settings?tab=rules");
+}
+
+export async function deleteCategoryRuleAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (id) await getDb().delete(categoryRules).where(eq(categoryRules.id, id));
+  redirect("/finance/spending/settings?tab=rules");
 }
 
 const KIND_FIELD_PREFIX = "kind:";

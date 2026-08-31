@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { summarizeMonthlyTransactions, type Txn } from "./spending-queries";
+import { flowLabel, summarizeMonthlyTransactions, type Txn } from "./spending-queries";
 
 function makeTxn(overrides: Partial<Txn>): Txn {
   return {
@@ -30,12 +30,17 @@ function kindOf(stdCategory: string | null): string {
 }
 
 describe("summarizeMonthlyTransactions", () => {
+  test("uses the Excel amount sign when it conflicts with the transaction type", () => {
+    expect(flowLabel(makeTxn({ txnType: "지출", amount: "10000" }))).toBe("입금");
+    expect(flowLabel(makeTxn({ txnType: "수입", amount: "-10000" }))).toBe("지출");
+  });
+
   test("splits income and expense totals by person", () => {
     const tx = [
       makeTxn({ personId: "husband", txnType: "수입", stdCategory: "월급", amount: "3000000" }),
       makeTxn({ personId: "wife", txnType: "수입", stdCategory: "월급", amount: "2000000" }),
-      makeTxn({ personId: "husband", txnType: "지출", stdCategory: "월세", amount: "1000000" }),
-      makeTxn({ personId: "wife", txnType: "지출", stdCategory: "식비", amount: "500000" }),
+      makeTxn({ personId: "husband", txnType: "지출", stdCategory: "월세", amount: "-1000000" }),
+      makeTxn({ personId: "wife", txnType: "지출", stdCategory: "식비", amount: "-500000" }),
     ];
 
     const summary = summarizeMonthlyTransactions(tx, kindOf);
@@ -56,8 +61,8 @@ describe("summarizeMonthlyTransactions", () => {
   test("computes savings rate per person, guarding against zero income", () => {
     const tx = [
       makeTxn({ personId: "husband", txnType: "수입", stdCategory: "월급", amount: "1000000" }),
-      makeTxn({ personId: "husband", txnType: "지출", stdCategory: "식비", amount: "250000" }),
-      makeTxn({ personId: "wife", txnType: "지출", stdCategory: "식비", amount: "100000" }),
+      makeTxn({ personId: "husband", txnType: "지출", stdCategory: "식비", amount: "-250000" }),
+      makeTxn({ personId: "wife", txnType: "지출", stdCategory: "식비", amount: "-100000" }),
     ];
 
     const summary = summarizeMonthlyTransactions(tx, kindOf);
@@ -69,8 +74,8 @@ describe("summarizeMonthlyTransactions", () => {
 
   test("groups category totals by person and beneficiary", () => {
     const tx = [
-      makeTxn({ personId: "husband", beneficiary: "joint", txnType: "지출", stdCategory: "식비", amount: "30000" }),
-      makeTxn({ personId: "wife", beneficiary: "wife", txnType: "지출", stdCategory: "식비", amount: "20000" }),
+      makeTxn({ personId: "husband", beneficiary: "joint", txnType: "지출", stdCategory: "식비", amount: "-30000" }),
+      makeTxn({ personId: "wife", beneficiary: "wife", txnType: "지출", stdCategory: "식비", amount: "-20000" }),
     ];
 
     const summary = summarizeMonthlyTransactions(tx, kindOf);
@@ -81,7 +86,7 @@ describe("summarizeMonthlyTransactions", () => {
   });
 
   test("falls back to 미분류 for transactions without a std category", () => {
-    const tx = [makeTxn({ txnType: "지출", stdCategory: null, amount: "10000" })];
+    const tx = [makeTxn({ txnType: "지출", stdCategory: null, amount: "-10000" })];
 
     const summary = summarizeMonthlyTransactions(tx, kindOf);
 

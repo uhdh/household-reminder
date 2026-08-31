@@ -4,6 +4,8 @@ import { budgetCategories } from "@/lib/finance-db";
 import { flowLabel, getActiveTransactions, isPersonId, latestYear, monthOf, toNum, yearOf, type PersonId } from "@/lib/spending-queries";
 import { PersonFilter } from "../person-filter";
 import { YearlyView } from "./yearly-view";
+import { DemoYearlySpending } from "@/app/finance/_components/demo-pages";
+import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +70,10 @@ export default async function YearlyPage({
 }) {
   const { year: yearParam, person } = await searchParams;
   const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
+
+  if (await isFinanceDemoMode()) {
+    return <DemoYearlySpending personFilter={personFilter} />;
+  }
 
   const { transactions: allTx, displayNameByPerson } = await getActiveTransactions();
   const includedTx = allTx.filter((t) => t.included);

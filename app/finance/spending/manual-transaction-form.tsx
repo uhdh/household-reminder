@@ -18,7 +18,7 @@ export function ManualTransactionForm({
   return (
     <details className="seed-card mb-3 shadow-none">
       <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-semibold text-fg-brand">
-        + 지출 내역 추가
+        + 세부 내역 추가
       </summary>
       <form action={addManualTransactionAction} className="grid gap-3 border-t border-hairline2 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <input type="hidden" name="returnTo" value={returnTo} />

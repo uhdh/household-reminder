@@ -2,11 +2,11 @@
 
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assetItems, categoryMappings, people, transactions, uploads } from "@/lib/finance-db";
+import { assetItems, categoryMappings, categoryRules, people, transactions, uploads } from "@/lib/finance-db";
 import { parseUploadFile, type ParsedUpload } from "@/lib/finance-parse";
-import { buildMappingIndex, deriveTransactionFields } from "@/lib/spending-derive";
+import { buildMappingIndex, buildRuleIndex, deriveTransactionFields } from "@/lib/spending-derive";
 
 const PERSON_IDS = ["husband", "wife"] as const;
 type PersonId = (typeof PERSON_IDS)[number];
@@ -75,6 +75,15 @@ export async function uploadAction(formData: FormData) {
     isActive: true,
   });
 
+  if (parsed.periodStart && parsed.periodEnd) {
+    await db.delete(transactions).where(and(
+      eq(transactions.personId, personId),
+      gte(transactions.txnDate, parsed.periodStart),
+      lte(transactions.txnDate, parsed.periodEnd),
+      or(isNull(transactions.category), ne(transactions.category, "직접 입력"))
+    ));
+  }
+
   await db
     .update(transactions)
     .set({ uploadId })
@@ -95,9 +104,13 @@ export async function uploadAction(formData: FormData) {
     );
   }
 
-  const mappingRows = await db.select().from(categoryMappings);
+  const [mappingRows, ruleRows] = await Promise.all([
+    db.select().from(categoryMappings),
+    db.select().from(categoryRules),
+  ]);
   const mappingIndex = buildMappingIndex(mappingRows);
-  const derived = deriveTransactionFields(parsed.transactions, mappingIndex);
+  const ruleIndex = buildRuleIndex(ruleRows);
+  const derived = deriveTransactionFields(parsed.transactions, mappingIndex, ruleIndex);
   const transactionsWithDerived = parsed.transactions.map((t, i) => ({ t, d: derived[i] }));
 
   for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {

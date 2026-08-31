@@ -1,12 +1,18 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { transactions, uploads } from "@/lib/finance-db";
 import { isBeneficiary, isPersonId } from "@/lib/spending-queries";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function spendingReturnTo(value: FormDataEntryValue | null): string {
+  const path = String(value ?? "");
+  return path.startsWith("/finance/spending") ? path : "/finance/spending";
+}
 
 export async function addManualTransactionAction(formData: FormData) {
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
@@ -42,7 +48,7 @@ export async function addManualTransactionAction(formData: FormData) {
     category: "직접 입력",
     subcategory: "직접 입력",
     description: description || null,
-    amount: String(Math.round(amount)),
+    amount: String(-Math.round(amount)),
     paymentMethod: paymentMethod || null,
     stdCategory,
     included: stdCategory !== "자산수정",
@@ -68,26 +74,18 @@ export async function updateBeneficiaryAction(formData: FormData) {
 
 export async function deleteTransactionAction(formData: FormData) {
   const txnId = String(formData.get("txnId") ?? "");
-  const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
+  const returnTo = spendingReturnTo(formData.get("returnTo"));
 
-  if (txnId) {
-    const db = getDb();
-    const [transaction] = await db
-      .select({ uploadId: transactions.uploadId })
-      .from(transactions)
-      .where(eq(transactions.id, txnId))
-      .limit(1);
+  if (UUID_RE.test(txnId)) await getDb().delete(transactions).where(eq(transactions.id, txnId));
 
-    if (transaction) {
-      const [upload] = await db
-        .select({ id: uploads.id })
-        .from(uploads)
-        .where(and(eq(uploads.id, transaction.uploadId), eq(uploads.isActive, true)))
-        .limit(1);
+  redirect(returnTo);
+}
 
-      if (upload) await db.delete(transactions).where(eq(transactions.id, txnId));
-    }
-  }
+export async function deleteTransactionsAction(formData: FormData) {
+  const returnTo = spendingReturnTo(formData.get("returnTo"));
+  const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
+
+  if (ids.length > 0) await getDb().delete(transactions).where(inArray(transactions.id, ids));
 
   redirect(returnTo);
 }

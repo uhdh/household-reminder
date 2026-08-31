@@ -20,6 +20,27 @@ async function main() {
   console.log("category_mappings 테이블 준비 완료");
 
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS category_rules (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      txn_type text NOT NULL,
+      payment_method text NOT NULL,
+      std_category text NOT NULL,
+      CONSTRAINT category_rules_txn_type_payment_method_unique UNIQUE (txn_type, payment_method)
+    );
+  `);
+  await db.execute(sql`
+    INSERT INTO category_rules (txn_type, payment_method, std_category)
+    VALUES ('지출', 'MG생활비통장', '대출원리금')
+    ON CONFLICT (txn_type, payment_method) DO UPDATE SET std_category = EXCLUDED.std_category;
+  `);
+  const ruleApplied = await db.execute(sql`
+    UPDATE transactions
+    SET std_category = '대출원리금'
+    WHERE txn_type = '지출' AND payment_method = 'MG생활비통장';
+  `);
+  console.log("MG생활비통장 지출 규칙 준비 완료:", ruleApplied.rowCount ?? ruleApplied, "행");
+
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS budget_categories (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       name text NOT NULL UNIQUE,

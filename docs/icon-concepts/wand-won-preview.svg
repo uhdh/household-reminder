@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560">
+  <rect width="1000" height="560" rx="32" fill="#F4F5F7"/>
+  <text x="56" y="64" fill="#1B1C1E" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="28" font-weight="700">마법봉 + 원화</text>
+  <text x="56" y="96" fill="#6B7280" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="16">돈 관리를 마법처럼 알아서 정리하는 ‘가계부탁’을 표현했습니다.</text>
+  <rect x="56" y="132" width="560" height="372" rx="24" fill="#fff" stroke="#E5E7EB"/>
+  <image href="05-wand-won.svg" x="176" y="158" width="282" height="282"/>
+  <rect x="652" y="132" width="292" height="372" rx="24" fill="#fff" stroke="#E5E7EB"/>
+  <text x="684" y="177" fill="#1B1C1E" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="18" font-weight="700">실제 사용 크기</text>
+  <image href="05-wand-won.svg" x="684" y="212" width="64" height="64"/>
+  <text x="768" y="250" fill="#1B1C1E" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="22" font-weight="700">가계부탁</text>
+  <image href="05-wand-won.svg" x="684" y="318" width="32" height="32"/>
+  <text x="732" y="340" fill="#6B7280" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="15">32px 탭 아이콘</text>
+  <image href="05-wand-won.svg" x="692" y="390" width="16" height="16"/>
+  <text x="732" y="405" fill="#6B7280" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="15">16px 파비콘</text>
+</svg>

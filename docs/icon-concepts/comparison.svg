@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520">
+  <rect width="1200" height="520" rx="32" fill="#F4F5F7"/>
+  <text x="60" y="65" fill="#1B1C1E" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="28" font-weight="700">가계부탁 아이콘 3안</text>
+  <text x="60" y="96" fill="#6B7280" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="16">현재 주황색을 유지하고, 작은 크기에서도 의미가 읽히도록 단순화했습니다.</text>
+
+  <g transform="translate(48 128)">
+    <rect width="344" height="344" rx="24" fill="#fff" stroke="#E5E7EB"/>
+    <g transform="translate(92 30) scale(2.5)">
+      <rect width="64" height="64" rx="15" fill="#FF6F0F"/>
+      <path d="M18 11h28v42l-4-3-5 3-5-3-5 3-5-3-4 3V11Z" fill="#fff"/>
+      <path d="M25 22h14M25 29h9" fill="none" stroke="#FF6F0F" stroke-width="3.5" stroke-linecap="round"/>
+      <path d="m25 39 4 4 9-10" fill="none" stroke="#FF6F0F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M48 13v-4M50 15h4" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    </g>
+    <text x="24" y="230" fill="#FF6F0F" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="14" font-weight="700">추천</text>
+    <text x="24" y="263" fill="#1B1C1E" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="24" font-weight="700">1. 영수증 탁!</text>
+    <text x="24" y="292" fill="#6B7280" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="15">가계부 자동 정리가 바로 읽히는 안</text>
+    <g transform="translate(279 277) scale(.5)">
+      <rect width="64" height="64" rx="15" fill="#FF6F0F"/>
+      <path d="M18 11h28v42l-4-3-5 3-5-3-5 3-5-3-4 3V11Z" fill="#fff"/>
+      <path d="m25 39 4 4 9-10" fill="none" stroke="#FF6F0F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <g transform="translate(428 128)">
+    <rect width="344" height="344" rx="24" fill="#fff" stroke="#E5E7EB"/>
+    <g transform="translate(92 30) scale(2.5)">
+      <rect width="64" height="64" rx="15" fill="#FF6F0F"/>
+      <circle cx="21" cy="20" r="7" fill="#fff"/><circle cx="43" cy="20" r="7" fill="#fff"/>
+      <path d="M13 35c1.5-6 5-9 8-9s6.5 3 8 9M35 35c1.5-6 5-9 8-9s6.5 3 8 9" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <path d="M12 35h40v16a5 5 0 0 1-5 5H17a5 5 0 0 1-5-5V35Z" fill="#fff"/>
+      <rect x="35" y="41" width="17" height="9" rx="4.5" fill="#FF6F0F"/><circle cx="41" cy="45.5" r="2" fill="#fff"/>
+    </g>
+    <text x="24" y="263" fill="#1B1C1E" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="24" font-weight="700">2. 둘이 한 지갑</text>
+    <text x="24" y="292" fill="#6B7280" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="15">부부 자산 통합을 보여주는 안</text>
+    <g transform="translate(279 277) scale(.5)">
+      <rect width="64" height="64" rx="15" fill="#FF6F0F"/>
+      <circle cx="21" cy="20" r="7" fill="#fff"/><circle cx="43" cy="20" r="7" fill="#fff"/>
+      <path d="M12 35h40v16a5 5 0 0 1-5 5H17a5 5 0 0 1-5-5V35Z" fill="#fff"/>
+    </g>
+  </g>
+
+  <g transform="translate(808 128)">
+    <rect width="344" height="344" rx="24" fill="#fff" stroke="#E5E7EB"/>
+    <g transform="translate(92 30) scale(2.5)">
+      <rect width="64" height="64" rx="15" fill="#FF6F0F"/>
+      <path d="M49 24A19 19 0 1 0 50 39" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+      <path d="m44 16 6 8 5-9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="m23 24 5 17 4-12 4 12 5-17M22 30h20M23 35h18" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="24" y="263" fill="#1B1C1E" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="24" font-weight="700">3. 자동 원화</text>
+    <text x="24" y="292" fill="#6B7280" font-family="Arial, 'Noto Sans KR', sans-serif" font-size="15">자산 자동화를 압축한 안</text>
+    <g transform="translate(279 277) scale(.5)">
+      <rect width="64" height="64" rx="15" fill="#FF6F0F"/>
+      <path d="M49 24A19 19 0 1 0 50 39" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+      <path d="m23 24 5 17 4-12 4 12 5-17" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

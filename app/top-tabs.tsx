@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { label: "자산관리", href: "/finance", active: (pathname: string) => pathname === "/finance" },
   { label: "월별지출", href: "/finance/spending/monthly", active: (pathname: string) => pathname.startsWith("/finance/spending/monthly") },
-  { label: "지출 내역", href: "/finance/spending", active: (pathname: string) => pathname === "/finance/spending" },
-  { label: "연지출", href: "/finance/spending/yearly", active: (pathname: string) => pathname.startsWith("/finance/spending/yearly") },
+  { label: "세부 내역", href: "/finance/spending", active: (pathname: string) => pathname === "/finance/spending" },
+  { label: "연간 내역", href: "/finance/spending/yearly", active: (pathname: string) => pathname.startsWith("/finance/spending/yearly") },
   { label: "설정", href: "/finance/spending/settings", active: (pathname: string) => pathname.startsWith("/finance/spending/settings") || pathname === "/finance/upload" },
 ];
 

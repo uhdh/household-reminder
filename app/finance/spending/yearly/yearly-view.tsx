@@ -73,7 +73,7 @@ export function YearlyView({
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg bg-bg-neutral-weak p-1" aria-label="연지출 보기 방식">
+        <div className="inline-flex rounded-lg bg-bg-neutral-weak p-1" aria-label="연간 내역 보기 방식">
           {(["chart", "table"] as const).map((value) => (
             <button
               key={value}

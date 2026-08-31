@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import {
   MONTH_RE,
-  PERSON_LABELS,
+  flowLabel,
   getActiveTransactions,
   isPersonId,
   latestMonth,
@@ -18,7 +18,10 @@ import { buildCategoryColorMap, formatCompactKRW, formatKRW, topNWithOther } fro
 import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { CategoryPie } from "./chart";
 import { PersonFilter } from "../person-filter";
-import { CategoryRow, UsageAmount, type BreakdownItem } from "./category-row";
+import { CategoryRow, UsageAmount } from "./category-row";
+import { DemoMonthlySpending } from "@/app/finance/_components/demo-pages";
+import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
+import { MonthlyNavigator } from "./monthly-navigator";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +63,11 @@ export default async function MonthlyPage({
   const { month: monthParam, person } = await searchParams;
   const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
 
+  if (await isFinanceDemoMode()) {
+    const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : "2026-07";
+    return <DemoMonthlySpending personFilter={personFilter} month={month} />;
+  }
+
   const { transactions: allTx, displayNameByPerson } = await getActiveTransactions();
   const includedTx = allTx.filter((t) => t.included);
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(includedTx);
@@ -77,14 +85,7 @@ export default async function MonthlyPage({
   }
 
   const summary = summarizeMonthlyTransactions(monthTx, kindOf);
-  const { categoryTotals, categoryByPerson, categoryByBeneficiary } = summary;
-
-  const personLabelOf = (key: string) => displayNameByPerson.get(key) ?? PERSON_LABELS[key as PersonId] ?? key;
-  const benLabelOf = (key: string) => (key === "joint" ? "우리" : personLabelOf(key));
-  const toBreakdown = (record: Record<string, number>, labelOf: (key: string) => string): BreakdownItem[] =>
-    Object.entries(record)
-      .filter(([, value]) => value > 0)
-      .map(([key, value]) => ({ label: labelOf(key), value }));
+  const { categoryTotals } = summary;
 
   function categoryEntriesForKind(kind: "고정비" | "변동비"): [string, number][] {
     return Array.from(categoryTotals.entries()).filter(([name, value]) => {
@@ -112,6 +113,10 @@ export default async function MonthlyPage({
     .filter(([name]) => !knownNames.has(name))
     .reduce((s, [, v]) => s + v, 0);
   const hrefForMonth = (value: string) => `/finance/spending/monthly?month=${value}${personFilter === "all" ? "" : `&person=${personFilter}`}`;
+  const transactionsFor = (category: string) => monthTx
+    .filter((transaction) => flowLabel(transaction) === "지출" && (transaction.stdCategory ?? UNMAPPED) === category)
+    .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)))
+    .map((transaction) => ({ id: transaction.id, description: transaction.description, amount: Math.abs(toNum(transaction.amount)) }));
 
   // 이번 달 가장 심한 초과율에 맞춰 초과 구간 게이지 스케일을 자동으로 잡는다 (최소 200%).
   const usagePercents = [...fixedRows, ...variableRows]
@@ -130,7 +135,7 @@ export default async function MonthlyPage({
         >
           ← 이전달
         </Link>
-        <span className="text-[14px] font-semibold text-ink">{month}</span>
+        <MonthlyNavigator month={month} personFilter={personFilter} />
         <Link
           href={hrefForMonth(shiftMonth(month, 1))}
           className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
@@ -189,9 +194,7 @@ export default async function MonthlyPage({
                 name={b.name}
                 budget={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : null}
                 actual={categoryTotals.get(b.name) ?? 0}
-                paidBy={toBreakdown(categoryByPerson.get(b.name) ?? {}, personLabelOf)}
-                beneficiaries={toBreakdown(categoryByBeneficiary.get(b.name) ?? {}, benLabelOf)}
-                hidePayerBreakdown={personFilter !== "all"}
+                transactions={transactionsFor(b.name)}
                 scaleMax={scaleMax}
               />
             ))}
@@ -211,9 +214,7 @@ export default async function MonthlyPage({
                 name={b.name}
                 budget={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : null}
                 actual={categoryTotals.get(b.name) ?? 0}
-                paidBy={toBreakdown(categoryByPerson.get(b.name) ?? {}, personLabelOf)}
-                beneficiaries={toBreakdown(categoryByBeneficiary.get(b.name) ?? {}, benLabelOf)}
-                hidePayerBreakdown={personFilter !== "all"}
+                transactions={transactionsFor(b.name)}
                 scaleMax={scaleMax}
               />
             ))}
@@ -222,9 +223,7 @@ export default async function MonthlyPage({
                 name={UNMAPPED}
                 budget={null}
                 actual={unmappedTotal}
-                paidBy={toBreakdown(categoryByPerson.get(UNMAPPED) ?? {}, personLabelOf)}
-                beneficiaries={toBreakdown(categoryByBeneficiary.get(UNMAPPED) ?? {}, benLabelOf)}
-                hidePayerBreakdown={personFilter !== "all"}
+                transactions={transactionsFor(UNMAPPED)}
                 scaleMax={scaleMax}
               />
             )}
