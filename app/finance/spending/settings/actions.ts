@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { budgetCategories, categoryMappings, categoryRules, transactions } from "@/lib/finance-db";
+import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, transactions } from "@/lib/finance-db";
 
 const VALID_TXN_TYPES = new Set(["수입", "지출", "이체"]);
 const VALID_KINDS = new Set(["고정비", "변동비", "고정수입", "변동수입"]);
@@ -78,6 +78,50 @@ export async function upsertCategoryRuleAction(formData: FormData) {
 export async function deleteCategoryRuleAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (id) await getDb().delete(categoryRules).where(eq(categoryRules.id, id));
+  redirect("/finance/spending/settings?tab=rules");
+}
+
+export async function upsertCategoryKeywordRuleAction(formData: FormData) {
+  const txnType = String(formData.get("txnType") ?? "지출").trim();
+  const keyword = String(formData.get("keyword") ?? "").trim();
+  const stdCategory = String(formData.get("stdCategory") ?? "").trim();
+  const applyToExisting = formData.get("applyToExisting") === "true" || formData.get("applyToExisting") === "on";
+
+  if (keyword && stdCategory) {
+    const db = getDb();
+    await db
+      .insert(categoryKeywordRules)
+      .values({
+        txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
+        keyword,
+        stdCategory,
+      })
+      .onConflictDoUpdate({
+        target: categoryKeywordRules.keyword,
+        set: {
+          stdCategory,
+          txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
+        },
+      });
+
+    if (applyToExisting) {
+      const typeFilter = txnType !== "전체" ? eq(transactions.txnType, txnType) : undefined;
+      const descFilter = ilike(transactions.description, `%${keyword}%`);
+      const whereCondition = typeFilter ? and(typeFilter, descFilter) : descFilter;
+      if (stdCategory === "자산수정") {
+        await db.update(transactions).set({ stdCategory, included: false }).where(whereCondition);
+      } else {
+        await db.update(transactions).set({ stdCategory }).where(whereCondition);
+      }
+    }
+  }
+
+  redirect("/finance/spending/settings?tab=rules");
+}
+
+export async function deleteCategoryKeywordRuleAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (id) await getDb().delete(categoryKeywordRules).where(eq(categoryKeywordRules.id, id));
   redirect("/finance/spending/settings?tab=rules");
 }
 

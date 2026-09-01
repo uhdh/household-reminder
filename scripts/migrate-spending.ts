@@ -1,9 +1,27 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const envPath = path.resolve(process.cwd(), ".env.local");
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx > 0) {
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      process.env[key] = val;
+    }
+  }
+}
+
 import { sql } from "drizzle-orm";
 import { getDb } from "../lib/db";
 
-// transactions 테이블에 이미 실 데이터가 있어 drizzle-kit push가 beneficiary NOT NULL
-// 추가를 대화형으로 확인받으려 하므로(비대화형 환경에서 불가), 기존 행은 person_id로
-// 백필하는 수동 마이그레이션을 한 번 실행한다.
 async function main() {
   const db = getDb();
 
@@ -38,7 +56,16 @@ async function main() {
     SET std_category = '대출원리금'
     WHERE txn_type = '지출' AND payment_method = 'MG생활비통장';
   `);
-  console.log("MG생활비통장 지출 규칙 준비 완료:", ruleApplied.rowCount ?? ruleApplied, "행");
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS category_keyword_rules (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      txn_type text NOT NULL,
+      keyword text NOT NULL UNIQUE,
+      std_category text NOT NULL,
+      created_at timestamp with time zone NOT NULL DEFAULT now()
+    );
+  `);
+  console.log("category_keyword_rules 테이블 준비 완료");
 
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS budget_categories (

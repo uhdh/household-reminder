@@ -94,6 +94,9 @@ export default async function SpendingPage({
   };
   const returnTo = hrefFor(month, personFilter);
 
+  const exportParams = new URLSearchParams({ month, ...(personFilter !== "all" ? { person: personFilter } : {}), ...activeFilterParams });
+  const exportHref = `/api/finance/spending/export?${exportParams.toString()}`;
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -149,6 +152,17 @@ export default async function SpendingPage({
         </label>
         <ActionButton type="submit" className="min-h-9 px-3 py-1">적용</ActionButton>
         <Link href={hrefFor(month, personFilter, false)} className="seed-button seed-button-secondary min-h-9 px-3 py-1 text-[12px]">초기화</Link>
+        <a
+          href={exportHref}
+          download
+          className="seed-button seed-button-secondary min-h-9 inline-flex items-center gap-1.5 px-3 py-1 text-[12px]"
+          title="현재 조건의 세부 내역을 엑셀 파일로 다운로드합니다"
+        >
+          <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          엑셀 다운로드
+        </a>
         <span className="ml-auto pb-2 text-[11px] text-ink-muted">{filtered.length}건</span>
       </form>
 
@@ -206,7 +220,14 @@ export default async function SpendingPage({
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-1.5">
                         <CategoryIcon name={t.stdCategory} className="shrink-0 text-ink-muted" />
-                        <CategorySelect txnId={t.id} value={t.stdCategory} options={categoryOptions} returnTo={returnTo} />
+                        <CategorySelect
+                          txnId={t.id}
+                          value={t.stdCategory}
+                          options={categoryOptions}
+                          returnTo={returnTo}
+                          description={t.description}
+                          txnType={t.txnType}
+                        />
                       </div>
                       {rawCategory !== displayedCategory && <span className="text-[10px] text-ink-muted">원본: {rawCategory}</span>}
                     </div>

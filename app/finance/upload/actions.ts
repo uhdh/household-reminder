@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { and, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assetItems, categoryMappings, categoryRules, people, transactions, uploads } from "@/lib/finance-db";
+import { assetItems, categoryKeywordRules, categoryMappings, categoryRules, people, transactions, uploads } from "@/lib/finance-db";
 import { parseUploadFile, type ParsedUpload } from "@/lib/finance-parse";
 import { buildMappingIndex, buildRuleIndex, deriveTransactionFields } from "@/lib/spending-derive";
 
@@ -104,13 +104,14 @@ export async function uploadAction(formData: FormData) {
     );
   }
 
-  const [mappingRows, ruleRows] = await Promise.all([
+  const [mappingRows, ruleRows, keywordRuleRows] = await Promise.all([
     db.select().from(categoryMappings),
     db.select().from(categoryRules),
+    db.select().from(categoryKeywordRules),
   ]);
   const mappingIndex = buildMappingIndex(mappingRows);
   const ruleIndex = buildRuleIndex(ruleRows);
-  const derived = deriveTransactionFields(parsed.transactions, mappingIndex, ruleIndex);
+  const derived = deriveTransactionFields(parsed.transactions, mappingIndex, ruleIndex, keywordRuleRows);
   const transactionsWithDerived = parsed.transactions.map((t, i) => ({ t, d: derived[i] }));
 
   for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {

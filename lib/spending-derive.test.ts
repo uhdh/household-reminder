@@ -79,4 +79,28 @@ describe("mapStdCategory", () => {
       { stdCategory: "자산수정", included: false, isInternalTransfer: false },
     ]);
   });
+
+  test("키워드 규칙이 결제수단 및 원본 매핑보다 우선 적용된다", () => {
+    const row = transaction({
+      txnType: "지출",
+      category: "온라인쇼핑",
+      subcategory: "서비스구독",
+      description: "(주)이니시스(빌링_일반)",
+      paymentMethod: "체크카드",
+    });
+    const mappings = new Map([["지출|온라인쇼핑|서비스구독", "구독"]]);
+    const keywordRules = [
+      { txnType: "지출", keyword: "이니시스(빌링_일반)", stdCategory: "렌트카" },
+    ];
+
+    expect(mapStdCategory(row, mappings, new Map(), keywordRules)).toBe("렌트카");
+  });
+
+  test("suggestKeywordFromDescription이 불필요한 사업자 접두/접미사를 깔끔하게 제거한다", async () => {
+    const { suggestKeywordFromDescription } = await import("@/lib/spending-derive");
+    expect(suggestKeywordFromDescription("(주)이니시스(빌링_일반)")).toBe("이니시스(빌링_일반)");
+    expect(suggestKeywordFromDescription("쿠팡(쿠페이)_나이스")).toBe("쿠팡(쿠페이)");
+    expect(suggestKeywordFromDescription("우아한형제들_배민페이_알뜰배달_")).toBe("우아한형제들");
+    expect(suggestKeywordFromDescription("SK텔레콤(자동납부)")).toBe("SK텔레콤");
+  });
 });

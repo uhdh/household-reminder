@@ -13,11 +13,25 @@ export type CategoryRule = {
   stdCategory: string;
 };
 
+export type CategoryKeywordRule = {
+  txnType: string;
+  keyword: string;
+  stdCategory: string;
+};
+
 export type DerivedResult = {
   stdCategory: string | null;
   included: boolean;
   isInternalTransfer: boolean;
 };
+
+export function suggestKeywordFromDescription(desc: string | null | undefined): string {
+  if (!desc) return "";
+  let clean = desc.trim();
+  clean = clean.replace(/^(\(주\)|주식회사|\(유\))\s*/i, "");
+  clean = clean.replace(/(_나이스|_KCP|_KICC|_KG이니시스|_카카오페이|_토스|\(자동납부\)|_배민페이|_알뜰배달).*$/i, "");
+  return clean.trim() || desc.trim();
+}
 
 // 원본 엑셀 M열 수식에서, 매핑표와 무관하게 특정 키워드가 포함된 거래는 항상 "보험"으로 분류한다.
 const INSURANCE_KEYWORDS = ["11삼생", "DB생", "삼성생보험금"];
@@ -59,13 +73,28 @@ export function buildMappingIndex(mappings: CategoryMapping[]): Map<string, stri
 export function mapStdCategory(
   txn: ParsedTransaction,
   mappingIndex: Map<string, string>,
-  ruleIndex: Map<string, string> = new Map()
+  ruleIndex: Map<string, string> = new Map(),
+  keywordRules: CategoryKeywordRule[] = []
 ): string | null {
+  const description = (txn.description ?? "").trim();
+
+  // 1. 사용자 정의 키워드 규칙 (가맹점/적요 키워드 일치)
+  for (const kr of keywordRules) {
+    if (kr.txnType !== "전체" && kr.txnType !== txn.txnType) continue;
+    if (kr.keyword && description.toLowerCase().includes(kr.keyword.toLowerCase())) {
+      return kr.stdCategory;
+    }
+  }
+
+  // 2. 결제수단 규칙
   const ruleCategory = ruleIndex.get(ruleKey(txn.txnType, txn.paymentMethod ?? ""));
   if (ruleCategory) return ruleCategory;
-  const description = txn.description ?? "";
+
+  // 3. 내장 키워드 규칙
   if (INSURANCE_KEYWORDS.some((kw) => description.includes(kw))) return "보험";
   if (txn.txnType === "수입" && SALARY_KEYWORDS.some((kw) => description.includes(kw))) return "월급";
+
+  // 4. 원본 엑셀 대분류/소분류 매핑
   const rawCategory = txn.category ?? "미분류";
   const rawSubcategory = txn.subcategory ?? "미분류";
   return mappingIndex.get(mapKey(txn.txnType, rawCategory, rawSubcategory)) ?? null;
@@ -175,13 +204,14 @@ export function computeIncluded(
 export function deriveTransactionFields(
   transactions: ParsedTransaction[],
   mappingIndex: Map<string, string>,
-  ruleIndex: Map<string, string> = new Map()
+  ruleIndex: Map<string, string> = new Map(),
+  keywordRules: CategoryKeywordRule[] = []
 ): DerivedResult[] {
   const matched = matchSelfTransferPairs(transactions);
   return transactions.map((txn, i) => {
     const isTransferCand = isTransferCandidate(txn);
     const isMatchedPair = matched[i];
-    const stdCategory = mapStdCategory(txn, mappingIndex, ruleIndex);
+    const stdCategory = mapStdCategory(txn, mappingIndex, ruleIndex, keywordRules);
     return {
       stdCategory,
       included: stdCategory !== "자산수정" && computeIncluded(txn, isTransferCand, isMatchedPair),

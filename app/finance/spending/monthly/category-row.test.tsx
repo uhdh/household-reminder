@@ -12,8 +12,6 @@ describe("CategoryRow", () => {
           name="생필품"
           budget={100_000}
           actual={102_220}
-          paidBy={[{ label: "남편", value: 22_320 }]}
-          beneficiaries={[{ label: "아내", value: 79_900 }]}
           scaleMax={200}
           transactions={[
             { id: "tx-1", description: "세탁세제", amount: 52_900 },

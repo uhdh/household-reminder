@@ -1,5 +1,26 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const envPath = path.resolve(process.cwd(), ".env.local");
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx > 0) {
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      process.env[key] = val;
+    }
+  }
+}
+
 import { getDb } from "../lib/db";
-import { budgetCategories, categoryMappings } from "../lib/finance-db";
+import { budgetCategories, categoryKeywordRules, categoryMappings } from "../lib/finance-db";
 
 // 참고 파일(가계부자동화_v1.0_7월_수궁.xlsx)의 '카테고리매핑' 시트 61건을 그대로 시딩한다.
 const CATEGORY_MAPPINGS: {
@@ -129,6 +150,21 @@ const BUDGET_CATEGORIES: {
   { name: "부업 블로그", kind: "변동수입", sortOrder: 48, monthlyBudget: null },
 ];
 
+const CATEGORY_KEYWORD_RULES: {
+  txnType: string;
+  keyword: string;
+  stdCategory: string;
+}[] = [
+  { txnType: "지출", keyword: "이니시스(빌링_일반)", stdCategory: "렌트카" },
+  { txnType: "지출", keyword: "코스트코", stdCategory: "식재료" },
+  { txnType: "지출", keyword: "흥화", stdCategory: "보험" },
+  { txnType: "지출", keyword: "79대포", stdCategory: "식비" },
+  { txnType: "지출", keyword: "테라피", stdCategory: "카페" },
+  { txnType: "지출", keyword: "GS25잠실경기장", stdCategory: "카페" },
+  { txnType: "지출", keyword: "농협-박태연", stdCategory: "엄마용돈" },
+  { txnType: "지출", keyword: "카카오모빌리티", stdCategory: "식비" },
+];
+
 async function main() {
   const db = getDb();
 
@@ -142,6 +178,17 @@ async function main() {
       });
   }
   console.log(`카테고리 매핑 ${CATEGORY_MAPPINGS.length}건 시딩 완료`);
+
+  for (const kr of CATEGORY_KEYWORD_RULES) {
+    await db
+      .insert(categoryKeywordRules)
+      .values(kr)
+      .onConflictDoUpdate({
+        target: categoryKeywordRules.keyword,
+        set: { stdCategory: kr.stdCategory, txnType: kr.txnType },
+      });
+  }
+  console.log(`키워드 규칙 ${CATEGORY_KEYWORD_RULES.length}건 시딩 완료`);
 
   for (const b of BUDGET_CATEGORIES) {
     await db

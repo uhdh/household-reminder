@@ -8,6 +8,7 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/finance-db", () => ({
   budgetCategories: {},
+  categoryKeywordRules: {},
   categoryMappings: {},
   categoryRules: {},
 }));
@@ -25,5 +26,13 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("button", { name: "업로드" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "뱅크샐러드 엑셀 파일 다운받는 방법" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "업로드 화면 열기" })).toBeNull();
+  });
+
+  test("사용자 규칙 탭에서 키워드 규칙과 결제수단 규칙 섹션을 렌더링한다", async () => {
+    render(await SettingsPage({ searchParams: Promise.resolve({ tab: "rules" }) }));
+
+    expect(screen.getByRole("heading", { name: "가맹점 · 적요 키워드 규칙" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "결제수단 규칙" })).toBeTruthy();
+    expect(screen.getByPlaceholderText("키워드 (예: 코스트코, 이니시스)")).toBeTruthy();
   });
 });

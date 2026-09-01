@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, ilike, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { transactions, uploads } from "@/lib/finance-db";
+import { categoryKeywordRules, transactions, uploads } from "@/lib/finance-db";
 import { isBeneficiary, isPersonId } from "@/lib/spending-queries";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -118,6 +118,72 @@ export async function updateTransactionCategoryAction(formData: FormData) {
             ? !transaction.isInternalTransfer
             : transaction.included;
       await db.update(transactions).set({ stdCategory, included }).where(eq(transactions.id, txnId));
+    }
+  }
+
+  redirect(returnTo);
+}
+
+export async function createKeywordRuleAndApplyAction(formData: FormData) {
+  const txnId = String(formData.get("txnId") ?? "");
+  const keyword = String(formData.get("keyword") ?? "").trim();
+  const stdCategoryRaw = String(formData.get("stdCategory") ?? "").trim();
+  const txnType = String(formData.get("txnType") ?? "지출").trim();
+  const applyToExisting = formData.get("applyToExisting") === "true" || formData.get("applyToExisting") === "on";
+  const returnTo = spendingReturnTo(formData.get("returnTo"));
+
+  const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
+
+  if (keyword && stdCategory) {
+    const db = getDb();
+
+    await db
+      .insert(categoryKeywordRules)
+      .values({
+        txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
+        keyword,
+        stdCategory,
+      })
+      .onConflictDoUpdate({
+        target: categoryKeywordRules.keyword,
+        set: {
+          stdCategory,
+          txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
+        },
+      });
+
+    if (txnId) {
+      const [transaction] = await db
+        .select({
+          stdCategory: transactions.stdCategory,
+          included: transactions.included,
+          isInternalTransfer: transactions.isInternalTransfer,
+        })
+        .from(transactions)
+        .where(eq(transactions.id, txnId))
+        .limit(1);
+
+      if (transaction) {
+        const included =
+          stdCategory === "자산수정"
+            ? false
+            : transaction.stdCategory === "자산수정" && stdCategory
+              ? !transaction.isInternalTransfer
+              : transaction.included;
+        await db.update(transactions).set({ stdCategory, included }).where(eq(transactions.id, txnId));
+      }
+    }
+
+    if (applyToExisting) {
+      const typeFilter = txnType !== "전체" ? eq(transactions.txnType, txnType) : undefined;
+      const descFilter = ilike(transactions.description, `%${keyword}%`);
+      const whereCondition = typeFilter ? and(typeFilter, descFilter) : descFilter;
+
+      if (stdCategory === "자산수정") {
+        await db.update(transactions).set({ stdCategory, included: false }).where(whereCondition);
+      } else {
+        await db.update(transactions).set({ stdCategory }).where(whereCondition);
+      }
     }
   }
 

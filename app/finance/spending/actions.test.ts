@@ -41,4 +41,104 @@ describe("deleteTransactionsAction", () => {
 
     expect((await db.select({ id: transactions.id }).from(transactions)).map((row) => row.id)).toEqual([rows[1].id]);
   });
+
+  test("createKeywordRuleAndApplyAction saves rule and bulk updates matching transactions", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await db.execute(sql`
+      CREATE TABLE category_keyword_rules (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        txn_type text NOT NULL,
+        keyword text NOT NULL UNIQUE,
+        std_category text NOT NULL,
+        created_at timestamp with time zone NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE transactions (
+        id uuid PRIMARY KEY, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
+        txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
+        amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL,
+        is_internal_transfer boolean NOT NULL, beneficiary text NOT NULL
+      )
+    `);
+
+    const { categoryKeywordRules } = await import("@/lib/finance-db");
+    const { createKeywordRuleAndApplyAction } = await import("./actions");
+
+    const rows = [
+      {
+        id: "00000000-0000-4000-8000-000000000021",
+        uploadId: "00000000-0000-0000-0000-000000000001",
+        personId: "husband",
+        txnDate: "2026-08-21",
+        txnType: "지출",
+        category: "온라인쇼핑",
+        subcategory: "인터넷쇼핑",
+        description: "코스트코코리아",
+        amount: "-297020",
+        stdCategory: "온라인쇼핑",
+        included: true,
+        isInternalTransfer: false,
+        beneficiary: "husband",
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000022",
+        uploadId: "00000000-0000-0000-0000-000000000001",
+        personId: "husband",
+        txnDate: "2026-07-21",
+        txnType: "지출",
+        category: "온라인쇼핑",
+        subcategory: "인터넷쇼핑",
+        description: "코스트코온라인몰",
+        amount: "-150000",
+        stdCategory: "온라인쇼핑",
+        included: true,
+        isInternalTransfer: false,
+        beneficiary: "husband",
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000023",
+        uploadId: "00000000-0000-0000-0000-000000000001",
+        personId: "husband",
+        txnDate: "2026-08-10",
+        txnType: "지출",
+        category: "식비",
+        subcategory: "한식",
+        description: "순대국밥",
+        amount: "-10000",
+        stdCategory: "식비",
+        included: true,
+        isInternalTransfer: false,
+        beneficiary: "husband",
+      },
+    ];
+    await db.insert(transactions).values(rows);
+
+    const formData = new FormData();
+    formData.set("txnId", rows[0].id);
+    formData.set("keyword", "코스트코");
+    formData.set("stdCategory", "식재료");
+    formData.set("txnType", "지출");
+    formData.set("applyToExisting", "true");
+    formData.set("returnTo", "/finance/spending?month=2026-08");
+
+    await createKeywordRuleAndApplyAction(formData);
+
+    // Verify rule was saved
+    const rules = await db.select().from(categoryKeywordRules);
+    expect(rules).toHaveLength(1);
+    expect(rules[0].keyword).toBe("코스트코");
+    expect(rules[0].stdCategory).toBe("식재료");
+
+    // Verify both Costco transactions were updated to '식재료', and '순대국밥' was untouched
+    const txAfter = await db.select().from(transactions);
+    const costco1 = txAfter.find((t) => t.id === rows[0].id);
+    const costco2 = txAfter.find((t) => t.id === rows[1].id);
+    const other = txAfter.find((t) => t.id === rows[2].id);
+
+    expect(costco1?.stdCategory).toBe("식재료");
+    expect(costco2?.stdCategory).toBe("식재료");
+    expect(other?.stdCategory).toBe("식비");
+  });
 });

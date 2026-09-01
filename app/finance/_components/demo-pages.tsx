@@ -144,7 +144,20 @@ export function DemoTransactionList({ personFilter }: { personFilter: PersonFilt
     <AppShell>
       <DemoBanner title="세부 내역 샘플" />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <span className="rounded-full bg-bg-neutral-weak px-3 py-1.5 text-[12px] font-semibold text-ink-muted">샘플 내역은 수정되지 않아요</span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-bg-neutral-weak px-3 py-1.5 text-[12px] font-semibold text-ink-muted">샘플 내역은 수정되지 않아요</span>
+          <a
+            href={`/api/finance/spending/export?month=2026-07${personFilter !== "all" ? `&person=${personFilter}` : ""}`}
+            download
+            className="seed-button seed-button-secondary min-h-8 inline-flex items-center gap-1.5 px-3 py-1 text-[12px]"
+            title="샘플 세부 내역을 엑셀 파일로 다운로드합니다"
+          >
+            <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            엑셀 다운로드
+          </a>
+        </div>
         <DemoPersonFilter pathname="/finance/spending" selected={personFilter} />
       </div>
       <div className="seed-card overflow-x-auto shadow-none">

@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
-import { budgetCategories, categoryMappings, categoryRules } from "@/lib/finance-db";
+import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
 import { getActiveTransactions, toNum } from "@/lib/spending-queries";
 import { ActionButton, SelectInput, TextInput } from "@/components/ui";
 import {
   addBudgetCategoryAction,
   deleteBudgetCategoryAction,
+  deleteCategoryKeywordRuleAction,
   deleteCategoryMappingAction,
   deleteCategoryRuleAction,
   updateBudgetCategoriesAction,
+  upsertCategoryKeywordRuleAction,
   upsertCategoryMappingAction,
   upsertCategoryRuleAction,
 } from "./actions";
@@ -47,9 +49,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { tab, error, success } = await searchParams;
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
   const db = getDb();
-  const [mappings, rules, budgets, { transactions: allTx }] = await Promise.all([
+  const [mappings, rules, keywordRules, budgets, { transactions: allTx }] = await Promise.all([
     db.select().from(categoryMappings),
     db.select().from(categoryRules),
+    db.select().from(categoryKeywordRules),
     db.select().from(budgetCategories),
     getActiveTransactions(),
   ]);
@@ -240,52 +243,115 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </form>
       </div>}
 
-      {activeTab === "rules" && <div className="seed-card p-4">
-        <h2 className="mb-1 text-[13px] font-semibold text-ink">사용자 규칙</h2>
-        <p className="mb-3 text-[12px] text-ink-muted">결제수단/계좌가 정확히 일치하는 거래에 카테고리를 우선 적용합니다.</p>
-        <div className="mb-4 overflow-x-auto">
-          <table className="w-full text-[12px]">
-            <thead>
-              <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
-                <th className="px-2 py-1.5 font-semibold">구분</th>
-                <th className="px-2 py-1.5 font-semibold">결제수단/계좌</th>
-                <th className="px-2 py-1.5 font-semibold">적용 카테고리</th>
-                <th className="px-2 py-1.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((rule) => (
-                <tr key={rule.id} className="border-b-[0.8px] border-hairline2 last:border-0">
-                  <td className="px-2 py-1.5 text-ink-muted">{rule.txnType}</td>
-                  <td className="px-2 py-1.5 text-ink-muted">{rule.paymentMethod}</td>
-                  <td className="px-2 py-1.5 text-ink">{rule.stdCategory}</td>
-                  <td className="px-2 py-1.5">
-                    <form action={deleteCategoryRuleAction}>
-                      <input type="hidden" name="id" value={rule.id} />
-                      <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">삭제</ActionButton>
-                    </form>
-                  </td>
+      {activeTab === "rules" && <div className="space-y-6">
+        <div className="seed-card p-4">
+          <h2 className="mb-1 text-[13px] font-semibold text-ink">가맹점 · 적요 키워드 규칙</h2>
+          <p className="mb-3 text-[12px] text-ink-muted">내용(가맹점명·적요)에 특정 키워드가 포함된 거래를 해당 카테고리로 자동 분류합니다.</p>
+          <div className="mb-4 overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
+                  <th className="px-2 py-1.5 font-semibold">구분</th>
+                  <th className="px-2 py-1.5 font-semibold">키워드</th>
+                  <th className="px-2 py-1.5 font-semibold">적용 카테고리</th>
+                  <th className="px-2 py-1.5" />
                 </tr>
+              </thead>
+              <tbody>
+                {keywordRules.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-2 py-4 text-center text-ink-muted">
+                      등록된 키워드 규칙이 없습니다. 세부 내역에서 카테고리를 수정할 때 바로 규칙으로 등록할 수 있습니다.
+                    </td>
+                  </tr>
+                ) : (
+                  keywordRules.map((rule) => (
+                    <tr key={rule.id} className="border-b-[0.8px] border-hairline2 last:border-0">
+                      <td className="px-2 py-1.5 text-ink-muted">{rule.txnType}</td>
+                      <td className="px-2 py-1.5 font-semibold text-ink">{rule.keyword}</td>
+                      <td className="px-2 py-1.5 text-ink">{rule.stdCategory}</td>
+                      <td className="px-2 py-1.5">
+                        <form action={deleteCategoryKeywordRuleAction}>
+                          <input type="hidden" name="id" value={rule.id} />
+                          <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">삭제</ActionButton>
+                        </form>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <h3 className="mb-2 text-[12px] font-semibold text-ink-muted">새 키워드 규칙 추가</h3>
+          <form action={upsertCategoryKeywordRuleAction} className="flex flex-wrap items-center gap-2 text-[12px]">
+            <SelectInput name="txnType" required defaultValue="지출" className="min-h-9 w-auto px-2 py-1">
+              <option value="전체">전체</option>
+              {TXN_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+            </SelectInput>
+            <TextInput name="keyword" placeholder="키워드 (예: 코스트코, 이니시스)" required className="min-h-9 w-auto px-2 py-1" />
+            <span className="text-ink-muted">→</span>
+            <SelectInput name="stdCategory" required className="min-h-9 w-auto px-2 py-1">
+              {Object.entries(groupByKind(categoryOptions)).map(([kind, names]) => (
+                <optgroup key={kind} label={kind}>
+                  {names.map((name) => <option key={name} value={name}>{name}</option>)}
+                </optgroup>
               ))}
-            </tbody>
-          </table>
+            </SelectInput>
+            <label className="inline-flex items-center gap-1 text-[12px] text-ink-muted">
+              <input type="checkbox" name="applyToExisting" value="true" defaultChecked className="size-3.5 rounded border-hairline" />
+              기존 내역 일괄 반영
+            </label>
+            <ActionButton type="submit" className="min-h-9 px-3 py-1">추가</ActionButton>
+          </form>
         </div>
-        <h3 className="mb-2 text-[12px] font-semibold text-ink-muted">새 규칙 추가</h3>
-        <form action={upsertCategoryRuleAction} className="flex flex-wrap items-center gap-2 text-[12px]">
-          <SelectInput name="txnType" required defaultValue="지출" className="min-h-9 w-auto px-2 py-1">
-            {TXN_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-          </SelectInput>
-          <TextInput name="paymentMethod" placeholder="결제수단/계좌" required className="min-h-9 w-auto px-2 py-1" />
-          <span className="text-ink-muted">→</span>
-          <SelectInput name="stdCategory" required className="min-h-9 w-auto px-2 py-1">
-            {Object.entries(groupByKind(categoryOptions)).map(([kind, names]) => (
-              <optgroup key={kind} label={kind}>
-                {names.map((name) => <option key={name} value={name}>{name}</option>)}
-              </optgroup>
-            ))}
-          </SelectInput>
-          <ActionButton type="submit" className="min-h-9 px-3 py-1">추가</ActionButton>
-        </form>
+
+        <div className="seed-card p-4">
+          <h2 className="mb-1 text-[13px] font-semibold text-ink">결제수단 규칙</h2>
+          <p className="mb-3 text-[12px] text-ink-muted">결제수단/계좌가 정확히 일치하는 거래에 카테고리를 우선 적용합니다.</p>
+          <div className="mb-4 overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
+                  <th className="px-2 py-1.5 font-semibold">구분</th>
+                  <th className="px-2 py-1.5 font-semibold">결제수단/계좌</th>
+                  <th className="px-2 py-1.5 font-semibold">적용 카테고리</th>
+                  <th className="px-2 py-1.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {rules.map((rule) => (
+                  <tr key={rule.id} className="border-b-[0.8px] border-hairline2 last:border-0">
+                    <td className="px-2 py-1.5 text-ink-muted">{rule.txnType}</td>
+                    <td className="px-2 py-1.5 text-ink-muted">{rule.paymentMethod}</td>
+                    <td className="px-2 py-1.5 text-ink">{rule.stdCategory}</td>
+                    <td className="px-2 py-1.5">
+                      <form action={deleteCategoryRuleAction}>
+                        <input type="hidden" name="id" value={rule.id} />
+                        <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">삭제</ActionButton>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <h3 className="mb-2 text-[12px] font-semibold text-ink-muted">새 결제수단 규칙 추가</h3>
+          <form action={upsertCategoryRuleAction} className="flex flex-wrap items-center gap-2 text-[12px]">
+            <SelectInput name="txnType" required defaultValue="지출" className="min-h-9 w-auto px-2 py-1">
+              {TXN_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+            </SelectInput>
+            <TextInput name="paymentMethod" placeholder="결제수단/계좌" required className="min-h-9 w-auto px-2 py-1" />
+            <span className="text-ink-muted">→</span>
+            <SelectInput name="stdCategory" required className="min-h-9 w-auto px-2 py-1">
+              {Object.entries(groupByKind(categoryOptions)).map(([kind, names]) => (
+                <optgroup key={kind} label={kind}>
+                  {names.map((name) => <option key={name} value={name}>{name}</option>)}
+                </optgroup>
+              ))}
+            </SelectInput>
+            <ActionButton type="submit" className="min-h-9 px-3 py-1">추가</ActionButton>
+          </form>
+        </div>
       </div>}
 
       {activeTab === "categories" && <div className="seed-card p-4">
