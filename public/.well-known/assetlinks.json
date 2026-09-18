@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.gagyebutak.twa",
+      "sha256_cert_fingerprints": ["2B:CA:54:B9:BA:FE:8C:16:C0:77:BD:19:6A:EA:C2:51:B1:EB:C0:59:9E:4C:9B:86:79:57:37:2E:DC:F1:97:29"]
+    }
+  }
+]
