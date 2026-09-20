@@ -49,7 +49,7 @@
   --color-legend1: var(--seed-color-fg-brand);
   --color-gain: var(--seed-color-fg-critical);
   --color-husband: var(--seed-color-palette-blue-600);
-  --color-wife: var(--seed-color-palette-pink-600);
+  --color-wife: #e0508d;
   --color-joint: #8a7f6a;
 }
 

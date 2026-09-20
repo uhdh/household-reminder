@@ -90,21 +90,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   );
 
   return (
-    <div className="space-y-6">
-      <nav className="inline-flex max-w-full overflow-x-auto rounded-lg bg-bg-neutral-weak p-1" aria-label="설정 메뉴">
+    <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start lg:gap-10">
+      <nav className="flex max-w-full gap-1 overflow-x-auto [scrollbar-width:none] lg:flex-col [&::-webkit-scrollbar]:hidden" aria-label="설정 메뉴">
+        <h1 className="mb-4 hidden text-[28px] font-extrabold tracking-[-0.02em] text-ink lg:block">설정</h1>
         {SETTING_TABS.map((item) => (
           <Link
             key={item.id}
             href={`/finance/spending/settings?tab=${item.id}`}
             aria-current={activeTab === item.id ? "page" : undefined}
-            className={`shrink-0 rounded-md px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-              activeTab === item.id ? "bg-card text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+            className={`flex h-11 shrink-0 items-center rounded-r3 px-4 text-[15px] transition-colors ${
+              activeTab === item.id ? "bg-bg-neutral-weak font-bold text-ink" : "font-medium text-ink-muted hover:text-ink"
             }`}
           >
             {item.label}
           </Link>
         ))}
       </nav>
+
+      <div className="min-w-0 space-y-6">
 
       {activeTab === "upload" && <UploadForm error={error} success={success} />}
 
@@ -159,29 +162,29 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </div>
         </div>
       ) : (
-        <div className="seed-card p-4 text-[13px] text-ink-muted">현재 관리할 미분류 항목이 없습니다.</div>
+        <div className="seed-card p-5 sm:p-7 text-[13px] text-ink-muted">현재 관리할 미분류 항목이 없습니다.</div>
       ))}
 
-      {activeTab === "mappings" && <div className="seed-card p-4">
-        <h2 className="mb-3 text-[13px] font-semibold text-ink">카테고리 매핑</h2>
+      {activeTab === "mappings" && <div className="seed-card p-5 sm:p-7">
+        <h2 className="mb-3 text-[18px] font-extrabold text-ink">카테고리 매핑</h2>
         <div className="mb-4 overflow-x-auto">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-[14px]">
             <thead>
               <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
-                <th className="px-2 py-1.5 font-semibold">타입</th>
-                <th className="px-2 py-1.5 font-semibold">대분류</th>
-                <th className="px-2 py-1.5 font-semibold">소분류</th>
-                <th className="px-2 py-1.5 font-semibold">표준카테고리</th>
-                <th className="px-2 py-1.5" />
+                <th className="px-3 py-3 font-semibold">타입</th>
+                <th className="px-3 py-3 font-semibold">대분류</th>
+                <th className="px-3 py-3 font-semibold">소분류</th>
+                <th className="px-3 py-3 font-semibold">표준카테고리</th>
+                <th className="px-3 py-3" />
               </tr>
             </thead>
             <tbody>
               {sortedMappings.map((m) => (
                 <tr key={m.id} className="border-b-[0.8px] border-hairline2 last:border-0">
-                  <td className="px-2 py-1.5 text-ink-muted">{m.txnType}</td>
-                  <td className="px-2 py-1.5 text-ink-muted">{m.rawCategory}</td>
-                  <td className="px-2 py-1.5 text-ink-muted">{m.rawSubcategory}</td>
-                  <td className="px-2 py-1.5">
+                  <td className="px-3 py-3 text-ink-muted">{m.txnType}</td>
+                  <td className="px-3 py-3 text-ink-muted">{m.rawCategory}</td>
+                  <td className="px-3 py-3 text-ink-muted">{m.rawSubcategory}</td>
+                  <td className="px-3 py-3">
                     <form action={upsertCategoryMappingAction} className="flex items-center gap-1">
                       <input type="hidden" name="txnType" value={m.txnType} />
                       <input type="hidden" name="rawCategory" value={m.rawCategory} />
@@ -196,7 +199,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                       </ActionButton>
                     </form>
                   </td>
-                  <td className="px-2 py-1.5">
+                  <td className="px-3 py-3">
                     <form action={deleteCategoryMappingAction}>
                       <input type="hidden" name="id" value={m.id} />
                       <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">
@@ -244,17 +247,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </div>}
 
       {activeTab === "rules" && <div className="space-y-6">
-        <div className="seed-card p-4">
-          <h2 className="mb-1 text-[13px] font-semibold text-ink">가맹점 · 적요 키워드 규칙</h2>
+        <div className="seed-card p-5 sm:p-7">
+          <h2 className="mb-1 text-[18px] font-extrabold text-ink">가맹점 · 적요 키워드 규칙</h2>
           <p className="mb-3 text-[12px] text-ink-muted">내용(가맹점명·적요)에 특정 키워드가 포함된 거래를 해당 카테고리로 자동 분류합니다.</p>
           <div className="mb-4 overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-[14px]">
               <thead>
                 <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
-                  <th className="px-2 py-1.5 font-semibold">구분</th>
-                  <th className="px-2 py-1.5 font-semibold">키워드</th>
-                  <th className="px-2 py-1.5 font-semibold">적용 카테고리</th>
-                  <th className="px-2 py-1.5" />
+                  <th className="px-3 py-3 font-semibold">구분</th>
+                  <th className="px-3 py-3 font-semibold">키워드</th>
+                  <th className="px-3 py-3 font-semibold">적용 카테고리</th>
+                  <th className="px-3 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -267,10 +270,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 ) : (
                   keywordRules.map((rule) => (
                     <tr key={rule.id} className="border-b-[0.8px] border-hairline2 last:border-0">
-                      <td className="px-2 py-1.5 text-ink-muted">{rule.txnType}</td>
-                      <td className="px-2 py-1.5 font-semibold text-ink">{rule.keyword}</td>
-                      <td className="px-2 py-1.5 text-ink">{rule.stdCategory}</td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-3 py-3 text-ink-muted">{rule.txnType}</td>
+                      <td className="px-3 py-3 font-semibold text-ink">{rule.keyword}</td>
+                      <td className="px-3 py-3 text-ink">{rule.stdCategory}</td>
+                      <td className="px-3 py-3">
                         <form action={deleteCategoryKeywordRuleAction}>
                           <input type="hidden" name="id" value={rule.id} />
                           <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">삭제</ActionButton>
@@ -305,26 +308,26 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </form>
         </div>
 
-        <div className="seed-card p-4">
-          <h2 className="mb-1 text-[13px] font-semibold text-ink">결제수단 규칙</h2>
+        <div className="seed-card p-5 sm:p-7">
+          <h2 className="mb-1 text-[18px] font-extrabold text-ink">결제수단 규칙</h2>
           <p className="mb-3 text-[12px] text-ink-muted">결제수단/계좌가 정확히 일치하는 거래에 카테고리를 우선 적용합니다.</p>
           <div className="mb-4 overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-[14px]">
               <thead>
                 <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
-                  <th className="px-2 py-1.5 font-semibold">구분</th>
-                  <th className="px-2 py-1.5 font-semibold">결제수단/계좌</th>
-                  <th className="px-2 py-1.5 font-semibold">적용 카테고리</th>
-                  <th className="px-2 py-1.5" />
+                  <th className="px-3 py-3 font-semibold">구분</th>
+                  <th className="px-3 py-3 font-semibold">결제수단/계좌</th>
+                  <th className="px-3 py-3 font-semibold">적용 카테고리</th>
+                  <th className="px-3 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {rules.map((rule) => (
                   <tr key={rule.id} className="border-b-[0.8px] border-hairline2 last:border-0">
-                    <td className="px-2 py-1.5 text-ink-muted">{rule.txnType}</td>
-                    <td className="px-2 py-1.5 text-ink-muted">{rule.paymentMethod}</td>
-                    <td className="px-2 py-1.5 text-ink">{rule.stdCategory}</td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-3 py-3 text-ink-muted">{rule.txnType}</td>
+                    <td className="px-3 py-3 text-ink-muted">{rule.paymentMethod}</td>
+                    <td className="px-3 py-3 text-ink">{rule.stdCategory}</td>
+                    <td className="px-3 py-3">
                       <form action={deleteCategoryRuleAction}>
                         <input type="hidden" name="id" value={rule.id} />
                         <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">삭제</ActionButton>
@@ -354,24 +357,24 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
       </div>}
 
-      {activeTab === "categories" && <div className="seed-card p-4">
-        <h2 className="mb-3 text-[13px] font-semibold text-ink">카테고리 성격 · 월 예산</h2>
+      {activeTab === "categories" && <div className="seed-card p-5 sm:p-7">
+        <h2 className="mb-3 text-[18px] font-extrabold text-ink">카테고리 성격 · 월 예산</h2>
         <form action={updateBudgetCategoriesAction}>
           <div className="mb-4 overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-[14px]">
               <thead>
                 <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
-                  <th className="px-2 py-1.5 font-semibold">카테고리</th>
-                  <th className="px-2 py-1.5 font-semibold">성격</th>
-                  <th className="px-2 py-1.5 text-right font-semibold">월 예산</th>
-                  <th className="px-2 py-1.5" />
+                  <th className="px-3 py-3 font-semibold">카테고리</th>
+                  <th className="px-3 py-3 font-semibold">성격</th>
+                  <th className="px-3 py-3 text-right font-semibold">월 예산</th>
+                  <th className="px-3 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {sortedBudgets.map((b) => (
                   <tr key={b.id} className="border-b-[0.8px] border-hairline2 last:border-0">
-                    <td className="px-2 py-1.5 text-ink">{b.name}</td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-3 py-3 text-ink">{b.name}</td>
+                    <td className="px-3 py-3">
                       <SelectInput
                         name={`kind:${b.name}`}
                         defaultValue={b.kind}
@@ -384,7 +387,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                         ))}
                       </SelectInput>
                     </td>
-                    <td className="px-2 py-1.5 text-right">
+                    <td className="px-3 py-3 text-right">
                       <TextInput
                         type="number"
                         min={0}
@@ -394,7 +397,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                         className="min-h-9 w-28 px-2 py-1 text-right"
                       />
                     </td>
-                    <td className="px-2 py-1.5">
+                    <td className="px-3 py-3">
                       <ActionButton
                         variant="ghost"
                         type="submit"
@@ -442,6 +445,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </ActionButton>
         </form>
       </div>}
+      </div>
     </div>
   );
 }

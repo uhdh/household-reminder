@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IconArrowUpBracketDownLine, IconLinechartUpXaxisLine, IconPerson2Line } from "@karrotmarket/react-monochrome-icon";
 import { eq, inArray } from "drizzle-orm";
 import { AppShell, Card } from "@/components/ui";
 import { getDb } from "@/lib/db";
@@ -12,21 +13,9 @@ import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 import { BrandHero } from "@/app/brand-hero";
 
 const benefits = [
-  {
-    tag: "입력 0",
-    title: "수기 작성 없이 자동화",
-    description: "뱅크샐러드 파일을 한 번 올리면 거래와 카테고리를 알아서 정리해요.",
-  },
-  {
-    tag: "각자 → 함께",
-    title: "따로 관리하고, 같이 확인",
-    description: "각자의 소비와 자산은 그대로 두고 부부 전체 현황만 한 화면에 합쳐요.",
-  },
-  {
-    tag: "소비 + 투자",
-    title: "투자 내역까지 투명하게",
-    description: "가계부뿐 아니라 주식 수익률과 포트폴리오도 함께 공개하고 관리해요.",
-  },
+  { Icon: IconArrowUpBracketDownLine, title: "한 번만 올리면", description: "정리는 자동" },
+  { Icon: IconPerson2Line, title: "각자 올리면", description: "한 화면에 합쳐서" },
+  { Icon: IconLinechartUpXaxisLine, title: "소비부터 투자까지", description: "한눈에 확인" },
 ];
 
 const EXCLUDED_ASSET_CATEGORIES = new Set(["부동산", "동산", "전자금융 자산", "보험 자산"]);
@@ -159,10 +148,12 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
       <section className="py-6 sm:py-8" aria-label="가계부탁의 주요 기능">
         <div className="grid gap-3 sm:grid-cols-3">
           {benefits.map((benefit) => (
-            <Card key={benefit.title} className="p-5 shadow-none">
-              <span className="inline-flex rounded-full bg-bg-brand-weak px-2.5 py-1 text-xs font-bold text-fg-brand">{benefit.tag}</span>
-              <h3 className="mt-4 text-base font-bold text-fg-neutral">{benefit.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-fg-neutral-muted">{benefit.description}</p>
+            <Card key={benefit.title} className="p-7 shadow-none">
+              <span className="flex size-14 items-center justify-center rounded-r3 bg-bg-brand-weak text-fg-brand" aria-hidden="true">
+                <benefit.Icon size={28} />
+              </span>
+              <h3 className="mt-5 text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">{benefit.title}</h3>
+              <p className="mt-1 text-base text-fg-neutral-muted">{benefit.description}</p>
             </Card>
           ))}
         </div>

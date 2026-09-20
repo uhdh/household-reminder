@@ -5,7 +5,7 @@ type AppShellSize = "compact" | "default" | "wide";
 const widths: Record<AppShellSize, string> = {
   compact: "max-w-md",
   default: "max-w-2xl",
-  wide: "max-w-5xl",
+  wide: "max-w-6xl",
 };
 
 export function AppShell({

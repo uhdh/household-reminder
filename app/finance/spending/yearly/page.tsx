@@ -167,31 +167,28 @@ export default async function YearlyPage({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={hrefForYear(year - 1)}
-          className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
-        >
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-4">
+        <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">연간 내역</h1>
+        <div className="inline-flex items-center gap-0.5 rounded-r3 bg-bg-neutral-weak p-1 text-[14px]">
+        <Link href={hrefForYear(year - 1)} className="flex h-9 items-center rounded-r2 px-3 text-ink-muted hover:text-ink">
           ← {year - 1}년
         </Link>
-        <span className="text-[14px] font-semibold text-ink">{year}년</span>
-        <Link
-          href={hrefForYear(year + 1)}
-          className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
-        >
+        <span className="flex h-9 items-center rounded-r2 bg-bg-layer-default px-4 font-bold text-ink">{year}년</span>
+        <Link href={hrefForYear(year + 1)} className="flex h-9 items-center rounded-r2 px-3 text-ink-muted hover:text-ink">
           {year + 1}년 →
         </Link>
-        <span className="ml-2 text-[12px] text-ink-muted">{divisor}월까지 · 평균은 {divisor}개월 기준</span>
+        </div>
+        <span className="text-[13px] text-ink-muted">{divisor}월까지 · 평균은 {divisor}개월 기준</span>
         </div>
         <PersonFilter pathname="/finance/spending/yearly" periodKey="year" periodValue={String(year)} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
       <YearlyView data={chartData} fixedCategories={fixedCategorySeries} variableCategories={variableCategorySeries} annualCategory={annualCategory}>
-      <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">
-        <table className="w-full text-[13px]">
+      <div className="seed-card relative overflow-x-auto shadow-none">
+        <table className="w-full text-[14px]">
           <thead>
-            <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
+            <tr className="border-b border-stroke-neutral-muted text-left text-ink-muted">
               <th className="sticky left-0 whitespace-nowrap bg-card px-3 py-2 text-[11px] font-semibold">구분</th>
               <th className="whitespace-nowrap px-3 py-2 text-right text-[11px] font-semibold">합계</th>
               <th className="whitespace-nowrap px-3 py-2 text-right text-[11px] font-semibold">평균</th>

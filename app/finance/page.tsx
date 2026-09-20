@@ -283,7 +283,7 @@ export default async function DashboardPage({
         )}
 
         {!hasAnyData ? (
-          <div className="border-[0.8px] border-hairline bg-card p-10 text-center">
+          <div className="seed-card p-10 text-center shadow-none">
             <p className="mb-4 text-[13px] text-ink-muted">
               아직 업로드된 자산 데이터가 없습니다. 뱅크샐러드 엑셀 파일을 업로드해 주세요.
             </p>
@@ -345,8 +345,8 @@ function HeroRow({
 
   if (personFilter !== "all") {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <SummaryCard label="순자산" value={totalNet} format="manwon" />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+        <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="순자산" value={totalNet} format="manwon" />
         <SummaryCard label="총자산" value={totalAsset} format="manwon" />
         <SummaryCard label="총부채" value={totalDebt} format="manwon" />
       </div>
@@ -354,8 +354,8 @@ function HeroRow({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <SummaryCard label="우리집 자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]} />
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+      <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="우리집 자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]} />
       <SummaryCard label={`${husband.label} 순자산`} value={husband.net} format="manwon" />
       <SummaryCard label={`${wife.label} 순자산`} value={wife.net} format="manwon" />
     </div>
@@ -377,7 +377,7 @@ function PersonFilterTabs({
     { key: "wife", label: wifeLabel, dotColor: "bg-wife" },
   ];
   return (
-    <div className="seed-card inline-flex gap-1 p-1 shadow-none">
+    <div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">
       {tabs.map((tab) => {
         const active = tab.key === current;
         const href = tab.key === "all" ? "/finance" : `/finance?person=${tab.key}`;
@@ -385,8 +385,8 @@ function PersonFilterTabs({
           <Link
             key={tab.key}
             href={href}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-              active ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-ink-muted hover:bg-bg-neutral-weak hover:text-ink"
+            className={`flex h-9 items-center gap-1.5 rounded-r2 px-4 text-[14px] transition-colors ${
+              active ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-ink-muted hover:text-ink"
             }`}
           >
             {tab.dotColor && <span className={`h-1.5 w-1.5 rounded-full ${tab.dotColor}`} />}
@@ -424,36 +424,36 @@ function InvestmentPnlCard({
   totalGainPct: number;
 }) {
   return (
-    <div className="mt-4 border-[0.8px] border-hairline bg-card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-ink">투자 손익 현황</h2>
-        <span className="text-[11px] text-ink-muted">{items.length}개 종목 매칭</span>
+    <div className="seed-card mt-4 p-5 shadow-none sm:p-7">
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="text-[18px] font-extrabold text-ink">투자 손익 현황</h2>
+        <span className="text-[12px] text-ink-muted">{items.length}개 종목 매칭</span>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div>
-          <p className="text-[11px] font-semibold text-ink-muted">투자원금</p>
-          <p className="text-[16px] font-bold text-ink">
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-r3 bg-bg-neutral-weak p-4">
+          <p className="text-[13px] text-ink-muted">투자원금</p>
+          <p className="mt-1.5 text-[22px] font-extrabold tracking-[-0.02em] text-ink">
             <AnimatedNumber value={totals.costBasis} format="manwon" />
           </p>
         </div>
-        <div>
-          <p className="text-[11px] font-semibold text-ink-muted">평가금액</p>
-          <p className="text-[16px] font-bold text-ink">
+        <div className="rounded-r3 bg-bg-neutral-weak p-4">
+          <p className="text-[13px] text-ink-muted">평가금액</p>
+          <p className="mt-1.5 text-[22px] font-extrabold tracking-[-0.02em] text-ink">
             <AnimatedNumber value={totals.value} format="manwon" />
           </p>
         </div>
-        <div>
-          <p className="text-[11px] font-semibold text-ink-muted">손익금액</p>
-          <p className="text-[16px] font-bold">
+        <div className="rounded-r3 bg-bg-neutral-weak p-4">
+          <p className="text-[13px] text-ink-muted">손익금액</p>
+          <p className="mt-1.5 text-[22px] font-extrabold tracking-[-0.02em]">
             <GainText amount={totalGain}>
               <AnimatedNumber value={totalGain} format="signedManwon" />
             </GainText>
           </p>
         </div>
-        <div>
-          <p className="text-[11px] font-semibold text-ink-muted">수익률</p>
-          <p className="text-[16px] font-bold">
+        <div className="rounded-r3 bg-bg-neutral-weak p-4">
+          <p className="text-[13px] text-ink-muted">수익률</p>
+          <p className="mt-1.5 text-[22px] font-extrabold tracking-[-0.02em]">
             <GainText amount={totalGainPct}>
               <AnimatedNumber value={totalGainPct} format="signedPct" />
             </GainText>

@@ -67,12 +67,12 @@ export function TargetAllocationCard({
   if (rows.length === 0) return null;
 
   return (
-    <div className="border-[0.8px] border-hairline bg-card p-4">
+    <div className="seed-card p-5 shadow-none sm:p-7">
       <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-ink">목표 배분 · 리밸런싱</h2>
-        <span className="text-[11px] text-ink-muted">현재% / 목표%</span>
+        <h2 className="text-[18px] font-extrabold text-ink">목표 배분 · 리밸런싱</h2>
+        <span className="text-[12px] text-ink-muted">현재% / 목표%</span>
       </div>
-      <p className="mb-2 text-[11px] text-ink-muted">
+      <p className="mb-4 text-[13px] text-ink-muted">
         막대 = 현재 비중, 눈금 = 목표 비중. 목표 %를 수정하고 저장하면 리밸런싱에 필요한 금액이 계산됩니다.
       </p>
       <form action={updateAllocationTargetsAction}>
@@ -84,7 +84,7 @@ export function TargetAllocationCard({
         </div>
         <button
           type="submit"
-          className="mt-3 w-full bg-legend1 px-3 py-2 text-[12px] font-medium text-canvas transition-opacity hover:opacity-90 sm:w-auto"
+          className="seed-button seed-button-primary mt-5 w-full sm:w-auto"
         >
           목표 저장
         </button>

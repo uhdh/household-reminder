@@ -72,13 +72,13 @@ export function DemoFinanceDashboard({ personFilter }: { personFilter: PersonFil
     <AppShell>
       <DemoBanner title="자산관리 샘플" />
       <div className="mb-3 flex justify-end"><DemoPersonFilter pathname="/finance" selected={personFilter} /></div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard label="순자산" value={totalAsset - totalDebt} format="manwon" />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+        <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="순자산" value={totalAsset - totalDebt} format="manwon" />
         <SummaryCard label="총자산" value={totalAsset} format="manwon" />
         <SummaryCard label="총부채" value={totalDebt} format="manwon" />
       </div>
       {personFilter === "all" && (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
           <SummaryCard label="남편 순자산" value={159_970_000} format="manwon" />
           <SummaryCard label="아내 순자산" value={180_600_000} format="manwon" />
         </div>

@@ -20,21 +20,21 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   const content = (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-stroke-neutral-muted bg-bg-layer-default/95 backdrop-blur">
-        <div className="flex items-center justify-between gap-3 px-3 py-2 sm:px-4">
+        <div className="flex flex-wrap items-center gap-x-10 px-4 sm:px-6 lg:px-12">
           <Link
             href="/"
             aria-label="가계부탁 홈으로 이동"
-            className="flex shrink-0 items-center gap-2 rounded-r2 px-1.5 py-1 text-sm font-bold text-fg-neutral hover:bg-bg-layer-default-pressed"
+            className="order-1 flex h-14 shrink-0 items-center gap-2.5 rounded-r2 text-lg font-extrabold tracking-[-0.02em] text-fg-neutral md:h-[62px]"
           >
-            <Image src="/icon.svg" alt="" width={28} height={28} priority />
+            <Image src="/icon.svg" alt="" width={32} height={32} priority />
             <span>가계부탁</span>
           </Link>
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="order-2 ml-auto flex min-w-0 items-center gap-2 md:order-3">
             <ThemeToggle />
             <AuthControls />
           </div>
+          <TopTabs />
         </div>
-        <TopTabs />
       </header>
       {children}
     </>

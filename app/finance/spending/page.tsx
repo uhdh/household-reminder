@@ -9,7 +9,6 @@ import {
   isPersonId,
   latestMonth,
   monthKeyOf,
-  shiftMonth,
   toNum,
   type PersonId,
 } from "@/lib/spending-queries";
@@ -19,6 +18,7 @@ import { BeneficiarySelect } from "./beneficiary-select";
 import { CategoryIcon } from "./category-icon";
 import { CategorySelect } from "./category-select";
 import { PersonFilter } from "./person-filter";
+import { MonthlyNavigator } from "./monthly/monthly-navigator";
 import { ManualTransactionForm } from "./manual-transaction-form";
 import { TransactionDeleteButton } from "./transaction-delete-button";
 import { SelectAllTransactions, TransactionBulkDeleteForm, TransactionCheckbox } from "./transaction-bulk-delete";
@@ -99,21 +99,10 @@ export default async function SpendingPage({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Link
-            href={hrefFor(shiftMonth(month, -1), personFilter)}
-            className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
-          >
-            ← 이전달
-          </Link>
-          <span className="text-[14px] font-semibold text-ink">{month}</span>
-          <Link
-            href={hrefFor(shiftMonth(month, 1), personFilter)}
-            className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
-          >
-            다음달 →
-          </Link>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">세부 내역</h1>
+          <MonthlyNavigator month={month} personFilter={personFilter} basePath="/finance/spending" extraParams={activeFilterParams} />
         </div>
 
         <PersonFilter pathname="/finance/spending" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} extraParams={activeFilterParams} />
@@ -185,10 +174,10 @@ export default async function SpendingPage({
       />
 
       <TransactionBulkDeleteForm transactionIds={filtered.map((transaction) => transaction.id)} returnTo={returnTo}>
-      <div className="overflow-x-auto border-[0.8px] border-hairline bg-card">
-        <table className="w-full text-[13px]">
+      <div className="seed-card relative overflow-x-auto shadow-none">
+        <table className="w-full min-w-[760px] text-[14px]">
           <thead>
-            <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
+            <tr className="border-b border-stroke-neutral-muted text-left text-ink-muted">
               <th className="w-9 px-2 py-2 text-center"><SelectAllTransactions /></th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">날짜</th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">카테고리</th>
@@ -213,7 +202,7 @@ export default async function SpendingPage({
               const payerLabel = displayNameByPerson.get(t.personId) ?? PERSON_LABELS[t.personId as PersonId] ?? t.personId;
               const amount = toNum(t.amount);
               return (
-                <tr key={t.id} className="border-b-[0.8px] border-hairline2 last:border-0">
+                <tr key={t.id} className="border-b border-stroke-neutral-muted/60 last:border-0 [&>td]:py-3">
                   <td className="px-2 py-2 text-center"><TransactionCheckbox transactionId={t.id} /></td>
                   <td className="whitespace-nowrap px-2 py-2 text-ink-muted sm:px-3">{t.txnDate.slice(5)}</td>
                   <td className="whitespace-nowrap px-2 py-2 sm:px-3">

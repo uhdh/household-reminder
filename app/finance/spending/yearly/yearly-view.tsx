@@ -42,10 +42,10 @@ const formatRateLabel = (value: unknown) => {
 };
 
 const tooltipStyle = {
-  backgroundColor: "#FFFFFF",
-  border: "1px solid #E1E0D9",
-  borderRadius: 8,
-  color: "#0B0B0B",
+  backgroundColor: "var(--seed-color-bg-layer-floating)",
+  border: "1px solid var(--seed-color-stroke-neutral-muted)",
+  borderRadius: 10,
+  color: "var(--seed-color-fg-neutral)",
   fontSize: 12,
 };
 
@@ -95,9 +95,9 @@ export function YearlyView({
         children
       ) : (
         <div className="space-y-4">
-        <div className="border-[0.8px] border-hairline bg-card px-2 py-4 sm:p-5">
+        <div className="seed-card px-3 py-5 shadow-none sm:p-7">
           <div className="mb-4">
-            <h2 className="text-[14px] font-semibold text-ink">월별 수입 · 지출</h2>
+            <h2 className="text-[18px] font-extrabold text-ink">월별 수입 · 지출</h2>
             <p className="mt-1 text-[12px] text-ink-muted">월별 흐름을 비교해 지출이 커진 시점을 확인하세요.</p>
           </div>
           <div className="h-[360px] w-full">
@@ -124,28 +124,28 @@ export function YearlyView({
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="seed-card p-4 shadow-none">
-            <p className="text-[11px] font-semibold text-ink-muted">연간 고정비</p>
-            <p className="mt-1 text-[20px] font-bold tabular-nums text-ink">{fixedTotal.toLocaleString("ko-KR")}만원</p>
+          <div className="seed-card p-5 shadow-none">
+            <p className="text-[13px] font-medium text-ink-muted">연간 고정비</p>
+            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{fixedTotal.toLocaleString("ko-KR")}만원</p>
           </div>
-          <div className="seed-card p-4 shadow-none">
-            <p className="text-[11px] font-semibold text-ink-muted">연간 변동비</p>
-            <p className="mt-1 text-[20px] font-bold tabular-nums text-ink">{variableTotal.toLocaleString("ko-KR")}만원</p>
+          <div className="seed-card p-5 shadow-none">
+            <p className="text-[13px] font-medium text-ink-muted">연간 변동비</p>
+            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{variableTotal.toLocaleString("ko-KR")}만원</p>
           </div>
-          <div className="seed-card p-4 shadow-none">
+          <div className="seed-card p-5 shadow-none">
             <p className="text-[11px] font-semibold text-ink-muted">변동비 비중</p>
-            <p className="mt-1 text-[20px] font-bold tabular-nums text-ink">{variableRatio.toFixed(1)}%</p>
+            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{variableRatio.toFixed(1)}%</p>
           </div>
-          <div className="seed-card p-4 shadow-none">
-            <p className="text-[11px] font-semibold text-ink-muted">연간 저축률</p>
-            <p className={`mt-1 text-[20px] font-bold tabular-nums ${savingsRate >= 0 ? "text-fg-positive" : "text-fg-critical"}`}>
+          <div className="seed-card p-5 shadow-none">
+            <p className="text-[13px] font-medium text-ink-muted">연간 저축률</p>
+            <p className={`mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums ${savingsRate >= 0 ? "text-fg-positive" : "text-fg-critical"}`}>
               {savingsRate >= 0 ? "+" : ""}{savingsRate.toFixed(1)}%
             </p>
           </div>
         </div>
-        <div className="border-[0.8px] border-hairline bg-card px-2 py-4 sm:p-5">
+        <div className="seed-card px-3 py-5 shadow-none sm:p-7">
           <div className="mb-4">
-            <h2 className="text-[14px] font-semibold text-ink">월별 고정비 카테고리</h2>
+            <h2 className="text-[18px] font-extrabold text-ink">월별 고정비 카테고리</h2>
             <p className="mt-1 text-[12px] text-ink-muted">월별 고정비를 카테고리별로 비교합니다.</p>
           </div>
           <div className="h-[360px] w-full">
@@ -168,9 +168,9 @@ export function YearlyView({
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="border-[0.8px] border-hairline bg-card px-2 py-4 sm:p-5">
+        <div className="seed-card px-3 py-5 shadow-none sm:p-7">
           <div className="mb-4">
-            <h2 className="text-[14px] font-semibold text-ink">월별 변동비 카테고리</h2>
+            <h2 className="text-[18px] font-extrabold text-ink">월별 변동비 카테고리</h2>
             <p className="mt-1 text-[12px] text-ink-muted">월별 변동비를 카테고리별로 비교합니다.</p>
           </div>
           <div className="h-[360px] w-full">
@@ -191,7 +191,7 @@ export function YearlyView({
           </div>
         </div>
         {annualCategory && (
-          <div className="overflow-x-auto border-[0.8px] border-hairline bg-card px-2 py-4 sm:p-5">
+          <div className="overflow-x-auto seed-card px-3 py-5 shadow-none sm:p-7">
             <div className="mb-3">
               <h2 className="text-[14px] font-semibold text-ink">{annualCategory.name}</h2>
               <p className="mt-1 text-[12px] text-ink-muted">한 달에 몰려서 매달 비교를 방해하기 때문에 그래프에서 빼고 표로만 보여줍니다.</p>

@@ -72,7 +72,8 @@ function HeatmapCell(props: unknown) {
         y={y}
         width={width}
         height={height}
-        style={{ fill, stroke: "var(--finance-canvas)", strokeWidth: 2 }}
+        rx={10}
+        style={{ fill, stroke: "var(--seed-color-bg-layer-default)", strokeWidth: 3 }}
       />
       <title>{`${name} · ${sharePct.toFixed(0)}%${returnLabel ? ` · 수익률 ${returnLabel}` : ""}`}</title>
       <clipPath id={clipId}>
@@ -110,11 +111,11 @@ function HeatmapLegend() {
 
 function HeatmapCard({ data }: { data: TreemapDatum[] }) {
   return (
-    <div className="seed-card p-4 shadow-none">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+    <div className="seed-card p-5 shadow-none sm:p-7">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div>
-          <h2 className="text-[13px] font-semibold text-ink">자산 항목 히트맵</h2>
-          <span className="text-[11px] text-ink-muted">면적 = 금액 비중 · 상단 띠 = 수익·손실</span>
+          <h2 className="text-[18px] font-extrabold text-ink">자산 항목 히트맵</h2>
+          <span className="text-[13px] text-ink-muted">큰 칸일수록 비중이 크고, 색으로 수익·손실을 보여줘요</span>
         </div>
         <HeatmapLegend />
       </div>

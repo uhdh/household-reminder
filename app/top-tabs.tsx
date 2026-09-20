@@ -2,32 +2,45 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  IconBarchartSquareLine,
+  IconCalendarLine,
+  IconGearLine,
+  IconHouseLine,
+  IconReceiptLine,
+} from "@karrotmarket/react-monochrome-icon";
 
 const tabs = [
-  { label: "자산관리", href: "/finance", active: (pathname: string) => pathname === "/finance" },
-  { label: "월별지출", href: "/finance/spending/monthly", active: (pathname: string) => pathname.startsWith("/finance/spending/monthly") },
-  { label: "세부 내역", href: "/finance/spending", active: (pathname: string) => pathname === "/finance/spending" },
-  { label: "연간 내역", href: "/finance/spending/yearly", active: (pathname: string) => pathname.startsWith("/finance/spending/yearly") },
-  { label: "설정", href: "/finance/spending/settings", active: (pathname: string) => pathname.startsWith("/finance/spending/settings") || pathname === "/finance/upload" },
+  { label: "자산관리", href: "/finance", Icon: IconHouseLine, active: (pathname: string) => pathname === "/finance" },
+  { label: "월별지출", href: "/finance/spending/monthly", Icon: IconCalendarLine, active: (pathname: string) => pathname.startsWith("/finance/spending/monthly") },
+  { label: "세부 내역", href: "/finance/spending", Icon: IconReceiptLine, active: (pathname: string) => pathname === "/finance/spending" },
+  { label: "연간 내역", href: "/finance/spending/yearly", Icon: IconBarchartSquareLine, active: (pathname: string) => pathname.startsWith("/finance/spending/yearly") },
+  { label: "설정", href: "/finance/spending/settings", Icon: IconGearLine, active: (pathname: string) => pathname.startsWith("/finance/spending/settings") || pathname === "/finance/upload" },
 ];
 
 export function TopTabs() {
   const pathname = usePathname();
   return (
-    <nav aria-label="주요 메뉴" className="w-full overflow-x-auto border-t border-stroke-neutral-muted px-3 sm:px-4">
-      <div className="mx-auto flex w-max min-w-full max-w-5xl gap-1 py-1">
-        {tabs.map((tab) => {
-          const isActive = tab.active(pathname);
+    <nav
+      aria-label="주요 메뉴"
+      className="order-3 w-full overflow-x-auto border-t border-stroke-neutral-muted [scrollbar-width:none] md:order-2 md:w-auto md:flex-1 md:border-t-0 [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="flex w-max min-w-full gap-6 md:gap-7">
+        {tabs.map(({ label, href, Icon, active }) => {
+          const isActive = active(pathname);
           return (
             <Link
-              key={tab.href}
-              href={tab.href}
+              key={href}
+              href={href}
               aria-current={isActive ? "page" : undefined}
-              className={`shrink-0 rounded-r2 px-3 py-2 text-[13px] font-semibold transition-colors ${
-                isActive ? "bg-bg-brand-weak text-fg-brand" : "text-fg-neutral-muted hover:bg-bg-neutral-weak hover:text-fg-neutral"
+              className={`-mb-px flex h-12 shrink-0 items-center gap-1.5 border-b-[3px] text-[14px] transition-colors md:h-[62px] md:text-[15px] ${
+                isActive
+                  ? "border-fg-brand font-bold text-fg-neutral"
+                  : "border-transparent font-medium text-fg-neutral-muted hover:text-fg-neutral"
               }`}
             >
-              {tab.label}
+              <Icon size={18} aria-hidden="true" />
+              {label}
             </Link>
           );
         })}

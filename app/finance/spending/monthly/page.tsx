@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import {
@@ -8,7 +7,6 @@ import {
   isPersonId,
   latestMonth,
   monthKeyOf,
-  shiftMonth,
   summarizeMonthlyTransactions,
   toNum,
   UNMAPPED_CATEGORY,
@@ -30,23 +28,23 @@ const UNMAPPED = UNMAPPED_CATEGORY;
 function CompositionCard({ title, items }: { title: string; items: { label: string; value: number; color: string }[] }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
-    <section className="seed-card p-4 shadow-none">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
-        <span className="text-[12px] tabular-nums text-ink-muted" title={formatKRW(total)}>{formatCompactKRW(total)}</span>
+    <section className="seed-card p-5 shadow-none sm:p-7">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="text-[18px] font-extrabold text-ink">{title}</h2>
+        <span className="text-[17px] font-bold tabular-nums text-ink" title={formatKRW(total)}>{formatCompactKRW(total)}</span>
       </div>
-      <div className="mb-4 flex h-2 overflow-hidden rounded-full bg-bg-neutral-weak" aria-hidden="true">
-        {items.map((item) => <span key={item.label} className={item.color} style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }} />)}
+      <div className="mb-4 flex h-3 gap-[3px] overflow-hidden rounded-full" aria-hidden="true">
+        {items.map((item) => <span key={item.label} className={`rounded-full ${item.color}`} style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }} />)}
       </div>
-      <ul className="space-y-3">
+      <ul className="flex flex-wrap justify-between gap-x-6 gap-y-2">
         {items.map((item) => {
           const percent = total > 0 ? (item.value / total) * 100 : 0;
           return (
-            <li key={item.label} className="flex items-center gap-2 text-[12px]">
-              <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} aria-hidden="true" />
-              <span className="flex-1 text-ink-muted">{item.label}</span>
-              <span className="font-semibold tabular-nums text-ink" title={formatKRW(item.value)}>{formatCompactKRW(item.value)}</span>
-              <span className="w-10 text-right tabular-nums text-ink-muted">{percent.toFixed(0)}%</span>
+            <li key={item.label} className="flex items-center gap-2 text-[14px]">
+              <span className={`h-2.5 w-2.5 rounded-[3px] ${item.color}`} aria-hidden="true" />
+              <span className="text-ink">{item.label}</span>
+              <span className="font-bold tabular-nums text-ink" title={formatKRW(item.value)}>{formatCompactKRW(item.value)}</span>
+              <span className="tabular-nums text-ink-muted">{percent.toFixed(0)}%</span>
             </li>
           );
         })}
@@ -112,7 +110,6 @@ export default async function MonthlyPage({
   const unmappedTotal = Array.from(categoryTotals.entries())
     .filter(([name]) => !knownNames.has(name))
     .reduce((s, [, v]) => s + v, 0);
-  const hrefForMonth = (value: string) => `/finance/spending/monthly?month=${value}${personFilter === "all" ? "" : `&person=${personFilter}`}`;
   const transactionsFor = (category: string) => monthTx
     .filter((transaction) => flowLabel(transaction) === "지출" && (transaction.stdCategory ?? UNMAPPED) === category)
     .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)))
@@ -127,26 +124,15 @@ export default async function MonthlyPage({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-        <Link
-          href={hrefForMonth(shiftMonth(month, -1))}
-          className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
-        >
-          ← 이전달
-        </Link>
-        <MonthlyNavigator month={month} personFilter={personFilter} />
-        <Link
-          href={hrefForMonth(shiftMonth(month, 1))}
-          className="border-[0.8px] border-hairline px-2 py-1 text-[12px] text-ink-muted hover:text-ink"
-        >
-          다음달 →
-        </Link>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">월별 지출</h1>
+          <MonthlyNavigator month={month} personFilter={personFilter} />
         </div>
         <PersonFilter pathname="/finance/spending/monthly" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <SummaryCard label="총수입" value={summary.totalIncome} format="compactKrw" />
         <SummaryCard label="총지출" value={summary.totalExpense} format="compactKrw" />
         <SummaryCard label="당월 저축" value={summary.balance} format="compactKrw" />
@@ -180,11 +166,11 @@ export default async function MonthlyPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="border-[0.8px] border-hairline bg-card">
+        <div className="seed-card overflow-hidden shadow-none">
           <ul className="text-[13px]">
-            <li className="border-b-[0.8px] border-hairline2 bg-canvas px-2 py-2 sm:px-3">
+            <li className="border-b border-stroke-neutral-muted px-4 py-4 sm:px-6">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[11px] font-semibold text-ink-muted">고정비</span>
+                <span className="text-[17px] font-extrabold text-ink">고정비</span>
                 <UsageAmount actual={summary.fixedExpense} budget={fixedBudgetTotal} />
               </div>
             </li>
@@ -200,11 +186,11 @@ export default async function MonthlyPage({
             ))}
           </ul>
         </div>
-        <div className="border-[0.8px] border-hairline bg-card">
+        <div className="seed-card overflow-hidden shadow-none">
           <ul className="text-[13px]">
-            <li className="border-b-[0.8px] border-hairline2 bg-canvas px-2 py-2 sm:px-3">
+            <li className="border-b border-stroke-neutral-muted px-4 py-4 sm:px-6">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[11px] font-semibold text-ink-muted">변동비</span>
+                <span className="text-[17px] font-extrabold text-ink">변동비</span>
                 <UsageAmount actual={summary.variableExpense} budget={variableBudgetTotal} />
               </div>
             </li>
