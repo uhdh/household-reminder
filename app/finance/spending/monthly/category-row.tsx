@@ -30,7 +30,7 @@ function usagePctOf(actual: number, budget: number | null): number | null {
 export function UsageAmount({ actual, budget }: { actual: number; budget: number | null }) {
   const usagePct = usagePctOf(actual, budget);
   return (
-    <span className="whitespace-nowrap font-semibold tabular-nums text-ink">
+    <span className="whitespace-nowrap text-[14px] font-bold tabular-nums text-ink">
       {formatKRW(actual)}
       {budget !== null && budget > 0 && <span className="text-ink-muted"> / {formatKRW(budget)}</span>}
       {usagePct !== null && <span className={USAGE_COLORS[usageStatus(usagePct)].text}>({usagePct.toFixed(0)}%)</span>}
@@ -52,12 +52,12 @@ export function UsageBar({ actual, budget, scaleMax }: { actual: number; budget:
   const usagePct = usagePctOf(actual, budget);
   if (usagePct === null) return null;
   return (
-    <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-bg-neutral-weak">
+    <div className="relative mt-2.5 h-2 overflow-hidden rounded-full bg-bg-neutral-weak">
       <div
         className={`h-full rounded-full ${USAGE_COLORS[usageStatus(usagePct)].fill}`}
         style={{ width: `${gaugeWidth(usagePct, scaleMax)}%` }}
       />
-      <div className="absolute -top-0.5 -bottom-0.5 w-px bg-ink-muted/40" style={{ left: `${GAUGE_SPLIT}%` }} />
+      <div className="absolute inset-y-0 w-0.5 bg-ink/50" style={{ left: `${GAUGE_SPLIT}%` }} />
     </div>
   );
 }
@@ -80,17 +80,17 @@ export function CategoryRow({
   const hasBudget = budget !== null && budget > 0;
 
   return (
-    <li className="border-b-[0.8px] border-hairline2 px-2 py-2.5 last:border-0 sm:px-3">
+    <li className="border-b border-stroke-neutral-muted/60 px-4 py-4 last:border-0 sm:px-6">
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
         className="flex w-full items-baseline justify-between gap-3 text-left"
       >
-        <span className="flex items-center gap-1.5 text-ink">
+        <span className="flex items-center gap-2 text-[15px] font-bold text-ink">
           <span
             aria-hidden="true"
-            className={`text-[10px] text-ink-muted transition-transform ${expanded ? "rotate-90" : ""}`}
+            className={`text-[14px] font-bold text-ink-muted transition-transform ${expanded ? "rotate-90" : ""}`}
           >
             ›
           </span>
@@ -101,12 +101,12 @@ export function CategoryRow({
       {hasBudget ? (
         <UsageBar actual={actual} budget={budget} scaleMax={scaleMax} />
       ) : (
-        <span className="mt-1.5 inline-block rounded-full bg-bg-neutral-weak px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
+        <span className="mt-2 inline-block rounded-full bg-bg-neutral-weak px-2.5 py-1 text-[12px] font-medium text-ink-muted">
           예산 미설정
         </span>
       )}
       {expanded && (
-        <ul className="mt-3 divide-y divide-hairline2 border-t border-hairline2 text-[12px]">
+        <ul className="mt-3 divide-y divide-stroke-neutral-muted/60 border-t border-stroke-neutral-muted/60 text-[13px]">
           {transactions.length > 0 ? transactions.map((transaction) => (
             <li key={transaction.id} className="flex items-center justify-between gap-3 py-2">
               <span className="min-w-0 truncate text-ink-muted">{transaction.description || "메모 없음"}</span>

@@ -108,43 +108,43 @@ export default async function SpendingPage({
         <PersonFilter pathname="/finance/spending" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} extraParams={activeFilterParams} />
       </div>
 
-      <form method="get" className="seed-card mb-4 flex flex-wrap items-end gap-2 p-3">
+      <form method="get" className="seed-card mb-4 flex flex-wrap items-end gap-3 p-4 shadow-none sm:p-5">
         <input type="hidden" name="month" value={month} />
         {personFilter !== "all" && <input type="hidden" name="person" value={personFilter} />}
-        <label className="min-w-24 flex-1 text-[11px] font-semibold text-ink-muted sm:flex-none">
+        <label className="min-w-24 flex-1 text-[12px] font-medium text-ink-muted sm:flex-none">
           구분
-          <SelectInput name="flow" defaultValue={flowFilter} className="mt-1 min-h-9 w-full px-2 py-1 text-[12px]">
+          <SelectInput name="flow" defaultValue={flowFilter} className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]">
             <option value="all">전체</option>
             <option value="expense">지출</option>
             <option value="income">입금</option>
           </SelectInput>
         </label>
-        <label className="min-w-24 flex-1 text-[11px] font-semibold text-ink-muted sm:flex-none">
+        <label className="min-w-24 flex-1 text-[12px] font-medium text-ink-muted sm:flex-none">
           사용 대상
-          <SelectInput name="beneficiary" defaultValue={beneficiaryFilter} className="mt-1 min-h-9 w-full px-2 py-1 text-[12px]">
+          <SelectInput name="beneficiary" defaultValue={beneficiaryFilter} className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]">
             <option value="all">전체</option>
             <option value="husband">남편</option>
             <option value="wife">아내</option>
             <option value="joint">우리</option>
           </SelectInput>
         </label>
-        <label className="min-w-32 flex-1 text-[11px] font-semibold text-ink-muted sm:flex-none">
+        <label className="min-w-32 flex-1 text-[12px] font-medium text-ink-muted sm:flex-none">
           카테고리
-          <SelectInput name="category" defaultValue={categoryFilter} className="mt-1 min-h-9 w-full px-2 py-1 text-[12px]">
+          <SelectInput name="category" defaultValue={categoryFilter} className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]">
             <option value="all">전체</option>
             {categoryOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}
           </SelectInput>
         </label>
-        <label className="min-w-44 flex-[2] text-[11px] font-semibold text-ink-muted">
+        <label className="min-w-44 flex-[2] text-[12px] font-medium text-ink-muted">
           검색
-          <TextInput name="q" defaultValue={query} placeholder="메모·결제수단·원본 분류" className="mt-1 min-h-9 w-full px-2 py-1 text-[12px]" />
+          <TextInput name="q" defaultValue={query} placeholder="메모·결제수단·원본 분류" className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]" />
         </label>
-        <ActionButton type="submit" className="min-h-9 px-3 py-1">적용</ActionButton>
-        <Link href={hrefFor(month, personFilter, false)} className="seed-button seed-button-secondary min-h-9 px-3 py-1 text-[12px]">초기화</Link>
+        <ActionButton type="submit" className="min-h-11 px-5 py-2 text-[14px]">적용</ActionButton>
+        <Link href={hrefFor(month, personFilter, false)} className="seed-button seed-button-secondary min-h-11 px-4 py-2 text-[14px]">초기화</Link>
         <a
           href={exportHref}
           download
-          className="seed-button seed-button-secondary min-h-9 inline-flex items-center gap-1.5 px-3 py-1 text-[12px]"
+          className="seed-button seed-button-secondary inline-flex min-h-11 items-center gap-1.5 px-4 py-2 text-[14px]"
           title="현재 조건의 세부 내역을 엑셀 파일로 다운로드합니다"
         >
           <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -152,13 +152,13 @@ export default async function SpendingPage({
           </svg>
           엑셀 다운로드
         </a>
-        <span className="ml-auto pb-2 text-[11px] text-ink-muted">{filtered.length}건</span>
+        <span className="ml-auto pb-3 text-[13px] text-ink-muted">{filtered.length}건</span>
       </form>
 
       {unmappedCount > 0 && (
-        <div className="mb-3 border-[0.8px] border-gain/30 bg-gain/10 px-3 py-2 text-[12px] text-gain">
+        <div className="mb-4 rounded-r3 border border-stroke-brand-weak bg-bg-brand-weak px-4 py-3 text-[14px] font-medium text-fg-neutral">
           표준카테고리가 없는 거래 {unmappedCount}건이 있습니다.{" "}
-          <Link href="/finance/spending/settings" className="underline">
+          <Link href="/finance/spending/settings" className="font-bold text-fg-brand">
             설정에서 매핑하기
           </Link>
         </div>

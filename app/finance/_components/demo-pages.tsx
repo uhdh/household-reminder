@@ -20,25 +20,25 @@ function amountFor(value: number, personFilter: PersonFilterValue): number {
 
 function DemoBanner({ title }: { title: string }) {
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-r3 border border-stroke-brand-weak bg-bg-brand-weak px-4 py-3">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <p className="text-[11px] font-bold text-fg-brand">로그인 없이 둘러보기</p>
-        <h1 className="mt-0.5 text-lg font-bold text-ink">{title}</h1>
+        <p className="text-[13px] font-bold text-fg-brand">로그인 없이 둘러보기</p>
+        <h1 className="mt-1 text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">{title}</h1>
       </div>
-      <p className="text-[12px] text-ink-muted">샘플 데이터이며, 로그인하면 내 데이터로 전환됩니다.</p>
+      <p className="rounded-r3 border border-stroke-brand-weak bg-bg-brand-weak px-4 py-2.5 text-[13px] font-medium text-fg-neutral">샘플 데이터이며, 로그인하면 내 데이터로 전환됩니다.</p>
     </div>
   );
 }
 
 function DemoPersonFilter({ pathname, selected }: { pathname: string; selected: PersonFilterValue }) {
   return (
-    <div className="seed-card inline-flex gap-1 p-1 shadow-none" aria-label="사람별 샘플 필터">
+    <div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1" aria-label="사람별 샘플 필터">
       {(["all", "husband", "wife"] as const).map((person) => (
         <Link
           key={person}
           href={person === "all" ? pathname : `${pathname}?person=${person}`}
           aria-current={selected === person ? "page" : undefined}
-          className={`rounded-full px-3 py-1.5 text-[12px] font-semibold ${selected === person ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-ink-muted"}`}
+          className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${selected === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-ink-muted hover:text-ink"}`}
         >
           {person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}
         </Link>
@@ -145,11 +145,11 @@ export function DemoTransactionList({ personFilter }: { personFilter: PersonFilt
       <DemoBanner title="세부 내역 샘플" />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-bg-neutral-weak px-3 py-1.5 text-[12px] font-semibold text-ink-muted">샘플 내역은 수정되지 않아요</span>
+          <span className="rounded-r3 bg-bg-neutral-weak px-4 py-2.5 text-[13px] font-medium text-ink-muted">샘플 내역은 수정되지 않아요</span>
           <a
             href={`/api/finance/spending/export?month=2026-07${personFilter !== "all" ? `&person=${personFilter}` : ""}`}
             download
-            className="seed-button seed-button-secondary min-h-8 inline-flex items-center gap-1.5 px-3 py-1 text-[12px]"
+            className="seed-button seed-button-secondary inline-flex min-h-11 items-center gap-1.5 px-4 py-2 text-[14px]"
             title="샘플 세부 내역을 엑셀 파일로 다운로드합니다"
           >
             <svg className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -161,9 +161,9 @@ export function DemoTransactionList({ personFilter }: { personFilter: PersonFilt
         <DemoPersonFilter pathname="/finance/spending" selected={personFilter} />
       </div>
       <div className="seed-card overflow-x-auto shadow-none">
-        <table className="w-full min-w-[760px] text-[12px]">
-          <thead><tr className="border-b border-hairline text-left text-ink-muted"><th className="px-3 py-3">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3">결제한 사람</th><th className="px-3 py-3">사용 대상</th><th className="px-3 py-3">카테고리</th><th className="px-3 py-3">결제수단</th><th className="px-3 py-3">메모</th><th className="px-3 py-3 text-right">금액</th></tr></thead>
-          <tbody>{rows.map((row, index) => <tr key={`${row.date}-${index}`} className="border-b border-hairline2 last:border-0"><td className="px-3 py-3 text-ink-muted">{row.date}</td><td className={`px-3 py-3 font-semibold ${row.flow === "입금" ? "text-fg-positive" : "text-ink"}`}>{row.flow}</td><td className="px-3 py-3">{DISPLAY_NAMES.get(row.person)}</td><td className="px-3 py-3">{row.target}</td><td className="px-3 py-3"><span className="rounded-full bg-bg-brand-weak px-2 py-1 font-semibold text-fg-brand">{row.category}</span></td><td className="px-3 py-3 text-ink-muted">{row.method}</td><td className="px-3 py-3 text-ink-muted">{row.memo}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{formatKRW(row.amount)}</td></tr>)}</tbody>
+        <table className="w-full min-w-[760px] text-[14px]">
+          <thead><tr className="border-b border-stroke-neutral-muted text-left text-[13px] text-ink-muted"><th className="px-3 py-3">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3">결제한 사람</th><th className="px-3 py-3">사용 대상</th><th className="px-3 py-3">카테고리</th><th className="px-3 py-3">결제수단</th><th className="px-3 py-3">메모</th><th className="px-3 py-3 text-right">금액</th></tr></thead>
+          <tbody>{rows.map((row, index) => <tr key={`${row.date}-${index}`} className="border-b border-stroke-neutral-muted/60 last:border-0"><td className="px-3 py-3.5 text-ink-muted">{row.date}</td><td className={`px-3 py-3 font-semibold ${row.flow === "입금" ? "text-fg-positive" : "text-ink"}`}>{row.flow}</td><td className="px-3 py-3">{DISPLAY_NAMES.get(row.person)}</td><td className="px-3 py-3">{row.target}</td><td className="px-3 py-3"><span className="rounded-r2 bg-bg-neutral-weak px-2.5 py-1 text-[13px] font-bold text-ink">{row.category}</span></td><td className="px-3 py-3 text-ink-muted">{row.method}</td><td className="px-3 py-3 text-ink-muted">{row.memo}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{formatKRW(row.amount)}</td></tr>)}</tbody>
         </table>
       </div>
     </AppShell>
@@ -207,7 +207,7 @@ export function DemoYearlySpending({ personFilter }: { personFilter: PersonFilte
       <DemoBanner title="연간 내역 샘플" />
       <div className="mb-3 flex justify-end"><DemoPersonFilter pathname="/finance/spending/yearly" selected={personFilter} /></div>
       <YearlyView data={data} fixedCategories={fixedSeries} variableCategories={variableSeries} annualCategory={null}>
-        <div className="seed-card p-5 text-sm text-ink-muted shadow-none">샘플 연간 내역은 그래프로 먼저 보여드려요.</div>
+        <div className="seed-card p-5 text-sm text-ink-muted shadow-none sm:p-7">샘플 연간 내역은 그래프로 먼저 보여드려요.</div>
       </YearlyView>
     </AppShell>
   );

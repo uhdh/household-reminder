@@ -39,16 +39,23 @@ function chartSlices(totals: Map<string, number>, limit = 5): ChartSlice[] {
 function CompositionCard({ title, items }: { title: string; items: { label: string; value: number; color: string }[] }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
-    <section className="seed-card p-4 shadow-none">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
-        <span className="text-[12px] tabular-nums text-ink-muted">{formatManwon(total)}</span>
+    <section className="seed-card p-5 shadow-none sm:p-7">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="text-[18px] font-extrabold text-ink">{title}</h2>
+        <span className="text-[17px] font-bold tabular-nums text-ink">{formatManwon(total)}</span>
       </div>
-      <div className="mb-4 flex h-2 overflow-hidden rounded-full bg-bg-neutral-weak" aria-hidden="true">
-        {items.map((item, index) => <span key={`${item.label}-${index}`} className={item.color} style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }} />)}
+      <div className="mb-4 flex h-3 gap-[3px] overflow-hidden rounded-full" aria-hidden="true">
+        {items.map((item, index) => <span key={`${item.label}-${index}`} className={`rounded-full ${item.color}`} style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }} />)}
       </div>
-      <ul className="space-y-3">
-        {items.map((item, index) => <li key={`${item.label}-${index}`} className="flex items-center gap-2 text-[12px]"><span className={`h-2.5 w-2.5 rounded-full ${item.color}`} /><span className="flex-1 text-ink-muted">{item.label}</span><span className="font-semibold tabular-nums text-ink">{formatManwon(item.value)}</span><span className="w-10 text-right tabular-nums text-ink-muted">{total > 0 ? ((item.value / total) * 100).toFixed(0) : 0}%</span></li>)}
+      <ul className="flex flex-wrap justify-between gap-x-6 gap-y-2">
+        {items.map((item, index) => (
+          <li key={`${item.label}-${index}`} className="flex items-center gap-2 text-[14px]">
+            <span className={`h-2.5 w-2.5 rounded-[3px] ${item.color}`} aria-hidden="true" />
+            <span className="text-ink">{item.label}</span>
+            <span className="font-bold tabular-nums text-ink">{formatManwon(item.value)}</span>
+            <span className="tabular-nums text-ink-muted">{total > 0 ? ((item.value / total) * 100).toFixed(0) : 0}%</span>
+          </li>
+        ))}
       </ul>
     </section>
   );
@@ -163,16 +170,16 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-sm font-bold text-fg-brand">가계부탁이 만든 결과</p>
-            <h2 className="mt-2 text-2xl font-bold text-fg-neutral">입력은 한 번, 이후에는 확인만 하세요</h2>
+            <h2 className="mt-2 text-3xl font-extrabold tracking-[-0.03em] text-fg-neutral">입력은 한 번, 이후에는 확인만 하세요</h2>
           </div>
         </div>
 
         {hasPreviewData ? (
           <div className="mt-6 space-y-6">
             <Card className="overflow-hidden p-5 sm:p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-bold text-fg-neutral">자산 현황(샘플)</h3><div className="inline-flex rounded-r2 bg-bg-neutral-weak p-1 text-[12px] font-semibold">{(["all", "husband", "wife"] as const).map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`rounded-r2 px-3 py-1.5 ${personFilter === person ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}</Link>)}</div></div>
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-                  <SummaryCard label="순자산" value={totalAsset - totalDebt} format="manwon" breakdown={[{ label: "자산", value: totalAsset }]} />
+                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">자산 현황(샘플)</h3><div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">{(["all", "husband", "wife"] as const).map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${personFilter === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}</Link>)}</div></div>
+                <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+                  <SummaryCard variant="feature" className="col-span-2 lg:col-span-4" label="순자산" value={totalAsset - totalDebt} format="manwon" breakdown={[{ label: "자산", value: totalAsset }]} />
                   <SummaryCard label="총자산" value={totalAsset} format="manwon" />
                   <SummaryCard label="총부채" value={totalDebt} format="manwon" />
                   <SummaryCard label="남편 순자산" value={netByPerson.get("husband") ?? 0} format="manwon" />
@@ -184,8 +191,8 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
             </Card>
 
             <Card className="overflow-hidden p-5 sm:p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-bold text-fg-neutral">월별 지출(샘플)</h3><div className="inline-flex rounded-r2 bg-bg-neutral-weak p-1 text-[12px] font-semibold">{(["all", "husband", "wife"] as const).map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`rounded-r2 px-3 py-1.5 ${personFilter === person ? "bg-bg-brand-solid text-fg-neutral-inverted" : "text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}</Link>)}</div></div>
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">월별 지출(샘플)</h3><div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">{(["all", "husband", "wife"] as const).map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${personFilter === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}</Link>)}</div></div>
+                <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
                   <SummaryCard label="총수입" value={monthlyIncome} format="compactKrw" />
                   <SummaryCard label="총지출" value={monthlyExpense} format="compactKrw" />
                   <SummaryCard label="당월 저축" value={monthlyBalance} format="compactKrw" />
