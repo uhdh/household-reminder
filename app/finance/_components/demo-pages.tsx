@@ -161,9 +161,22 @@ export function DemoTransactionList({ personFilter }: { personFilter: PersonFilt
         <DemoPersonFilter pathname="/finance/spending" selected={personFilter} />
       </div>
       <div className="seed-card overflow-x-auto shadow-none">
-        <table className="w-full min-w-[760px] text-[14px]">
-          <thead><tr className="border-b border-stroke-neutral-muted text-left text-[13px] text-ink-muted"><th className="px-3 py-3">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3">결제한 사람</th><th className="px-3 py-3">사용 대상</th><th className="px-3 py-3">카테고리</th><th className="px-3 py-3">결제수단</th><th className="px-3 py-3">메모</th><th className="px-3 py-3 text-right">금액</th></tr></thead>
-          <tbody>{rows.map((row, index) => <tr key={`${row.date}-${index}`} className="border-b border-stroke-neutral-muted/60 last:border-0"><td className="px-3 py-3.5 text-ink-muted">{row.date}</td><td className={`px-3 py-3 font-semibold ${row.flow === "입금" ? "text-fg-positive" : "text-ink"}`}>{row.flow}</td><td className="px-3 py-3">{DISPLAY_NAMES.get(row.person)}</td><td className="px-3 py-3">{row.target}</td><td className="px-3 py-3"><span className="rounded-r2 bg-bg-neutral-weak px-2.5 py-1 text-[13px] font-bold text-ink">{row.category}</span></td><td className="px-3 py-3 text-ink-muted">{row.method}</td><td className="px-3 py-3 text-ink-muted">{row.memo}</td><td className="px-3 py-3 text-right font-semibold tabular-nums">{formatKRW(row.amount)}</td></tr>)}</tbody>
+        <table className="block w-full text-[14px] md:table md:min-w-[760px]">
+          <thead className="hidden md:table-header-group"><tr className="border-b border-stroke-neutral-muted text-left text-[13px] text-ink-muted"><th className="px-3 py-3">날짜</th><th className="px-3 py-3">구분</th><th className="px-3 py-3">결제한 사람</th><th className="px-3 py-3">사용 대상</th><th className="px-3 py-3">카테고리</th><th className="px-3 py-3">결제수단</th><th className="px-3 py-3">메모</th><th className="px-3 py-3 text-right">금액</th></tr></thead>
+          <tbody className="block md:table-row-group">
+            {rows.map((row, index) => (
+              <tr key={`${row.date}-${index}`} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 border-b border-stroke-neutral-muted/60 p-4 last:border-0 md:table-row md:p-0">
+                <td className="col-start-1 row-start-1 text-[13px] text-ink-muted md:table-cell md:px-3 md:py-3.5 md:text-[14px]">{row.date}</td>
+                <td className={`col-start-1 row-start-2 font-semibold md:table-cell md:px-3 md:py-3.5 ${row.flow === "입금" ? "text-fg-positive" : "text-ink"}`}>{row.flow}</td>
+                <td className="hidden md:table-cell md:px-3 md:py-3.5">{DISPLAY_NAMES.get(row.person)}</td>
+                <td className="hidden md:table-cell md:px-3 md:py-3.5">{row.target}</td>
+                <td className="col-start-1 row-start-3 md:table-cell md:px-3 md:py-3.5"><span className="rounded-r2 bg-bg-neutral-weak px-2.5 py-1 text-[13px] font-bold text-ink">{row.category}</span></td>
+                <td className="col-span-2 col-start-1 row-start-4 text-[13px] text-ink-muted md:table-cell md:px-3 md:py-3.5 md:text-[14px]"><span className="md:hidden">{DISPLAY_NAMES.get(row.person)} → {row.target} · </span>{row.method}</td>
+                <td className="col-span-2 col-start-1 row-start-5 text-ink-muted md:table-cell md:px-3 md:py-3.5">{row.memo}</td>
+                <td className="col-start-2 row-start-1 row-span-2 text-right text-[17px] font-extrabold tabular-nums md:table-cell md:px-3 md:py-3.5 md:text-[14px] md:font-semibold">{formatKRW(row.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </AppShell>

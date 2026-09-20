@@ -174,9 +174,13 @@ export default async function SpendingPage({
       />
 
       <TransactionBulkDeleteForm transactionIds={filtered.map((transaction) => transaction.id)} returnTo={returnTo}>
+      <div className="mb-2 flex items-center gap-2 px-1 text-[13px] text-ink-muted md:hidden">
+        <SelectAllTransactions />
+        <span>전체 선택</span>
+      </div>
       <div className="seed-card relative overflow-x-auto shadow-none">
-        <table className="w-full min-w-[760px] text-[14px]">
-          <thead>
+        <table className="block w-full text-[14px] md:table md:min-w-[760px]">
+          <thead className="hidden md:table-header-group">
             <tr className="border-b border-stroke-neutral-muted text-left text-ink-muted">
               <th className="w-9 px-2 py-2 text-center"><SelectAllTransactions /></th>
               <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">날짜</th>
@@ -187,10 +191,10 @@ export default async function SpendingPage({
               <th className="w-12 px-2 py-2 text-right text-[11px] font-semibold sm:px-3"><span className="sr-only">관리</span></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="block md:table-row-group">
             {filtered.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-ink-muted">
+              <tr className="block md:table-row">
+                <td colSpan={7} className="block px-3 py-8 text-center text-ink-muted md:table-cell">
                   해당 월에 표시할 거래가 없습니다.
                 </td>
               </tr>
@@ -202,10 +206,13 @@ export default async function SpendingPage({
               const payerLabel = displayNameByPerson.get(t.personId) ?? PERSON_LABELS[t.personId as PersonId] ?? t.personId;
               const amount = toNum(t.amount);
               return (
-                <tr key={t.id} className="border-b border-stroke-neutral-muted/60 last:border-0 [&>td]:py-3">
-                  <td className="px-2 py-2 text-center"><TransactionCheckbox transactionId={t.id} /></td>
-                  <td className="whitespace-nowrap px-2 py-2 text-ink-muted sm:px-3">{t.txnDate.slice(5)}</td>
-                  <td className="whitespace-nowrap px-2 py-2 sm:px-3">
+                <tr
+                  key={t.id}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 border-b border-stroke-neutral-muted/60 p-4 last:border-0 md:table-row md:p-0 md:[&>td]:py-3"
+                >
+                  <td className="col-start-1 row-start-1 md:table-cell md:px-2 md:text-center"><TransactionCheckbox transactionId={t.id} /></td>
+                  <td className="col-start-2 row-start-1 text-[13px] text-ink-muted md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px]">{t.txnDate.slice(5)}</td>
+                  <td className="col-span-2 col-start-2 row-start-2 md:table-cell md:whitespace-nowrap md:px-3">
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-1.5">
                         <CategoryIcon name={t.stdCategory} className="shrink-0 text-ink-muted" />
@@ -221,7 +228,7 @@ export default async function SpendingPage({
                       {rawCategory !== displayedCategory && <span className="text-[10px] text-ink-muted">원본: {rawCategory}</span>}
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2 sm:px-3">
+                  <td className="col-span-2 col-start-2 row-start-3 md:table-cell md:whitespace-nowrap md:px-3">
                     <div className="flex items-center gap-1 text-[12px]">
                       {t.personId !== t.beneficiary && (
                         <span className="text-ink-muted">
@@ -232,19 +239,19 @@ export default async function SpendingPage({
                       <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} />
                     </div>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="col-span-2 col-start-2 row-start-4 md:table-cell md:px-3">
                     <div className="flex flex-col gap-0.5">
                       <span className="text-ink-muted">{t.description ?? "-"}</span>
                       {t.paymentMethod && <span className="text-[10px] text-ink-muted/70">{t.paymentMethod}</span>}
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right font-semibold tabular-nums sm:px-3">
+                  <td className="col-start-3 row-start-1 text-right text-[17px] font-extrabold tabular-nums md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px] md:font-semibold">
                     <span className={flow === "입금" ? "text-fg-positive" : "text-ink"}>
                       {flow === "입금" ? "+" : "-"}
                       {formatKRW(Math.abs(amount))}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2 text-right sm:px-3">
+                  <td className="col-span-2 col-start-2 row-start-5 justify-self-end md:table-cell md:whitespace-nowrap md:px-3 md:text-right">
                     <TransactionDeleteButton txnId={t.id} returnTo={returnTo} />
                   </td>
                 </tr>
