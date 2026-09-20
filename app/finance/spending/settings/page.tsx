@@ -112,9 +112,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {activeTab === "upload" && <UploadForm error={error} success={success} />}
 
       {activeTab === "unmapped" && (unmapped.length > 0 ? (
-        <div className="seed-card bg-bg-critical-weak p-4">
-          <h2 className="mb-1 text-[13px] font-semibold text-gain">매핑되지 않은 카테고리 ({unmapped.length}건)</h2>
-          <p className="mb-3 text-[12px] text-ink-muted">
+        <div className="seed-card bg-bg-critical-weak p-5 shadow-none sm:p-7">
+          <h2 className="mb-1 text-[18px] font-extrabold text-fg-critical">매핑되지 않은 카테고리 ({unmapped.length}건)</h2>
+          <p className="mb-4 text-[14px] text-ink-muted">
             실제 수입/지출 집계에 반영되는 거래만 모았고, 금액이 큰 순서로 정렬했습니다. 목록에서 카테고리를
             고르고 저장하면 되고, 잘 모르겠으면 일단 &quot;기타&quot;로 두었다가 나중에 바꿔도 됩니다.
           </p>
@@ -126,12 +126,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <form
                   key={`${u.txnType}|${u.rawCategory}|${u.rawSubcategory}`}
                   action={upsertCategoryMappingAction}
-                  className="flex flex-wrap items-center gap-2 text-[12px]"
+                  className="flex flex-wrap items-center gap-2 text-[14px]"
                 >
                   <input type="hidden" name="txnType" value={u.txnType} />
                   <input type="hidden" name="rawCategory" value={u.rawCategory} />
                   <input type="hidden" name="rawSubcategory" value={u.rawSubcategory} />
-                  <span className="border-[0.8px] border-hairline2 bg-card px-2 py-1 text-ink-muted">
+                  <span className="rounded-r2 bg-bg-layer-default px-2.5 py-1 font-medium text-ink">
                     {u.txnType} · {u.rawCategory} · {u.rawSubcategory}
                   </span>
                   <span className="text-ink-muted">
@@ -141,7 +141,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   <SelectInput
                     name="stdCategory"
                     defaultValue={guess}
-                    className="min-h-9 w-auto px-2 py-1"
+                    className="min-h-11 w-auto px-3 py-2"
                   >
                     {Object.entries(grouped).map(([kind, names]) => (
                       <optgroup key={kind} label={kind}>
@@ -153,7 +153,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                       </optgroup>
                     ))}
                   </SelectInput>
-                  <ActionButton type="submit" className="min-h-9 px-3 py-1">
+                  <ActionButton type="submit" className="min-h-11 px-4 py-2">
                     저장
                   </ActionButton>
                 </form>
@@ -192,9 +192,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                       <TextInput
                         name="stdCategory"
                         defaultValue={m.stdCategory}
-                        className="min-h-9 w-28 px-2 py-1"
+                        className="min-h-11 w-28 px-3 py-2"
                       />
-                      <ActionButton type="submit" variant="secondary" className="min-h-9 px-2 py-1">
+                      <ActionButton type="submit" variant="secondary" className="min-h-11 px-3 py-2">
                         저장
                       </ActionButton>
                     </form>
@@ -202,7 +202,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   <td className="px-3 py-3">
                     <form action={deleteCategoryMappingAction}>
                       <input type="hidden" name="id" value={m.id} />
-                      <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">
+                      <ActionButton type="submit" variant="ghost" className="min-h-11 px-3 py-2 text-fg-critical">
                         삭제
                       </ActionButton>
                     </form>
@@ -213,9 +213,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </table>
         </div>
 
-        <h3 className="mb-2 text-[12px] font-semibold text-ink-muted">새 매핑 추가</h3>
-        <form action={upsertCategoryMappingAction} className="flex flex-wrap items-center gap-2 text-[12px]">
-          <SelectInput name="txnType" required className="min-h-9 w-auto px-2 py-1">
+        <h3 className="mb-3 text-[14px] font-bold text-ink">새 매핑 추가</h3>
+        <form action={upsertCategoryMappingAction} className="flex flex-wrap items-center gap-2 text-[14px]">
+          <SelectInput name="txnType" required className="min-h-11 w-auto px-3 py-2">
             {TXN_TYPES.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -226,21 +226,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             name="rawCategory"
             placeholder="대분류"
             required
-            className="min-h-9 w-auto px-2 py-1"
+            className="min-h-11 w-auto px-3 py-2"
           />
           <TextInput
             name="rawSubcategory"
             placeholder="소분류 (기본: 미분류)"
-            className="min-h-9 w-auto px-2 py-1"
+            className="min-h-11 w-auto px-3 py-2"
           />
           <span className="text-ink-muted">→</span>
           <TextInput
             name="stdCategory"
             placeholder="표준카테고리"
             required
-            className="min-h-9 w-auto px-2 py-1"
+            className="min-h-11 w-auto px-3 py-2"
           />
-          <ActionButton type="submit" className="min-h-9 px-3 py-1">
+          <ActionButton type="submit" className="min-h-11 px-4 py-2">
             추가
           </ActionButton>
         </form>
@@ -249,7 +249,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {activeTab === "rules" && <div className="space-y-6">
         <div className="seed-card p-5 sm:p-7">
           <h2 className="mb-1 text-[18px] font-extrabold text-ink">가맹점 · 적요 키워드 규칙</h2>
-          <p className="mb-3 text-[12px] text-ink-muted">내용(가맹점명·적요)에 특정 키워드가 포함된 거래를 해당 카테고리로 자동 분류합니다.</p>
+          <p className="mb-4 text-[14px] text-ink-muted">내용(가맹점명·적요)에 특정 키워드가 포함된 거래를 해당 카테고리로 자동 분류합니다.</p>
           <div className="mb-4 overflow-x-auto">
             <table className="w-full text-[14px]">
               <thead>
@@ -276,7 +276,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                       <td className="px-3 py-3">
                         <form action={deleteCategoryKeywordRuleAction}>
                           <input type="hidden" name="id" value={rule.id} />
-                          <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">삭제</ActionButton>
+                          <ActionButton type="submit" variant="ghost" className="min-h-11 px-3 py-2 text-fg-critical">삭제</ActionButton>
                         </form>
                       </td>
                     </tr>
@@ -285,32 +285,32 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </tbody>
             </table>
           </div>
-          <h3 className="mb-2 text-[12px] font-semibold text-ink-muted">새 키워드 규칙 추가</h3>
-          <form action={upsertCategoryKeywordRuleAction} className="flex flex-wrap items-center gap-2 text-[12px]">
-            <SelectInput name="txnType" required defaultValue="지출" className="min-h-9 w-auto px-2 py-1">
+          <h3 className="mb-3 text-[14px] font-bold text-ink">새 키워드 규칙 추가</h3>
+          <form action={upsertCategoryKeywordRuleAction} className="flex flex-wrap items-center gap-2 text-[14px]">
+            <SelectInput name="txnType" required defaultValue="지출" className="min-h-11 w-auto px-3 py-2">
               <option value="전체">전체</option>
               {TXN_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
             </SelectInput>
-            <TextInput name="keyword" placeholder="키워드 (예: 코스트코, 이니시스)" required className="min-h-9 w-auto px-2 py-1" />
+            <TextInput name="keyword" placeholder="키워드 (예: 코스트코, 이니시스)" required className="min-h-11 w-auto px-3 py-2" />
             <span className="text-ink-muted">→</span>
-            <SelectInput name="stdCategory" required className="min-h-9 w-auto px-2 py-1">
+            <SelectInput name="stdCategory" required className="min-h-11 w-auto px-3 py-2">
               {Object.entries(groupByKind(categoryOptions)).map(([kind, names]) => (
                 <optgroup key={kind} label={kind}>
                   {names.map((name) => <option key={name} value={name}>{name}</option>)}
                 </optgroup>
               ))}
             </SelectInput>
-            <label className="inline-flex items-center gap-1 text-[12px] text-ink-muted">
+            <label className="inline-flex items-center gap-1.5 text-[13px] text-ink-muted">
               <input type="checkbox" name="applyToExisting" value="true" defaultChecked className="size-3.5 rounded border-hairline" />
               기존 내역 일괄 반영
             </label>
-            <ActionButton type="submit" className="min-h-9 px-3 py-1">추가</ActionButton>
+            <ActionButton type="submit" className="min-h-11 px-4 py-2">추가</ActionButton>
           </form>
         </div>
 
         <div className="seed-card p-5 sm:p-7">
           <h2 className="mb-1 text-[18px] font-extrabold text-ink">결제수단 규칙</h2>
-          <p className="mb-3 text-[12px] text-ink-muted">결제수단/계좌가 정확히 일치하는 거래에 카테고리를 우선 적용합니다.</p>
+          <p className="mb-4 text-[14px] text-ink-muted">결제수단/계좌가 정확히 일치하는 거래에 카테고리를 우선 적용합니다.</p>
           <div className="mb-4 overflow-x-auto">
             <table className="w-full text-[14px]">
               <thead>
@@ -330,7 +330,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     <td className="px-3 py-3">
                       <form action={deleteCategoryRuleAction}>
                         <input type="hidden" name="id" value={rule.id} />
-                        <ActionButton type="submit" variant="ghost" className="min-h-9 px-2 py-1 text-fg-critical">삭제</ActionButton>
+                        <ActionButton type="submit" variant="ghost" className="min-h-11 px-3 py-2 text-fg-critical">삭제</ActionButton>
                       </form>
                     </td>
                   </tr>
@@ -338,21 +338,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </tbody>
             </table>
           </div>
-          <h3 className="mb-2 text-[12px] font-semibold text-ink-muted">새 결제수단 규칙 추가</h3>
-          <form action={upsertCategoryRuleAction} className="flex flex-wrap items-center gap-2 text-[12px]">
-            <SelectInput name="txnType" required defaultValue="지출" className="min-h-9 w-auto px-2 py-1">
+          <h3 className="mb-3 text-[14px] font-bold text-ink">새 결제수단 규칙 추가</h3>
+          <form action={upsertCategoryRuleAction} className="flex flex-wrap items-center gap-2 text-[14px]">
+            <SelectInput name="txnType" required defaultValue="지출" className="min-h-11 w-auto px-3 py-2">
               {TXN_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
             </SelectInput>
-            <TextInput name="paymentMethod" placeholder="결제수단/계좌" required className="min-h-9 w-auto px-2 py-1" />
+            <TextInput name="paymentMethod" placeholder="결제수단/계좌" required className="min-h-11 w-auto px-3 py-2" />
             <span className="text-ink-muted">→</span>
-            <SelectInput name="stdCategory" required className="min-h-9 w-auto px-2 py-1">
+            <SelectInput name="stdCategory" required className="min-h-11 w-auto px-3 py-2">
               {Object.entries(groupByKind(categoryOptions)).map(([kind, names]) => (
                 <optgroup key={kind} label={kind}>
                   {names.map((name) => <option key={name} value={name}>{name}</option>)}
                 </optgroup>
               ))}
             </SelectInput>
-            <ActionButton type="submit" className="min-h-9 px-3 py-1">추가</ActionButton>
+            <ActionButton type="submit" className="min-h-11 px-4 py-2">추가</ActionButton>
           </form>
         </div>
       </div>}
@@ -378,7 +378,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                       <SelectInput
                         name={`kind:${b.name}`}
                         defaultValue={b.kind}
-                        className="min-h-9 w-auto px-2 py-1"
+                        className="min-h-11 w-auto px-3 py-2"
                       >
                         {KINDS.map((k) => (
                           <option key={k} value={k}>
@@ -394,7 +394,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                         step={1000}
                         name={`budget:${b.name}`}
                         defaultValue={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : ""}
-                        className="min-h-9 w-28 px-2 py-1 text-right"
+                        className="min-h-11 w-28 px-3 py-2 text-right"
                       />
                     </td>
                     <td className="px-3 py-3">
@@ -402,7 +402,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                         variant="ghost"
                         type="submit"
                         formAction={deleteBudgetCategoryAction.bind(null, b.name)}
-                        className="min-h-9 px-2 py-1 text-fg-critical"
+                        className="min-h-11 px-3 py-2 text-fg-critical"
                       >
                         삭제
                       </ActionButton>
@@ -412,20 +412,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </tbody>
             </table>
           </div>
-          <ActionButton type="submit" className="min-h-9 px-3 py-1.5 text-[12px]">
+          <ActionButton type="submit" className="min-h-11 px-5 py-2 text-[14px]">
             전체 저장
           </ActionButton>
         </form>
 
-        <h3 className="mb-2 mt-5 text-[12px] font-semibold text-ink-muted">새 카테고리 추가</h3>
-        <form action={addBudgetCategoryAction} className="flex flex-wrap items-center gap-2 text-[12px]">
+        <h3 className="mb-3 mt-6 text-[14px] font-bold text-ink">새 카테고리 추가</h3>
+        <form action={addBudgetCategoryAction} className="flex flex-wrap items-center gap-2 text-[14px]">
           <TextInput
             name="name"
             placeholder="카테고리명"
             required
-            className="min-h-9 w-auto px-2 py-1"
+            className="min-h-11 w-auto px-3 py-2"
           />
-          <SelectInput name="kind" required className="min-h-9 w-auto px-2 py-1">
+          <SelectInput name="kind" required className="min-h-11 w-auto px-3 py-2">
             {KINDS.map((k) => (
               <option key={k} value={k}>
                 {k}
@@ -438,9 +438,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             step={1000}
             name="monthlyBudget"
             placeholder="월 예산(선택)"
-            className="min-h-9 w-32 px-2 py-1"
+            className="min-h-11 w-32 px-3 py-2"
           />
-          <ActionButton type="submit" className="min-h-9 px-3 py-1">
+          <ActionButton type="submit" className="min-h-11 px-4 py-2">
             추가
           </ActionButton>
         </form>
