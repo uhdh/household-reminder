@@ -29,7 +29,7 @@ export function BeneficiarySelect({
         name="beneficiary"
         defaultValue={value}
         onChange={() => formRef.current?.requestSubmit()}
-        className="min-h-8 rounded-r2 px-1.5 py-0.5 text-[12px] text-ink"
+        className="min-h-9 appearance-none rounded-r2 border-transparent bg-transparent [background-image:none] px-1 py-1 text-[14px] font-medium text-ink"
       >
         {OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>

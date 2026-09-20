@@ -75,7 +75,7 @@ export function CategorySelect({
           name="stdCategory"
           value={selectedVal}
           onChange={handleSelectChange}
-          className={`min-h-8 rounded-r2 px-1.5 py-0.5 text-[12px] ${
+          className={`min-h-9 appearance-none rounded-r2 border-transparent bg-bg-neutral-weak [background-image:none] px-3 py-1 text-[13px] font-bold ${
             value === "자산수정" ? "font-semibold text-fg-brand" : value ? "text-ink" : "text-gain"
           }`}
         >
