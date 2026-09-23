@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { topNWithOther } from "./finance-format";
+import {
+  formatManwon,
+  formatSignedPct,
+  isAllocationTargetSumValid,
+  sumTargetPct,
+  topNWithOther,
+} from "./finance-format";
 
 describe("topNWithOther", () => {
   test("returns entries unchanged when within the limit", () => {
@@ -68,5 +74,51 @@ describe("topNWithOther", () => {
       ["식비", 300],
       ["나머지", 150],
     ]);
+  });
+});
+
+describe("formatManwon", () => {
+  test("rounds a tiny negative amount to 0 without a minus sign", () => {
+    expect(formatManwon(-1000)).toBe("0만원");
+  });
+
+  test("keeps the minus sign for amounts that round to a nonzero value", () => {
+    expect(formatManwon(-2_880_000)).toBe("-288만원");
+  });
+
+  test("formats a positive amount", () => {
+    expect(formatManwon(2_880_000)).toBe("288만원");
+  });
+});
+
+describe("formatSignedPct", () => {
+  test("drops the sign when a tiny negative value rounds to zero", () => {
+    expect(formatSignedPct(-0.04)).toBe("0.0%");
+  });
+
+  test("keeps the minus sign for a value that rounds to a nonzero negative", () => {
+    expect(formatSignedPct(-0.4)).toBe("-0.4%");
+  });
+
+  test("adds a plus sign for positive values", () => {
+    expect(formatSignedPct(12.34)).toBe("+12.3%");
+  });
+
+  test("supports a custom suffix", () => {
+    expect(formatSignedPct(-0.02, 1, "%p")).toBe("0.0%p");
+  });
+});
+
+describe("isAllocationTargetSumValid", () => {
+  test("accepts exactly 100", () => {
+    expect(isAllocationTargetSumValid(sumTargetPct([90, 5, 5]))).toBe(true);
+  });
+
+  test("accepts small floating point drift within tolerance", () => {
+    expect(isAllocationTargetSumValid(99.95)).toBe(true);
+  });
+
+  test("rejects a sum that overshoots 100 like the reported 119.5% bug", () => {
+    expect(isAllocationTargetSumValid(sumTargetPct([90, 19.5, 7.3, 2.7]))).toBe(false);
   });
 });

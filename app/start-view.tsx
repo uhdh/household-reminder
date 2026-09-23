@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db";
 import { assetItems, budgetCategories, uploads } from "@/lib/finance-db";
 import { CATEGORY_PALETTE, formatManwon, toNumber } from "@/lib/finance-format";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
-import { flowLabel, getActiveTransactions, latestMonth, monthKeyOf, toNum } from "@/lib/spending-queries";
+import { countsInTotals, flowLabel, getActiveTransactions, latestMonth, monthKeyOf, toNum } from "@/lib/spending-queries";
 import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { AllocationCharts } from "@/app/finance/_components/charts";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
@@ -97,7 +97,7 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
   const assetSlices = chartSlices(assetTotals);
   const sectorSlices = chartSlices(sectorTotals);
 
-  const includedTx = transactions.filter((transaction) => transaction.included && (personFilter === "all" || transaction.personId === personFilter));
+  const includedTx = transactions.filter((transaction) => countsInTotals(transaction) && (personFilter === "all" || transaction.personId === personFilter));
   const month = latestMonth(includedTx);
   const monthTx = includedTx.filter((transaction) => monthKeyOf(transaction.txnDate) === month && flowLabel(transaction) === "지출");
   const monthlyExpense = monthTx.reduce((sum, transaction) => sum + Math.abs(toNum(transaction.amount)), 0);

@@ -1,7 +1,19 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
-import { flowLabel, getActiveTransactions, isPersonId, latestYear, monthOf, toNum, yearOf, type PersonId } from "@/lib/spending-queries";
+import { formatKRW } from "@/lib/finance-format";
+import {
+  countsInTotals,
+  flowLabel,
+  getActiveTransactions,
+  isPersonId,
+  latestYear,
+  monthOf,
+  toNum,
+  unmappedTransferExclusion,
+  yearOf,
+  type PersonId,
+} from "@/lib/spending-queries";
 import { PersonFilter } from "../person-filter";
 import { YearlyView } from "./yearly-view";
 import { DemoYearlySpending } from "@/app/finance/_components/demo-pages";
@@ -76,9 +88,12 @@ export default async function YearlyPage({
   }
 
   const { transactions: allTx, displayNameByPerson } = await getActiveTransactions();
-  const includedTx = allTx.filter((t) => t.included);
+  const includedTx = allTx.filter(countsInTotals);
   const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : latestYear(includedTx);
-  const yearTx = includedTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));
+  const periodTxAll = allTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));
+  const yearTx = periodTxAll.filter(countsInTotals);
+  const exclusion = unmappedTransferExclusion(periodTxAll);
+  const maxYear = Math.max(new Date().getFullYear(), latestYear(includedTx));
 
   const db = getDb();
   const budgetRows = await db.select().from(budgetCategories);
@@ -175,14 +190,29 @@ export default async function YearlyPage({
           ← {year - 1}년
         </Link>
         <span className="flex h-9 items-center rounded-r2 bg-bg-layer-default px-4 font-bold text-ink">{year}년</span>
-        <Link href={hrefForYear(year + 1)} className="flex h-9 items-center rounded-r2 px-3 text-ink-muted hover:text-ink">
-          {year + 1}년 →
-        </Link>
+        {year < maxYear ? (
+          <Link href={hrefForYear(year + 1)} className="flex h-9 items-center rounded-r2 px-3 text-ink-muted hover:text-ink">
+            {year + 1}년 →
+          </Link>
+        ) : (
+          <span aria-disabled="true" className="flex h-9 cursor-not-allowed items-center rounded-r2 px-3 text-ink-muted/40">
+            {year + 1}년 →
+          </span>
+        )}
         </div>
         <span className="text-[13px] text-ink-muted">{divisor}월까지 · 평균은 {divisor}개월 기준</span>
         </div>
         <PersonFilter pathname="/finance/spending/yearly" periodKey="year" periodValue={String(year)} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
+
+      {exclusion.count > 0 && (
+        <div className="mb-4 rounded-r3 bg-bg-warning-weak px-4 py-2.5 text-[13px] text-ink-muted">
+          분류 안 된 이체 {exclusion.count}건 · {formatKRW(exclusion.total)}은 집계에서 뺐어요 →{" "}
+          <Link href="/finance/spending/settings?tab=unmapped" className="font-semibold text-fg-brand hover:underline">
+            미분류 관리
+          </Link>
+        </div>
+      )}
 
       <YearlyView data={chartData} fixedCategories={fixedCategorySeries} variableCategories={variableCategorySeries} annualCategory={annualCategory}>
       <div className="seed-card relative overflow-x-auto shadow-none">

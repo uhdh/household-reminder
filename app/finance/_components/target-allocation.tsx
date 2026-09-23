@@ -1,4 +1,4 @@
-import { formatManwon } from "@/lib/finance-format";
+import { formatManwon, formatSignedPct, isAllocationTargetSumValid, sumTargetPct } from "@/lib/finance-format";
 import { updateAllocationTargetsAction } from "./allocation-actions";
 
 type AllocationRow = {
@@ -8,7 +8,15 @@ type AllocationRow = {
   targetPct: number;
 };
 
-function AllocationTargetRow({ row, totalAsset }: { row: AllocationRow; totalAsset: number }) {
+function AllocationTargetRow({
+  row,
+  totalAsset,
+  showRebalance,
+}: {
+  row: AllocationRow;
+  totalAsset: number;
+  showRebalance: boolean;
+}) {
   const deltaPct = row.currentPct - row.targetPct;
   const rebalanceAmount = (totalAsset * (row.targetPct - row.currentPct)) / 100;
   const barPct = Math.min(100, Math.max(0, row.currentPct));
@@ -43,12 +51,9 @@ function AllocationTargetRow({ row, totalAsset }: { row: AllocationRow; totalAss
         <div className="absolute inset-y-0 w-[2px] bg-ink" style={{ left: `${tickPct}%` }} />
       </div>
       <div className="mt-1 flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5 text-[11px] tabular-nums text-ink-muted">
-        <span>
-          {deltaPct >= 0 ? "+" : ""}
-          {deltaPct.toFixed(1)}%p
-        </span>
+        <span>{formatSignedPct(deltaPct, 1, "%p")}</span>
         <span className="text-ink">
-          {rebalanceAmount >= 0 ? "▲" : "▼"} {formatManwon(Math.abs(rebalanceAmount))}
+          {showRebalance ? `${rebalanceAmount >= 0 ? "▲" : "▼"} ${formatManwon(Math.abs(rebalanceAmount))}` : "-"}
         </span>
       </div>
     </div>
@@ -66,24 +71,32 @@ export function TargetAllocationCard({
 }) {
   if (rows.length === 0) return null;
 
+  const targetSum = sumTargetPct(rows.map((row) => row.targetPct));
+  const isValid = isAllocationTargetSumValid(targetSum);
+
   return (
     <div className="seed-card p-5 shadow-none sm:p-7">
       <div className="mb-1 flex items-center justify-between">
         <h2 className="text-[18px] font-extrabold text-ink">목표 배분 · 리밸런싱</h2>
         <span className="text-[12px] text-ink-muted">현재% / 목표%</span>
       </div>
-      <p className="mb-4 text-[13px] text-ink-muted">
+      <p className="mb-1 text-[13px] text-ink-muted">
         막대 = 현재 비중, 눈금 = 목표 비중. 목표 %를 수정하고 저장하면 리밸런싱에 필요한 금액이 계산됩니다.
+      </p>
+      <p className={`mb-4 text-[12px] font-semibold ${isValid ? "text-ink-muted" : "text-fg-critical"}`}>
+        목표 합계 {targetSum.toFixed(1)}%
+        {!isValid && " · 100%가 되도록 맞춰야 저장할 수 있어요"}
       </p>
       <form action={updateAllocationTargetsAction}>
         <input type="hidden" name="person" value={personFilter} />
         <div>
           {rows.map((row) => (
-            <AllocationTargetRow key={row.category} row={row} totalAsset={totalAsset} />
+            <AllocationTargetRow key={row.category} row={row} totalAsset={totalAsset} showRebalance={isValid} />
           ))}
         </div>
         <button
           type="submit"
+          disabled={!isValid}
           className="seed-button seed-button-primary mt-5 w-full sm:w-auto"
         >
           목표 저장

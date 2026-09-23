@@ -1,15 +1,20 @@
+import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import {
+  compareMonthlySummaries,
+  countsInTotals,
   MONTH_RE,
   flowLabel,
   getActiveTransactions,
   isPersonId,
   latestMonth,
   monthKeyOf,
+  shiftMonth,
   summarizeMonthlyTransactions,
   toNum,
   UNMAPPED_CATEGORY,
+  unmappedTransferExclusion,
   type PersonId,
 } from "@/lib/spending-queries";
 import { buildCategoryColorMap, formatCompactKRW, formatKRW, topNWithOther } from "@/lib/finance-format";
@@ -24,6 +29,18 @@ import { MonthlyNavigator } from "./monthly-navigator";
 export const dynamic = "force-dynamic";
 
 const UNMAPPED = UNMAPPED_CATEGORY;
+
+// 지출 증가·수입/저축 감소는 경고색, 반대 방향은 긍정색으로 표시한다.
+function DeltaLine({ kind, delta }: { kind: "income" | "expense" | "balance"; delta: number }) {
+  if (delta === 0) return null;
+  const increased = delta > 0;
+  const isWarning = kind === "expense" ? increased : !increased;
+  return (
+    <p className={`mt-1 px-1 text-[12px] font-semibold tabular-nums ${isWarning ? "text-fg-warning" : "text-fg-positive"}`}>
+      지난달보다 {increased ? "▲" : "▼"} {formatCompactKRW(Math.abs(delta))}
+    </p>
+  );
+}
 
 function CompositionCard({ title, items }: { title: string; items: { label: string; value: number; color: string }[] }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
@@ -67,9 +84,11 @@ export default async function MonthlyPage({
   }
 
   const { transactions: allTx, displayNameByPerson } = await getActiveTransactions();
-  const includedTx = allTx.filter((t) => t.included);
+  const includedTx = allTx.filter(countsInTotals);
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(includedTx);
-  const monthTx = includedTx.filter((t) => monthKeyOf(t.txnDate) === month && (personFilter === "all" || t.personId === personFilter));
+  const periodTxAll = allTx.filter((t) => monthKeyOf(t.txnDate) === month && (personFilter === "all" || t.personId === personFilter));
+  const monthTx = periodTxAll.filter(countsInTotals);
+  const exclusion = unmappedTransferExclusion(periodTxAll);
 
   const db = getDb();
   const budgetRows = await db.select().from(budgetCategories);
@@ -85,10 +104,19 @@ export default async function MonthlyPage({
   const summary = summarizeMonthlyTransactions(monthTx, kindOf);
   const { categoryTotals } = summary;
 
+  const prevMonth = shiftMonth(month, -1);
+  const prevMonthTx = includedTx.filter((t) => monthKeyOf(t.txnDate) === prevMonth && (personFilter === "all" || t.personId === personFilter));
+  const prevSummary = prevMonthTx.length > 0 ? summarizeMonthlyTransactions(prevMonthTx, kindOf) : null;
+  const comparison = compareMonthlySummaries(summary, prevSummary);
+
+  // 카테고리별 성격은 budgetCategories 기준으로만 판정한다(집계 때 kindOf가 쓰는
+  // 판정과 동일). "고정비"가 아니면 전부 변동비로 묶어야, 상단 지출 구성·하단
+  // 예산 목록 합계와 도넛 차트 합계가 항상 같아진다. 예산이 삭제됐거나(고아
+  // 카테고리) 수입성 카테고리에 지출이 잡힌 경우도 여기 포함된다.
   function categoryEntriesForKind(kind: "고정비" | "변동비"): [string, number][] {
     return Array.from(categoryTotals.entries()).filter(([name, value]) => {
       if (value <= 0) return false;
-      const categoryKind = name === UNMAPPED ? "변동비" : budgetByName.get(name)?.kind;
+      const categoryKind = budgetByName.get(name)?.kind === "고정비" ? "고정비" : "변동비";
       return categoryKind === kind;
     });
   }
@@ -132,16 +160,42 @@ export default async function MonthlyPage({
         <PersonFilter pathname="/finance/spending/monthly" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
+      {exclusion.count > 0 && (
+        <div className="mb-4 rounded-r3 bg-bg-warning-weak px-4 py-2.5 text-[13px] text-ink-muted">
+          분류 안 된 이체 {exclusion.count}건 · {formatKRW(exclusion.total)}은 집계에서 뺐어요 →{" "}
+          <Link href="/finance/spending/settings?tab=unmapped" className="font-semibold text-fg-brand hover:underline">
+            미분류 관리
+          </Link>
+        </div>
+      )}
+
       <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <SummaryCard label="총수입" value={summary.totalIncome} format="compactKrw" />
-        <SummaryCard label="총지출" value={summary.totalExpense} format="compactKrw" />
-        <SummaryCard label="당월 저축" value={summary.balance} format="compactKrw" />
+        <div>
+          <SummaryCard label="총수입" value={summary.totalIncome} format="compactKrw" />
+          {comparison && <DeltaLine kind="income" delta={comparison.totalIncomeDelta} />}
+        </div>
+        <div>
+          <SummaryCard label="총지출" value={summary.totalExpense} format="compactKrw" />
+          {comparison && <DeltaLine kind="expense" delta={comparison.totalExpenseDelta} />}
+        </div>
+        <div>
+          <SummaryCard label="당월 저축" value={summary.balance} format="compactKrw" />
+          {comparison && <DeltaLine kind="balance" delta={comparison.balanceDelta} />}
+        </div>
         <SummaryCard
           label="저축률"
           value={summary.savingsRate}
           format="signedPct"
         />
       </div>
+
+      {comparison && comparison.totalExpenseDelta !== 0 && (
+        <p className="mb-4 text-[13px] text-ink-muted">
+          지난달보다 지출이 {formatCompactKRW(Math.abs(comparison.totalExpenseDelta))} {comparison.totalExpenseDelta > 0 ? "늘었어요" : "줄었어요"}.
+          {comparison.topIncreaseCategory &&
+            ` 가장 많이 늘어난 건 ${comparison.topIncreaseCategory.name}(+${formatCompactKRW(comparison.topIncreaseCategory.delta)})`}
+        </p>
+      )}
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <CompositionCard

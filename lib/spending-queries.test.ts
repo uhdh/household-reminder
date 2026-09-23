@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { flowLabel, summarizeMonthlyTransactions, type Txn } from "./spending-queries";
+import { compareMonthlySummaries, countsInTotals, flowLabel, summarizeMonthlyTransactions, unmappedTransferExclusion, type Txn } from "./spending-queries";
 
 function makeTxn(overrides: Partial<Txn>): Txn {
   return {
@@ -91,5 +91,66 @@ describe("summarizeMonthlyTransactions", () => {
     const summary = summarizeMonthlyTransactions(tx, kindOf);
 
     expect(summary.categoryTotals.get("미분류")).toBe(10000);
+  });
+});
+
+describe("countsInTotals", () => {
+  test("excludes included 이체 transactions with no std category (대부분 내 계좌 간 이동)", () => {
+    expect(countsInTotals(makeTxn({ txnType: "이체", stdCategory: null, included: true }))).toBe(false);
+  });
+
+  test("includes an 이체 once it has been mapped to a std category", () => {
+    expect(countsInTotals(makeTxn({ txnType: "이체", stdCategory: "현금", included: true }))).toBe(true);
+  });
+
+  test("respects included=false regardless of txnType", () => {
+    expect(countsInTotals(makeTxn({ txnType: "지출", stdCategory: "식비", included: false }))).toBe(false);
+  });
+
+  test("includes normal 수입/지출 transactions", () => {
+    expect(countsInTotals(makeTxn({ txnType: "지출", stdCategory: "식비", included: true }))).toBe(true);
+  });
+});
+
+describe("unmappedTransferExclusion", () => {
+  test("sums count/amount of excluded unmapped transfers only", () => {
+    const rows = [
+      makeTxn({ txnType: "이체", stdCategory: null, included: true, amount: "-500000" }),
+      makeTxn({ txnType: "이체", stdCategory: null, included: true, amount: "300000" }),
+      makeTxn({ txnType: "지출", stdCategory: "식비", included: true, amount: "-10000" }),
+    ];
+    expect(unmappedTransferExclusion(rows)).toEqual({ count: 2, total: 800000 });
+  });
+});
+
+describe("compareMonthlySummaries", () => {
+  test("returns null when there is no previous month data", () => {
+    const current = summarizeMonthlyTransactions([makeTxn({ txnType: "지출", stdCategory: "식비", amount: "-10000" })], kindOf);
+    expect(compareMonthlySummaries(current, null)).toBeNull();
+  });
+
+  test("computes deltas and the category with the biggest increase", () => {
+    const previous = summarizeMonthlyTransactions(
+      [
+        makeTxn({ txnType: "수입", stdCategory: "월급", amount: "3000000" }),
+        makeTxn({ txnType: "지출", stdCategory: "식비", amount: "-100000" }),
+      ],
+      kindOf
+    );
+    const current = summarizeMonthlyTransactions(
+      [
+        makeTxn({ txnType: "수입", stdCategory: "월급", amount: "3000000" }),
+        makeTxn({ txnType: "지출", stdCategory: "식비", amount: "-180000" }),
+        makeTxn({ txnType: "지출", stdCategory: "월세", amount: "-1000000" }),
+      ],
+      kindOf
+    );
+
+    const comparison = compareMonthlySummaries(current, previous);
+
+    expect(comparison).not.toBeNull();
+    expect(comparison!.totalIncomeDelta).toBe(0);
+    expect(comparison!.totalExpenseDelta).toBe(1080000);
+    expect(comparison!.topIncreaseCategory).toEqual({ name: "월세", delta: 1000000 });
   });
 });

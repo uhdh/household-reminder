@@ -1,7 +1,7 @@
 "use client";
 
 import { ResponsiveContainer, Treemap } from "recharts";
-import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL, isLightColor } from "@/lib/finance-format";
+import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL, formatSignedPct, isLightColor } from "@/lib/finance-format";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 
 type CategoryDatum = { name: string; value: number; fill: string };
@@ -58,10 +58,7 @@ function HeatmapCell(props: unknown) {
   const padding = 8;
   const clipId = `heatmap-cell-clip-${index}`;
   const label = truncateToWidth(name, width - padding * 2);
-  const returnLabel =
-    returnPct === null || returnPct === undefined
-      ? ""
-      : `${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(1)}%`;
+  const returnLabel = returnPct === null || returnPct === undefined ? "" : formatSignedPct(returnPct);
   const shareLabel = `${sharePct.toFixed(0)}%`;
   const showLabel = width > 32 && height > 18 && label.length > 0;
   const showValue = showLabel && height > 30 && width > 35;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatCompactKRW, formatKRW, formatManwon } from "@/lib/finance-format";
+import { formatCompactKRW, formatKRW, formatManwon, formatSignedPct } from "@/lib/finance-format";
 
 type NumberFormat = "krw" | "compactKrw" | "manwon" | "signedKrw" | "signedManwon" | "signedPct";
 
@@ -16,7 +16,7 @@ function formatValue(n: number, format: NumberFormat): string {
     case "signedKrw":
       return `${n >= 0 ? "+" : ""}${formatKRW(n)}`;
     case "signedPct":
-      return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+      return formatSignedPct(n);
     default:
       return formatKRW(n);
   }

@@ -115,8 +115,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <div className="seed-card bg-bg-critical-weak p-5 shadow-none sm:p-7">
           <h2 className="mb-1 text-[18px] font-extrabold text-fg-critical">매핑되지 않은 카테고리 ({unmapped.length}건)</h2>
           <p className="mb-4 text-[14px] text-ink-muted">
-            실제 수입/지출 집계에 반영되는 거래만 모았고, 금액이 큰 순서로 정렬했습니다. 목록에서 카테고리를
-            고르고 저장하면 되고, 잘 모르겠으면 일단 &quot;기타&quot;로 두었다가 나중에 바꿔도 됩니다.
+            금액이 큰 순서로 정렬했습니다. 목록에서 카테고리를 고르고 저장하면 되고, 잘 모르겠으면 일단
+            &quot;기타&quot;로 두었다가 나중에 바꿔도 됩니다. 분류되지 않은 이체는 카테고리를 지정하기 전까지
+            월별·연간 집계에서 빠져요.
           </p>
           <div className="space-y-2">
             {unmapped.map((u) => {

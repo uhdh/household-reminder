@@ -13,7 +13,30 @@ export function formatCompactKRW(amount: number): string {
 }
 
 export function formatManwon(amount: number): string {
-  return `${Math.round(amount / 10_000).toLocaleString("ko-KR")}만원`;
+  const rounded = Math.round(amount / 10_000) || 0; // `|| 0` turns -0 (from e.g. -1000원) into 0, avoiding "-0만원"
+  return `${rounded.toLocaleString("ko-KR")}만원`;
+}
+
+function trimNegativeZero(fixed: string): string {
+  return fixed.replace(/^-(0(\.0+)?)$/, "$1");
+}
+
+/** 부호 있는 퍼센트 포맷. 반올림 결과가 0이면 부호 없이 "0.0%"를 반환한다(예: -0.04% → "0.0%"). */
+export function formatSignedPct(value: number, digits = 1, suffix = "%"): string {
+  const raw = value.toFixed(digits);
+  const trimmed = trimNegativeZero(raw);
+  return `${Number(trimmed) > 0 ? "+" : ""}${trimmed}${suffix}`;
+}
+
+export const ALLOCATION_TARGET_TOTAL_PCT = 100;
+export const ALLOCATION_TARGET_TOLERANCE_PCT = 0.1;
+
+export function sumTargetPct(values: number[]): number {
+  return values.reduce((sum, v) => sum + v, 0);
+}
+
+export function isAllocationTargetSumValid(sum: number): boolean {
+  return Math.abs(sum - ALLOCATION_TARGET_TOTAL_PCT) <= ALLOCATION_TARGET_TOLERANCE_PCT;
 }
 
 export const CATEGORY_PALETTE = [

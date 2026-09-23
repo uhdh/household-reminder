@@ -103,6 +103,26 @@ export function flowLabel(txn: { txnType: string; category: string | null; amoun
   return "지출";
 }
 
+/**
+ * 실제 수입/지출 "집계"에 넣을지 여부. included=true라도 뱅크샐러드 이체 거래 중
+ * 원본 대분류가 없어 표준카테고리를 못 정한 건(대부분 내 계좌 간 이동)은 미분류
+ * 관리에서 카테고리를 지정하기 전까지 합계에서 뺀다. 월별·연간·홈 등 "합계"를
+ * 내는 곳은 모두 이 함수를 거쳐야 한다. 세부 내역 목록처럼 개별 거래를 그대로
+ * 보여주는 화면(포함 여부만 표시)은 대상이 아니다.
+ */
+export function countsInTotals(t: { included: boolean; txnType: string; stdCategory: string | null }): boolean {
+  return t.included && !(t.txnType === "이체" && !t.stdCategory);
+}
+
+/** 집계에서 빠진(included=true지만 미분류 이체인) 거래의 건수·합계. 월별·연간 화면 상단 안내에 쓴다. */
+export function unmappedTransferExclusion(rows: { included: boolean; txnType: string; stdCategory: string | null; amount: string | number }[]): {
+  count: number;
+  total: number;
+} {
+  const excluded = rows.filter((t) => t.included && !countsInTotals(t));
+  return { count: excluded.length, total: excluded.reduce((sum, t) => sum + Math.abs(toNum(t.amount)), 0) };
+}
+
 export type PersonSplit = Record<PersonId, number>;
 
 function emptySplit(): PersonSplit {
@@ -233,5 +253,33 @@ export function summarizeMonthlyTransactions(
     categoryTotals,
     categoryByPerson,
     categoryByBeneficiary,
+  };
+}
+
+export interface MonthlyComparison {
+  totalIncomeDelta: number;
+  totalExpenseDelta: number;
+  balanceDelta: number;
+  /** 지난달보다 가장 많이 늘어난 지출 카테고리 (늘어난 카테고리가 없으면 null) */
+  topIncreaseCategory: { name: string; delta: number } | null;
+}
+
+/** 이번 달 요약을 전월 요약과 비교한다. 전월에 거래가 없으면(prev=null) 비교하지 않는다. */
+export function compareMonthlySummaries(current: MonthlySummary, previous: MonthlySummary | null): MonthlyComparison | null {
+  if (!previous) return null;
+
+  let topIncreaseCategory: { name: string; delta: number } | null = null;
+  for (const [name, value] of current.categoryTotals) {
+    const delta = value - (previous.categoryTotals.get(name) ?? 0);
+    if (delta > 0 && (!topIncreaseCategory || delta > topIncreaseCategory.delta)) {
+      topIncreaseCategory = { name, delta };
+    }
+  }
+
+  return {
+    totalIncomeDelta: current.totalIncome - previous.totalIncome,
+    totalExpenseDelta: current.totalExpense - previous.totalExpense,
+    balanceDelta: current.balance - previous.balance,
+    topIncreaseCategory,
   };
 }

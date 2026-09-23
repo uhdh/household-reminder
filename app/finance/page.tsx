@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { allocationTargets, assetItems, uploads } from "@/lib/finance-db";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
-import { buildCategoryColorMap, formatManwon, heatmapReturnColor, toNumber } from "@/lib/finance-format";
+import { buildCategoryColorMap, formatManwon, formatSignedPct, heatmapReturnColor, toNumber } from "@/lib/finance-format";
 import { AnimatedNumber } from "./_components/animated-number";
 import { SummaryCard } from "./_components/summary-card";
 import { DashboardCharts } from "./_components/charts";
@@ -164,10 +164,11 @@ export default async function DashboardPage({
       treemapAggregatedTotals.set(cat, (treemapAggregatedTotals.get(cat) ?? 0) + amt);
     } else {
       const costBasis = item.costBasis !== null ? toNumber(item.costBasis) : null;
-      const key = item.productName || item.category;
+      const rawName = item.productName || item.category;
+      const key = normalizeInvestmentProductName(rawName);
       const existing = treemapByProduct.get(key);
       treemapByProduct.set(key, {
-        name: key,
+        name: existing?.name ?? rawName,
         value: (existing?.value ?? 0) + amt,
         costBasis:
           existing?.costBasis !== null && existing?.costBasis !== undefined && costBasis !== null
@@ -487,10 +488,7 @@ function InvestmentPnlCard({
                   </GainText>
                 </td>
                 <td className="py-2 pl-3 text-right font-semibold tabular-nums">
-                  <GainText amount={i.gainPct}>
-                    {i.gainPct >= 0 ? "+" : ""}
-                    {i.gainPct.toFixed(1)}%
-                  </GainText>
+                  <GainText amount={i.gainPct}>{formatSignedPct(i.gainPct)}</GainText>
                 </td>
               </tr>
             ))}
