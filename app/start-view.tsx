@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import { assetItems, budgetCategories, uploads } from "@/lib/finance-db";
 import { CATEGORY_PALETTE, formatManwon, toNumber } from "@/lib/finance-format";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
+import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 import { countsInTotals, flowLabel, getActiveTransactions, latestMonth, monthKeyOf, toNum } from "@/lib/spending-queries";
 import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { AllocationCharts } from "@/app/finance/_components/charts";
@@ -63,11 +64,15 @@ function CompositionCard({ title, items }: { title: string; items: { label: stri
 
 export async function StartView({ showHomeLink = false, personFilter = "all" }: { showHomeLink?: boolean; personFilter?: "all" | "husband" | "wife" }) {
   const db = getDb();
-  const [activeUploads, { transactions }, budgetRows] = await Promise.all([
-    db.select().from(uploads).where(eq(uploads.isActive, true)),
-    getActiveTransactions(),
-    db.select().from(budgetCategories),
-  ]);
+  // 로그인하지 않은 방문자에게는 실제 가계부 데이터를 조회하지 않는다(빈 미리보기).
+  const demo = await isFinanceDemoMode();
+  const [activeUploads, { transactions }, budgetRows] = demo
+    ? [[], { transactions: [] }, []]
+    : await Promise.all([
+        db.select().from(uploads).where(eq(uploads.isActive, true)),
+        getActiveTransactions(),
+        db.select().from(budgetCategories),
+      ]);
   const activeUploadIds = activeUploads.map((upload) => upload.id);
   const rawAssets = activeUploadIds.length
     ? await db.select().from(assetItems).where(inArray(assetItems.uploadId, activeUploadIds))
