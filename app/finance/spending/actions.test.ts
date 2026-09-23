@@ -5,8 +5,10 @@ import { setDbForTesting } from "@/lib/db";
 import { transactions } from "@/lib/finance-db";
 import { deleteTransactionsAction } from "./actions";
 
+const HOUSEHOLD_ID = vi.hoisted(() => "00000000-0000-4000-8000-000000000099");
+
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
-vi.mock("@/lib/require-finance-user", () => ({ requireFinanceUser: vi.fn().mockResolvedValue({ email: "test@example.com" }) }));
+vi.mock("@/lib/require-household", () => ({ requireHousehold: vi.fn().mockResolvedValue({ userId: "test-user", householdId: HOUSEHOLD_ID, role: "owner", email: "test@example.com" }) }));
 
 describe("deleteTransactionsAction", () => {
   afterEach(() => setDbForTesting(null));
@@ -16,7 +18,7 @@ describe("deleteTransactionsAction", () => {
     setDbForTesting(db);
     await db.execute(sql`
       CREATE TABLE transactions (
-        id uuid PRIMARY KEY, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
+        id uuid PRIMARY KEY, household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
         txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
         amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL,
         is_internal_transfer boolean NOT NULL, beneficiary text NOT NULL
@@ -24,6 +26,7 @@ describe("deleteTransactionsAction", () => {
     `);
     const rows = ["00000000-0000-4000-8000-000000000011", "00000000-0000-4000-8000-000000000012"].map((id) => ({
       id,
+      householdId: HOUSEHOLD_ID,
       uploadId: "00000000-0000-0000-0000-000000000001",
       personId: "wife",
       txnDate: "2026-08-01",
@@ -49,15 +52,17 @@ describe("deleteTransactionsAction", () => {
     await db.execute(sql`
       CREATE TABLE category_keyword_rules (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        household_id uuid NOT NULL,
         txn_type text NOT NULL,
-        keyword text NOT NULL UNIQUE,
+        keyword text NOT NULL,
         std_category text NOT NULL,
-        created_at timestamp with time zone NOT NULL DEFAULT now()
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        UNIQUE (household_id, keyword)
       )
     `);
     await db.execute(sql`
       CREATE TABLE transactions (
-        id uuid PRIMARY KEY, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
+        id uuid PRIMARY KEY, household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
         txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
         amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL,
         is_internal_transfer boolean NOT NULL, beneficiary text NOT NULL
@@ -70,6 +75,7 @@ describe("deleteTransactionsAction", () => {
     const rows = [
       {
         id: "00000000-0000-4000-8000-000000000021",
+        householdId: HOUSEHOLD_ID,
         uploadId: "00000000-0000-0000-0000-000000000001",
         personId: "husband",
         txnDate: "2026-08-21",
@@ -85,6 +91,7 @@ describe("deleteTransactionsAction", () => {
       },
       {
         id: "00000000-0000-4000-8000-000000000022",
+        householdId: HOUSEHOLD_ID,
         uploadId: "00000000-0000-0000-0000-000000000001",
         personId: "husband",
         txnDate: "2026-07-21",
@@ -100,6 +107,7 @@ describe("deleteTransactionsAction", () => {
       },
       {
         id: "00000000-0000-4000-8000-000000000023",
+        householdId: HOUSEHOLD_ID,
         uploadId: "00000000-0000-0000-0000-000000000001",
         personId: "husband",
         txnDate: "2026-08-10",
@@ -117,6 +125,7 @@ describe("deleteTransactionsAction", () => {
         // 설명에 "코스트코"가 포함돼 ILIKE라면 잘못 걸렸을 거래. applyTxnId 목록에 없으므로
         // 정확 일치 방식에서는 건드리지 않아야 한다.
         id: "00000000-0000-4000-8000-000000000024",
+        householdId: HOUSEHOLD_ID,
         uploadId: "00000000-0000-0000-0000-000000000001",
         personId: "husband",
         txnDate: "2026-08-15",

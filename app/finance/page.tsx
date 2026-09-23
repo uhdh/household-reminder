@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { allocationTargets, assetItems, uploads } from "@/lib/finance-db";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
@@ -13,6 +13,7 @@ import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-u
 import { AppShell } from "@/components/ui";
 import { DemoFinanceDashboard } from "./_components/demo-pages";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
+import { requireHousehold } from "@/lib/require-household";
 
 export const dynamic = "force-dynamic";
 
@@ -67,11 +68,12 @@ export default async function DashboardPage({
     return <DemoFinanceDashboard personFilter={personFilter} />;
   }
 
+  const { householdId } = await requireHousehold();
   const db = getDb();
 
   const [activeUploads, allocationTargetRows] = await Promise.all([
-    db.select().from(uploads).where(eq(uploads.isActive, true)),
-    db.select().from(allocationTargets),
+    db.select().from(uploads).where(and(eq(uploads.householdId, householdId), eq(uploads.isActive, true))),
+    db.select().from(allocationTargets).where(eq(allocationTargets.householdId, householdId)),
   ]);
 
   if (activeUploads.length === 0) {
@@ -87,7 +89,7 @@ export default async function DashboardPage({
   const displayNameByPerson = new Map<string, string>(PERSON_IDS.map((id) => [id, PERSON_LABELS[id]]));
 
   const rawAssets = activeUploadIds.length
-    ? await db.select().from(assetItems).where(inArray(assetItems.uploadId, activeUploadIds))
+    ? await db.select().from(assetItems).where(and(eq(assetItems.householdId, householdId), inArray(assetItems.uploadId, activeUploadIds)))
     : [];
 
   const assets = rawAssets.filter((item) => !isExcludedItem(item));

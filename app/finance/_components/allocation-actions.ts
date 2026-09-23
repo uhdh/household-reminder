@@ -4,12 +4,12 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { allocationTargets } from "@/lib/finance-db";
 import { isAllocationTargetSumValid, sumTargetPct } from "@/lib/finance-format";
-import { requireFinanceUser } from "@/lib/require-finance-user";
+import { requireHousehold } from "@/lib/require-household";
 
 const TARGET_FIELD_PREFIX = "target:";
 
 export async function updateAllocationTargetsAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const db = getDb();
   const person = String(formData.get("person") ?? "all");
   const destination = person === "all" ? "/finance" : `/finance?person=${person}`;
@@ -32,9 +32,9 @@ export async function updateAllocationTargetsAction(formData: FormData) {
   for (const { category, targetPct: clamped } of entries) {
     await db
       .insert(allocationTargets)
-      .values({ category, targetPct: clamped.toString() })
+      .values({ householdId, category, targetPct: clamped.toString() })
       .onConflictDoUpdate({
-        target: allocationTargets.category,
+        target: [allocationTargets.householdId, allocationTargets.category],
         set: { targetPct: clamped.toString(), updatedAt: new Date() },
       });
   }

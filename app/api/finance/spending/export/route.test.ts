@@ -7,12 +7,14 @@ import { setDbForTesting } from "@/lib/db";
 import { transactions, uploads } from "@/lib/finance-db";
 import { GET } from "./route";
 
+const HOUSEHOLD_ID = "00000000-0000-4000-8000-000000000099";
+
 vi.mock("@/lib/finance-viewer-server", () => ({
   isFinanceDemoMode: vi.fn().mockResolvedValue(false),
 }));
-vi.mock("@/lib/require-finance-user", () => ({
-  requireFinanceUser: vi.fn().mockResolvedValue({ email: "test@example.com" }),
-  FinanceAuthError: class FinanceAuthError extends Error {},
+vi.mock("@/lib/require-household", () => ({
+  requireHousehold: vi.fn().mockResolvedValue({ userId: "test-user", householdId: "00000000-0000-4000-8000-000000000099", role: "owner", email: "test@example.com" }),
+  NoHouseholdError: class NoHouseholdError extends Error {},
 }));
 
 describe("Spending Export API Route", () => {
@@ -26,14 +28,14 @@ describe("Spending Export API Route", () => {
 
     await db.execute(sql`
       CREATE TABLE uploads (
-        id uuid PRIMARY KEY, person_id text NOT NULL, source_filename text NOT NULL,
+        id uuid PRIMARY KEY, household_id uuid NOT NULL, person_id text NOT NULL, source_filename text NOT NULL,
         period_start date, period_end date, is_active boolean NOT NULL DEFAULT true,
         uploaded_at timestamp with time zone NOT NULL DEFAULT now()
       )
     `);
     await db.execute(sql`
       CREATE TABLE transactions (
-        id uuid PRIMARY KEY, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
+        id uuid PRIMARY KEY, household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
         txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
         amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL,
         is_internal_transfer boolean NOT NULL, beneficiary text NOT NULL
@@ -43,6 +45,7 @@ describe("Spending Export API Route", () => {
     const uploadId = "00000000-0000-0000-0000-000000000001";
     await db.insert(uploads).values({
       id: uploadId,
+      householdId: HOUSEHOLD_ID,
       personId: "husband",
       sourceFilename: "test.xlsx",
       isActive: true,
@@ -51,6 +54,7 @@ describe("Spending Export API Route", () => {
     await db.insert(transactions).values([
       {
         id: "00000000-0000-0000-0000-000000000011",
+        householdId: HOUSEHOLD_ID,
         uploadId,
         personId: "husband",
         txnDate: "2026-08-20",
@@ -68,6 +72,7 @@ describe("Spending Export API Route", () => {
       },
       {
         id: "00000000-0000-0000-0000-000000000012",
+        householdId: HOUSEHOLD_ID,
         uploadId,
         personId: "husband",
         txnDate: "2026-07-15",

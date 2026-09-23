@@ -10,14 +10,52 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+// 여러 가구(가족) 지원: docs/superpowers/specs/2026-09-24-multi-household-design.md 참고.
+export const households = pgTable("households", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(), // 소문자로 저장
+  name: text("name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const householdMembers = pgTable(
+  "household_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull().references(() => households.id),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    role: text("role").notNull(), // 'owner' | 'member'
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.householdId, table.userId)]
+);
+
+export const householdInvites = pgTable("household_invites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  householdId: uuid("household_id").notNull().references(() => households.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  usedBy: uuid("used_by").references(() => users.id),
+});
+
 export const people = pgTable("people", {
-  id: text("id").primaryKey(), // 'husband' | 'wife'
+  id: text("id").primaryKey(), // 'husband' | 'wife'(기존 가구), 새 가구는 uuid 문자열
+  householdId: uuid("household_id").notNull().references(() => households.id),
   displayName: text("display_name").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const uploads = pgTable("uploads", {
   id: uuid("id").primaryKey().defaultRandom(),
+  householdId: uuid("household_id").notNull().references(() => households.id),
   personId: text("person_id").notNull().references(() => people.id),
   sourceFilename: text("source_filename").notNull(),
   periodStart: date("period_start"),
@@ -28,6 +66,7 @@ export const uploads = pgTable("uploads", {
 
 export const assetItems = pgTable("asset_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  householdId: uuid("household_id").notNull().references(() => households.id),
   uploadId: uuid("upload_id").notNull().references(() => uploads.id, { onDelete: "cascade" }),
   personId: text("person_id").notNull().references(() => people.id),
   side: text("side").notNull(), // 'asset' | 'debt'
@@ -42,15 +81,21 @@ export const assetItems = pgTable("asset_items", {
 
 // 자산 카테고리별 목표 배분 비중(%). 사용자가 대시보드에서 직접 설정하며,
 // 뱅크샐러드 데이터와 무관하게 수기로 관리한다.
-export const allocationTargets = pgTable("allocation_targets", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  category: text("category").notNull().unique(),
-  targetPct: numeric("target_pct", { precision: 5, scale: 2 }).notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const allocationTargets = pgTable(
+  "allocation_targets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull().references(() => households.id),
+    category: text("category").notNull(),
+    targetPct: numeric("target_pct", { precision: 5, scale: 2 }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.householdId, table.category)]
+);
 
 export const transactions = pgTable("transactions", {
   id: uuid("id").primaryKey().defaultRandom(),
+  householdId: uuid("household_id").notNull().references(() => households.id),
   uploadId: uuid("upload_id").notNull().references(() => uploads.id, { onDelete: "cascade" }),
   personId: text("person_id").notNull().references(() => people.id),
   txnDate: date("txn_date").notNull(),
@@ -73,41 +118,50 @@ export const categoryMappings = pgTable(
   "category_mappings",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull().references(() => households.id),
     txnType: text("txn_type").notNull(), // '수입' | '지출' | '이체'
     rawCategory: text("raw_category").notNull(),
     rawSubcategory: text("raw_subcategory").notNull(),
     stdCategory: text("std_category").notNull(),
   },
-  (table) => [unique().on(table.txnType, table.rawCategory, table.rawSubcategory)]
+  (table) => [unique().on(table.householdId, table.txnType, table.rawCategory, table.rawSubcategory)]
 );
 
 export const categoryRules = pgTable(
   "category_rules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull().references(() => households.id),
     txnType: text("txn_type").notNull(),
     paymentMethod: text("payment_method").notNull(),
     stdCategory: text("std_category").notNull(),
   },
-  (table) => [unique().on(table.txnType, table.paymentMethod)]
+  (table) => [unique().on(table.householdId, table.txnType, table.paymentMethod)]
 );
 
 export const categoryKeywordRules = pgTable(
   "category_keyword_rules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull().references(() => households.id),
     txnType: text("txn_type").notNull(), // '수입' | '지출' | '이체' | '전체'
-    keyword: text("keyword").notNull().unique(),
+    keyword: text("keyword").notNull(),
     stdCategory: text("std_category").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  }
+  },
+  (table) => [unique().on(table.householdId, table.keyword)]
 );
 
 // 표준카테고리별 성격(고정비/변동비/고정수입/변동수입)과 월 예산 목표. 수기로 관리한다.
-export const budgetCategories = pgTable("budget_categories", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(),
-  kind: text("kind").notNull(), // '고정비' | '변동비' | '고정수입' | '변동수입'
-  sortOrder: numeric("sort_order", { precision: 6, scale: 0 }).notNull().default("0"),
-  monthlyBudget: numeric("monthly_budget", { precision: 18, scale: 2 }),
-});
+export const budgetCategories = pgTable(
+  "budget_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull().references(() => households.id),
+    name: text("name").notNull(),
+    kind: text("kind").notNull(), // '고정비' | '변동비' | '고정수입' | '변동수입'
+    sortOrder: numeric("sort_order", { precision: 6, scale: 0 }).notNull().default("0"),
+    monthlyBudget: numeric("monthly_budget", { precision: 18, scale: 2 }),
+  },
+  (table) => [unique().on(table.householdId, table.name)]
+);

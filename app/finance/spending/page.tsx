@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
+import { requireHousehold } from "@/lib/require-household";
 import {
   MONTH_RE,
   PERSON_LABELS,
@@ -74,10 +76,11 @@ export default async function SpendingPage({
     return <DemoTransactionList personFilter={personFilter} />;
   }
 
+  const { householdId } = await requireHousehold();
   const db = getDb();
   const [{ transactions: allTx, displayNameByPerson }, budgetRows] = await Promise.all([
-    getActiveTransactions(),
-    db.select().from(budgetCategories),
+    getActiveTransactions(householdId),
+    db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
   ]);
   const categoryOptions = [...budgetRows]
     .sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder))

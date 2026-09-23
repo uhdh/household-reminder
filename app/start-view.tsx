@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { IconArrowUpBracketDownLine, IconLinechartUpXaxisLine, IconPerson2Line } from "@karrotmarket/react-monochrome-icon";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { AppShell, Card } from "@/components/ui";
 import { getDb } from "@/lib/db";
 import { assetItems, budgetCategories, uploads } from "@/lib/finance-db";
@@ -12,6 +12,7 @@ import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { AllocationCharts } from "@/app/finance/_components/charts";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 import { BrandHero } from "@/app/brand-hero";
+import { requireHousehold } from "@/lib/require-household";
 
 const benefits = [
   { Icon: IconArrowUpBracketDownLine, title: "한 번만 올리면", description: "정리는 자동" },
@@ -63,19 +64,29 @@ function CompositionCard({ title, items }: { title: string; items: { label: stri
 }
 
 export async function StartView({ showHomeLink = false, personFilter = "all" }: { showHomeLink?: boolean; personFilter?: "all" | "husband" | "wife" }) {
-  const db = getDb();
-  // 로그인하지 않은 방문자에게는 실제 가계부 데이터를 조회하지 않는다(빈 미리보기).
+  // "/"는 로그인 없이도 열리는 공개 페이지라 가구를 알 수 없다. 데모 모드거나(비로그인) 소속 가구가
+  // 없으면 실데이터를 절대 쿼리하지 않고 빈 미리보기 상태로 내려간다(타 가구 데이터 노출 방지).
   const demo = await isFinanceDemoMode();
-  const [activeUploads, { transactions }, budgetRows] = demo
-    ? [[], { transactions: [] }, []]
-    : await Promise.all([
-        db.select().from(uploads).where(eq(uploads.isActive, true)),
-        getActiveTransactions(),
-        db.select().from(budgetCategories),
-      ]);
+  let householdId: string | null = null;
+  if (!demo) {
+    try {
+      householdId = (await requireHousehold()).householdId;
+    } catch {
+      householdId = null;
+    }
+  }
+
+  const db = getDb();
+  const [activeUploads, { transactions }, budgetRows] = householdId
+    ? await Promise.all([
+        db.select().from(uploads).where(and(eq(uploads.householdId, householdId), eq(uploads.isActive, true))),
+        getActiveTransactions(householdId),
+        db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
+      ])
+    : [[] as (typeof uploads.$inferSelect)[], { transactions: [] as import("@/lib/spending-queries").Txn[] }, [] as (typeof budgetCategories.$inferSelect)[]];
   const activeUploadIds = activeUploads.map((upload) => upload.id);
-  const rawAssets = activeUploadIds.length
-    ? await db.select().from(assetItems).where(inArray(assetItems.uploadId, activeUploadIds))
+  const rawAssets = householdId && activeUploadIds.length
+    ? await db.select().from(assetItems).where(and(eq(assetItems.householdId, householdId), inArray(assetItems.uploadId, activeUploadIds)))
     : [];
   const allAssets = rawAssets.filter((item) =>
     item.side === "asset"

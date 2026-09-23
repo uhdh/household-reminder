@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { transactions, uploads } from "@/lib/finance-db";
 
@@ -22,13 +23,16 @@ export function isBeneficiary(value: string | undefined | null): value is Benefi
 export type Txn = typeof transactions.$inferSelect;
 
 /** 모든 업로드에서 누적된 거래 전체를 가져온다. 자산만 최신 업로드 스냅샷을 사용한다. */
-export async function getActiveTransactions(): Promise<{
+export async function getActiveTransactions(householdId: string): Promise<{
   transactions: Txn[];
   displayNameByPerson: Map<string, string>;
 }> {
   const db = getDb();
   const displayNameByPerson = new Map<string, string>(PERSON_IDS.map((id) => [id, PERSON_LABELS[id]]));
-  const [rows, uploadRows] = await Promise.all([db.select().from(transactions), db.select().from(uploads)]);
+  const [rows, uploadRows] = await Promise.all([
+    db.select().from(transactions).where(eq(transactions.householdId, householdId)),
+    db.select().from(uploads).where(eq(uploads.householdId, householdId)),
+  ]);
   const uploadById = new Map(uploadRows.map((upload) => [upload.id, upload]));
   const latestUploadByDate = new Map<string, string>();
 

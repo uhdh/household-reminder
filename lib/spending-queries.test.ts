@@ -4,6 +4,7 @@ import { compareMonthlySummaries, countsInTotals, flowLabel, summarizeMonthlyTra
 function makeTxn(overrides: Partial<Txn>): Txn {
   return {
     id: "txn-1",
+    householdId: "household-1",
     uploadId: "upload-1",
     personId: "husband",
     txnDate: "2026-07-01",

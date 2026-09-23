@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
 import { getActiveTransactions, toNum } from "@/lib/spending-queries";
+import { requireHousehold } from "@/lib/require-household";
 import { ActionButton, SelectInput, TextInput } from "@/components/ui";
 import {
   addBudgetCategoryAction,
@@ -48,13 +50,14 @@ function guessStdCategory(rawCategory: string, rawSubcategory: string, knownName
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string }> }) {
   const { tab, error, success } = await searchParams;
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
+  const { householdId } = await requireHousehold();
   const db = getDb();
   const [mappings, rules, keywordRules, budgets, { transactions: allTx }] = await Promise.all([
-    db.select().from(categoryMappings),
-    db.select().from(categoryRules),
-    db.select().from(categoryKeywordRules),
-    db.select().from(budgetCategories),
-    getActiveTransactions(),
+    db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
+    db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
+    db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
+    db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
+    getActiveTransactions(householdId),
   ]);
 
   const sortedBudgets = [...budgets].sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder));

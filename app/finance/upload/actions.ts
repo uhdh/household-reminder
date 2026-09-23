@@ -7,7 +7,7 @@ import { getDb } from "@/lib/db";
 import { assetItems, categoryKeywordRules, categoryMappings, categoryRules, people, transactions, uploads } from "@/lib/finance-db";
 import { parseUploadFile, type ParsedUpload } from "@/lib/finance-parse";
 import { buildMappingIndex, buildRuleIndex, deriveTransactionFields } from "@/lib/spending-derive";
-import { requireFinanceUser } from "@/lib/require-finance-user";
+import { requireHousehold } from "@/lib/require-household";
 
 const PERSON_IDS = ["husband", "wife"] as const;
 type PersonId = (typeof PERSON_IDS)[number];
@@ -32,7 +32,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export async function uploadAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const personId = String(formData.get("personId") ?? "");
   const file = formData.get("file");
 
@@ -59,7 +59,7 @@ export async function uploadAction(formData: FormData) {
 
   await db
     .insert(people)
-    .values({ id: personId, displayName })
+    .values({ id: personId, householdId, displayName })
     .onConflictDoUpdate({
       target: people.id,
       set: { displayName, updatedAt: new Date() },
@@ -67,9 +67,10 @@ export async function uploadAction(formData: FormData) {
   await db
     .update(uploads)
     .set({ isActive: false })
-    .where(and(eq(uploads.personId, personId), eq(uploads.isActive, true)));
+    .where(and(eq(uploads.householdId, householdId), eq(uploads.personId, personId), eq(uploads.isActive, true)));
   await db.insert(uploads).values({
     id: uploadId,
+    householdId,
     personId,
     sourceFilename: file.name,
     periodStart: parsed.periodStart,
@@ -79,6 +80,7 @@ export async function uploadAction(formData: FormData) {
 
   if (parsed.periodStart && parsed.periodEnd) {
     await db.delete(transactions).where(and(
+      eq(transactions.householdId, householdId),
       eq(transactions.personId, personId),
       gte(transactions.txnDate, parsed.periodStart),
       lte(transactions.txnDate, parsed.periodEnd),
@@ -89,11 +91,12 @@ export async function uploadAction(formData: FormData) {
   await db
     .update(transactions)
     .set({ uploadId })
-    .where(and(eq(transactions.personId, personId), eq(transactions.category, "직접 입력"), eq(transactions.subcategory, "직접 입력")));
+    .where(and(eq(transactions.householdId, householdId), eq(transactions.personId, personId), eq(transactions.category, "직접 입력"), eq(transactions.subcategory, "직접 입력")));
 
   for (const rows of chunk(parsed.assetItems, INSERT_CHUNK_SIZE)) {
     await db.insert(assetItems).values(
       rows.map((item) => ({
+        householdId,
         uploadId,
         personId,
         side: item.side,
@@ -107,9 +110,9 @@ export async function uploadAction(formData: FormData) {
   }
 
   const [mappingRows, ruleRows, keywordRuleRows] = await Promise.all([
-    db.select().from(categoryMappings),
-    db.select().from(categoryRules),
-    db.select().from(categoryKeywordRules),
+    db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
+    db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
+    db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
   ]);
   const mappingIndex = buildMappingIndex(mappingRows);
   const ruleIndex = buildRuleIndex(ruleRows);
@@ -119,6 +122,7 @@ export async function uploadAction(formData: FormData) {
   for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {
     await db.insert(transactions).values(
       rows.map(({ t, d }) => ({
+        householdId,
         uploadId,
         personId,
         txnDate: t.txnDate,

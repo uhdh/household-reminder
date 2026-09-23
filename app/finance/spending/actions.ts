@@ -5,7 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { categoryKeywordRules, transactions, uploads } from "@/lib/finance-db";
 import { isBeneficiary, isPersonId } from "@/lib/spending-queries";
-import { requireFinanceUser } from "@/lib/require-finance-user";
+import { requireHousehold } from "@/lib/require-household";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,7 +16,7 @@ function spendingReturnTo(value: FormDataEntryValue | null): string {
 }
 
 export async function addManualTransactionAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
   const personId = String(formData.get("personId") ?? "");
   const beneficiary = String(formData.get("beneficiary") ?? "");
@@ -34,7 +34,7 @@ export async function addManualTransactionAction(formData: FormData) {
   const [activeUpload] = await db
     .select({ id: uploads.id })
     .from(uploads)
-    .where(and(eq(uploads.personId, personId), eq(uploads.isActive, true)))
+    .where(and(eq(uploads.householdId, householdId), eq(uploads.personId, personId), eq(uploads.isActive, true)))
     .limit(1);
 
   if (!activeUpload) {
@@ -42,6 +42,7 @@ export async function addManualTransactionAction(formData: FormData) {
   }
 
   await db.insert(transactions).values({
+    householdId,
     uploadId: activeUpload.id,
     personId,
     txnDate,
@@ -62,35 +63,39 @@ export async function addManualTransactionAction(formData: FormData) {
 }
 
 export async function updateBeneficiaryAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const beneficiary = String(formData.get("beneficiary") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
 
   if (txnId && isBeneficiary(beneficiary)) {
     const db = getDb();
-    await db.update(transactions).set({ beneficiary }).where(eq(transactions.id, txnId));
+    await db.update(transactions).set({ beneficiary }).where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
   }
 
   redirect(returnTo);
 }
 
 export async function deleteTransactionAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const returnTo = spendingReturnTo(formData.get("returnTo"));
 
-  if (UUID_RE.test(txnId)) await getDb().delete(transactions).where(eq(transactions.id, txnId));
+  if (UUID_RE.test(txnId)) {
+    await getDb().delete(transactions).where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
+  }
 
   redirect(returnTo);
 }
 
 export async function deleteTransactionsAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const returnTo = spendingReturnTo(formData.get("returnTo"));
   const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
 
-  if (ids.length > 0) await getDb().delete(transactions).where(inArray(transactions.id, ids));
+  if (ids.length > 0) {
+    await getDb().delete(transactions).where(and(inArray(transactions.id, ids), eq(transactions.householdId, householdId)));
+  }
 
   redirect(returnTo);
 }
@@ -98,8 +103,9 @@ export async function deleteTransactionsAction(formData: FormData) {
 const UNMAPPED_VALUE = "__미분류__";
 
 // 자기계좌이체 등을 제외한 집계 포함 여부(included)를 카테고리 변경에 맞춰 재계산하며 저장한다.
-// 단건/규칙 일괄적용/다건 일괄변경이 모두 이 로직을 공유한다.
-async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, txnId: string, stdCategory: string | null) {
+// 단건/규칙 일괄적용/다건 일괄변경이 모두 이 로직을 공유한다. householdId 조건으로 다른 가구의
+// 거래 id가 섞여 들어와도(악의적 요청 포함) 절대 바뀌지 않는다.
+async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, householdId: string, txnId: string, stdCategory: string | null) {
   const [transaction] = await db
     .select({
       stdCategory: transactions.stdCategory,
@@ -107,7 +113,7 @@ async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, txnId
       isInternalTransfer: transactions.isInternalTransfer,
     })
     .from(transactions)
-    .where(eq(transactions.id, txnId))
+    .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)))
     .limit(1);
 
   if (!transaction) return;
@@ -118,25 +124,28 @@ async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, txnId
       : transaction.stdCategory === "자산수정" && stdCategory
         ? !transaction.isInternalTransfer
         : transaction.included;
-  await db.update(transactions).set({ stdCategory, included }).where(eq(transactions.id, txnId));
+  await db
+    .update(transactions)
+    .set({ stdCategory, included })
+    .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
 }
 
 export async function updateTransactionCategoryAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
 
   if (txnId) {
     const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
-    await applyStdCategoryToTransaction(getDb(), txnId, stdCategory);
+    await applyStdCategoryToTransaction(getDb(), householdId, txnId, stdCategory);
   }
 
   redirect(returnTo);
 }
 
 export async function updateTransactionsCategoryAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const returnTo = spendingReturnTo(formData.get("returnTo"));
   const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
@@ -144,7 +153,7 @@ export async function updateTransactionsCategoryAction(formData: FormData) {
 
   if (ids.length > 0) {
     const db = getDb();
-    await Promise.all(ids.map((id) => applyStdCategoryToTransaction(db, id, stdCategory)));
+    await Promise.all(ids.map((id) => applyStdCategoryToTransaction(db, householdId, id, stdCategory)));
   }
 
   redirect(returnTo);
@@ -159,7 +168,7 @@ function normalizeTxnType(txnType: string): string {
 // 기존 거래는 page.tsx가 미리 정확 일치로 골라준 applyTxnId 목록만 사용한다
 // (ILIKE 부분일치로 무관한 거래까지 바뀌는 것을 막기 위함).
 export async function createKeywordRuleAndApplyAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const keyword = String(formData.get("keyword") ?? "").trim();
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "").trim();
@@ -175,18 +184,18 @@ export async function createKeywordRuleAndApplyAction(formData: FormData) {
 
     await db
       .insert(categoryKeywordRules)
-      .values({ txnType, keyword, stdCategory })
+      .values({ householdId, txnType, keyword, stdCategory })
       .onConflictDoUpdate({
-        target: categoryKeywordRules.keyword,
+        target: [categoryKeywordRules.householdId, categoryKeywordRules.keyword],
         set: { stdCategory, txnType },
       });
 
     if (txnId) {
-      await applyStdCategoryToTransaction(db, txnId, stdCategory);
+      await applyStdCategoryToTransaction(db, householdId, txnId, stdCategory);
     }
 
     if (applyToExisting && applyTxnIds.length > 0) {
-      await Promise.all(applyTxnIds.map((id) => applyStdCategoryToTransaction(db, id, stdCategory)));
+      await Promise.all(applyTxnIds.map((id) => applyStdCategoryToTransaction(db, householdId, id, stdCategory)));
     }
   }
 

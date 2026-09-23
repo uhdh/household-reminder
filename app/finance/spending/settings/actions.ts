@@ -4,13 +4,13 @@ import { redirect } from "next/navigation";
 import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, transactions } from "@/lib/finance-db";
-import { requireFinanceUser } from "@/lib/require-finance-user";
+import { requireHousehold } from "@/lib/require-household";
 
 const VALID_TXN_TYPES = new Set(["수입", "지출", "이체"]);
 const VALID_KINDS = new Set(["고정비", "변동비", "고정수입", "변동수입"]);
 
 export async function upsertCategoryMappingAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const txnType = String(formData.get("txnType") ?? "").trim();
   const rawCategory = String(formData.get("rawCategory") ?? "").trim();
   const rawSubcategory = String(formData.get("rawSubcategory") ?? "").trim() || "미분류";
@@ -20,9 +20,9 @@ export async function upsertCategoryMappingAction(formData: FormData) {
     const db = getDb();
     await db
       .insert(categoryMappings)
-      .values({ txnType, rawCategory, rawSubcategory, stdCategory })
+      .values({ householdId, txnType, rawCategory, rawSubcategory, stdCategory })
       .onConflictDoUpdate({
-        target: [categoryMappings.txnType, categoryMappings.rawCategory, categoryMappings.rawSubcategory],
+        target: [categoryMappings.householdId, categoryMappings.txnType, categoryMappings.rawCategory, categoryMappings.rawSubcategory],
         set: { stdCategory },
       });
 
@@ -31,6 +31,7 @@ export async function upsertCategoryMappingAction(formData: FormData) {
       .set({ stdCategory })
       .where(
         and(
+          eq(transactions.householdId, householdId),
           eq(transactions.txnType, txnType),
           rawCategory === "미분류"
             ? or(isNull(transactions.category), eq(transactions.category, rawCategory))
@@ -46,17 +47,17 @@ export async function upsertCategoryMappingAction(formData: FormData) {
 }
 
 export async function deleteCategoryMappingAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const id = String(formData.get("id") ?? "");
   if (id) {
     const db = getDb();
-    await db.delete(categoryMappings).where(eq(categoryMappings.id, id));
+    await db.delete(categoryMappings).where(and(eq(categoryMappings.id, id), eq(categoryMappings.householdId, householdId)));
   }
   redirect("/finance/spending/settings");
 }
 
 export async function upsertCategoryRuleAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const txnType = String(formData.get("txnType") ?? "").trim();
   const paymentMethod = String(formData.get("paymentMethod") ?? "").trim();
   const stdCategory = String(formData.get("stdCategory") ?? "").trim();
@@ -65,29 +66,29 @@ export async function upsertCategoryRuleAction(formData: FormData) {
     const db = getDb();
     await db
       .insert(categoryRules)
-      .values({ txnType, paymentMethod, stdCategory })
+      .values({ householdId, txnType, paymentMethod, stdCategory })
       .onConflictDoUpdate({
-        target: [categoryRules.txnType, categoryRules.paymentMethod],
+        target: [categoryRules.householdId, categoryRules.txnType, categoryRules.paymentMethod],
         set: { stdCategory },
       });
     await db
       .update(transactions)
       .set({ stdCategory })
-      .where(and(eq(transactions.txnType, txnType), eq(transactions.paymentMethod, paymentMethod)));
+      .where(and(eq(transactions.householdId, householdId), eq(transactions.txnType, txnType), eq(transactions.paymentMethod, paymentMethod)));
   }
 
   redirect("/finance/spending/settings?tab=rules");
 }
 
 export async function deleteCategoryRuleAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const id = String(formData.get("id") ?? "");
-  if (id) await getDb().delete(categoryRules).where(eq(categoryRules.id, id));
+  if (id) await getDb().delete(categoryRules).where(and(eq(categoryRules.id, id), eq(categoryRules.householdId, householdId)));
   redirect("/finance/spending/settings?tab=rules");
 }
 
 export async function upsertCategoryKeywordRuleAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const txnType = String(formData.get("txnType") ?? "지출").trim();
   const keyword = String(formData.get("keyword") ?? "").trim();
   const stdCategory = String(formData.get("stdCategory") ?? "").trim();
@@ -98,12 +99,13 @@ export async function upsertCategoryKeywordRuleAction(formData: FormData) {
     await db
       .insert(categoryKeywordRules)
       .values({
+        householdId,
         txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
         keyword,
         stdCategory,
       })
       .onConflictDoUpdate({
-        target: categoryKeywordRules.keyword,
+        target: [categoryKeywordRules.householdId, categoryKeywordRules.keyword],
         set: {
           stdCategory,
           txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
@@ -113,7 +115,7 @@ export async function upsertCategoryKeywordRuleAction(formData: FormData) {
     if (applyToExisting) {
       const typeFilter = txnType !== "전체" ? eq(transactions.txnType, txnType) : undefined;
       const descFilter = ilike(transactions.description, `%${keyword}%`);
-      const whereCondition = typeFilter ? and(typeFilter, descFilter) : descFilter;
+      const whereCondition = and(eq(transactions.householdId, householdId), typeFilter, descFilter);
       if (stdCategory === "자산수정") {
         await db.update(transactions).set({ stdCategory, included: false }).where(whereCondition);
       } else {
@@ -126,9 +128,9 @@ export async function upsertCategoryKeywordRuleAction(formData: FormData) {
 }
 
 export async function deleteCategoryKeywordRuleAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const id = String(formData.get("id") ?? "");
-  if (id) await getDb().delete(categoryKeywordRules).where(eq(categoryKeywordRules.id, id));
+  if (id) await getDb().delete(categoryKeywordRules).where(and(eq(categoryKeywordRules.id, id), eq(categoryKeywordRules.householdId, householdId)));
   redirect("/finance/spending/settings?tab=rules");
 }
 
@@ -136,7 +138,7 @@ const KIND_FIELD_PREFIX = "kind:";
 const BUDGET_FIELD_PREFIX = "budget:";
 
 export async function updateBudgetCategoriesAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const db = getDb();
   const names = new Set<string>();
   for (const key of formData.keys()) {
@@ -152,38 +154,38 @@ export async function updateBudgetCategoriesAction(formData: FormData) {
     await db
       .update(budgetCategories)
       .set({ kind, monthlyBudget })
-      .where(eq(budgetCategories.name, name));
+      .where(and(eq(budgetCategories.name, name), eq(budgetCategories.householdId, householdId)));
   }
 
   redirect("/finance/spending/settings");
 }
 
 export async function addBudgetCategoryAction(formData: FormData) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   const name = String(formData.get("name") ?? "").trim();
   const kind = String(formData.get("kind") ?? "");
   const budgetRaw = String(formData.get("monthlyBudget") ?? "").trim();
 
   if (name && VALID_KINDS.has(kind)) {
     const db = getDb();
-    const existing = await db.select().from(budgetCategories);
+    const existing = await db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId));
     const nextSortOrder = existing.reduce((max, b) => Math.max(max, Number(b.sortOrder)), 0) + 1;
     const monthlyBudget = budgetRaw === "" ? null : String(Math.max(0, Number(budgetRaw)));
 
     await db
       .insert(budgetCategories)
-      .values({ name, kind, sortOrder: String(nextSortOrder), monthlyBudget })
-      .onConflictDoNothing({ target: budgetCategories.name });
+      .values({ householdId, name, kind, sortOrder: String(nextSortOrder), monthlyBudget })
+      .onConflictDoNothing({ target: [budgetCategories.householdId, budgetCategories.name] });
   }
 
   redirect("/finance/spending/settings");
 }
 
 export async function deleteBudgetCategoryAction(name: string) {
-  await requireFinanceUser();
+  const { householdId } = await requireHousehold();
   if (name) {
     const db = getDb();
-    await db.delete(budgetCategories).where(eq(budgetCategories.name, name));
+    await db.delete(budgetCategories).where(and(eq(budgetCategories.name, name), eq(budgetCategories.householdId, householdId)));
   }
   redirect("/finance/spending/settings");
 }

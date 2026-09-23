@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
+import { requireHousehold } from "@/lib/require-household";
 import {
   countsInTotals,
   flowLabel,
@@ -87,7 +89,8 @@ export default async function YearlyPage({
     return <DemoYearlySpending personFilter={personFilter} />;
   }
 
-  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions();
+  const { householdId } = await requireHousehold();
+  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions(householdId);
   const includedTx = allTx.filter(countsInTotals);
   const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : latestYear(includedTx);
   const periodTxAll = allTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));
@@ -96,7 +99,7 @@ export default async function YearlyPage({
   const maxYear = Math.max(new Date().getFullYear(), latestYear(includedTx));
 
   const db = getDb();
-  const budgetRows = await db.select().from(budgetCategories);
+  const budgetRows = await db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId));
   const budgetByName = new Map(budgetRows.map((b) => [b.name, b]));
   const sortedBudgets = [...budgetRows].sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder));
 

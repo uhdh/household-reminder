@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
+import { requireHousehold } from "@/lib/require-household";
 import {
   compareMonthlySummaries,
   countsInTotals,
@@ -83,7 +85,8 @@ export default async function MonthlyPage({
     return <DemoMonthlySpending personFilter={personFilter} month={month} />;
   }
 
-  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions();
+  const { householdId } = await requireHousehold();
+  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions(householdId);
   const includedTx = allTx.filter(countsInTotals);
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(includedTx);
   const periodTxAll = allTx.filter((t) => monthKeyOf(t.txnDate) === month && (personFilter === "all" || t.personId === personFilter));
@@ -91,7 +94,7 @@ export default async function MonthlyPage({
   const exclusion = unmappedTransferExclusion(periodTxAll);
 
   const db = getDb();
-  const budgetRows = await db.select().from(budgetCategories);
+  const budgetRows = await db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId));
   const budgetByName = new Map(budgetRows.map((b) => [b.name, b]));
   const sortedBudgets = [...budgetRows].sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder));
 

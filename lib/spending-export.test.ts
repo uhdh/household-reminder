@@ -8,6 +8,7 @@ describe("exportTransactionsToExcel", () => {
     const mockTx: Txn[] = [
       {
         id: "tx-1",
+        householdId: "household-1",
         uploadId: "u-1",
         personId: "husband",
         txnDate: "2026-08-25",
@@ -25,6 +26,7 @@ describe("exportTransactionsToExcel", () => {
       },
       {
         id: "tx-2",
+        householdId: "household-1",
         uploadId: "u-1",
         personId: "wife",
         txnDate: "2026-08-01",

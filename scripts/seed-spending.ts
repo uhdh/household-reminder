@@ -19,8 +19,9 @@ if (fs.existsSync(envPath)) {
   }
 }
 
+import { eq } from "drizzle-orm";
 import { getDb } from "../lib/db";
-import { budgetCategories, categoryKeywordRules, categoryMappings } from "../lib/finance-db";
+import { budgetCategories, categoryKeywordRules, categoryMappings, households } from "../lib/finance-db";
 
 // 참고 파일(가계부자동화_v1.0_7월_수궁.xlsx)의 '카테고리매핑' 시트 61건을 그대로 시딩한다.
 const CATEGORY_MAPPINGS: {
@@ -168,12 +169,17 @@ const CATEGORY_KEYWORD_RULES: {
 async function main() {
   const db = getDb();
 
+  // 여러 가구 지원 후에는 scripts/migrate-households.ts를 먼저 돌려 "우리집" 가구가 있어야 한다.
+  const [household] = await db.select({ id: households.id }).from(households).where(eq(households.name, "우리집")).limit(1);
+  if (!household) throw new Error('가구 "우리집"이 없습니다. scripts/migrate-households.ts를 먼저 실행하세요.');
+  const householdId = household.id;
+
   for (const m of CATEGORY_MAPPINGS) {
     await db
       .insert(categoryMappings)
-      .values(m)
+      .values({ ...m, householdId })
       .onConflictDoUpdate({
-        target: [categoryMappings.txnType, categoryMappings.rawCategory, categoryMappings.rawSubcategory],
+        target: [categoryMappings.householdId, categoryMappings.txnType, categoryMappings.rawCategory, categoryMappings.rawSubcategory],
         set: { stdCategory: m.stdCategory },
       });
   }
@@ -182,9 +188,9 @@ async function main() {
   for (const kr of CATEGORY_KEYWORD_RULES) {
     await db
       .insert(categoryKeywordRules)
-      .values(kr)
+      .values({ ...kr, householdId })
       .onConflictDoUpdate({
-        target: categoryKeywordRules.keyword,
+        target: [categoryKeywordRules.householdId, categoryKeywordRules.keyword],
         set: { stdCategory: kr.stdCategory, txnType: kr.txnType },
       });
   }
@@ -194,13 +200,14 @@ async function main() {
     await db
       .insert(budgetCategories)
       .values({
+        householdId,
         name: b.name,
         kind: b.kind,
         sortOrder: b.sortOrder.toString(),
         monthlyBudget: b.monthlyBudget !== null ? b.monthlyBudget.toString() : null,
       })
       .onConflictDoUpdate({
-        target: budgetCategories.name,
+        target: [budgetCategories.householdId, budgetCategories.name],
         set: {
           kind: b.kind,
           sortOrder: b.sortOrder.toString(),
