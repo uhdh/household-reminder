@@ -45,6 +45,15 @@ export function CategoryPicker({
   allowUnclassified?: boolean;
 }) {
   const [open, setOpen] = useState(autoOpen);
+  // 분류 모드에서 행을 저장→redirect하면 목록이 바뀌면서 "다음 미분류" 행이 이전과 같은 key(txnId)를
+  // 가진 컴포넌트로 재사용될 수 있다(React가 리마운트하지 않음) — 이 경우 useState 초기값만으로는
+  // 다시 안 열린다. 렌더 중 이전 autoOpen과 비교해 바뀌었을 때만 반영하는 React 공식 패턴을 써서
+  // 이펙트 안에서 setState하지 않고(react-hooks/set-state-in-effect 위반 방지) 처리한다.
+  const [prevAutoOpen, setPrevAutoOpen] = useState(autoOpen);
+  if (autoOpen !== prevAutoOpen) {
+    setPrevAutoOpen(autoOpen);
+    if (autoOpen) setOpen(true);
+  }
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);

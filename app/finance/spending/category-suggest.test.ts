@@ -7,6 +7,7 @@ import {
   displayCategoryLabel,
   findMatchingTransactionIds,
   findNextUnclassifiedId,
+  merchantCountKey,
   recommendCategoriesForTransaction,
   topFrequentCategories,
 } from "./category-suggest";
@@ -35,9 +36,18 @@ describe("buildRawCategoryIndex", () => {
 });
 
 describe("buildMerchantCounts", () => {
-  it("counts transactions per normalized merchant key", () => {
-    const txns = [{ description: "스타벅스" }, { description: "(주)스타벅스" }, { description: "이디야" }];
-    expect(buildMerchantCounts(txns)).toEqual({ 스타벅스: 2, 이디야: 1 });
+  it("counts transactions per normalized merchant key + txnType", () => {
+    const txns = [
+      { description: "스타벅스", txnType: "지출" },
+      { description: "(주)스타벅스", txnType: "지출" },
+      { description: "스타벅스", txnType: "수입" }, // 다른 txnType은 별도로 카운트
+      { description: "이디야", txnType: "지출" },
+    ];
+    expect(buildMerchantCounts(txns)).toEqual({
+      [merchantCountKey("스타벅스", "지출")]: 2,
+      [merchantCountKey("스타벅스", "수입")]: 1,
+      [merchantCountKey("이디야", "지출")]: 1,
+    });
   });
 });
 

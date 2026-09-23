@@ -61,12 +61,19 @@ export function buildRawCategoryIndex(transactions: MinimalTxn[]): Record<string
   return top;
 }
 
-// 가맹점 키별 전체 거래 건수(본인 포함). 같은 가맹점 일괄 적용 제안에 사용.
-export function buildMerchantCounts(transactions: { description: string | null }[]): Record<string, number> {
+// (가맹점 키, txnType)별 전체 거래 건수(본인 포함). 토스트를 띄울지 결정하는 클라이언트 사전
+// 체크에 쓰는데, findMatchingTransactionIds와 같은 기준(정규화 키 + txnType 정확 일치)이어야
+// "다른 거래 0건인데 토스트 쿼리만 붙는" 불일치가 안 생긴다.
+export function merchantCountKey(merchantKey: string, txnType: string): string {
+  return `${merchantKey}|${txnType}`;
+}
+
+export function buildMerchantCounts(transactions: { description: string | null; txnType: string }[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const t of transactions) {
-    const key = suggestKeywordFromDescription(t.description);
-    if (!key) continue;
+    const merchantKey = suggestKeywordFromDescription(t.description);
+    if (!merchantKey) continue;
+    const key = merchantCountKey(merchantKey, t.txnType);
     counts[key] = (counts[key] ?? 0) + 1;
   }
   return counts;

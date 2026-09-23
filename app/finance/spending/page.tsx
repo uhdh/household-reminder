@@ -213,7 +213,7 @@ export default async function SpendingPage({
       {unclassifiedCount > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-r3 border border-stroke-brand-weak bg-bg-brand-weak px-4 py-3 text-[14px] font-medium text-fg-neutral">
           <span>
-            분류 안 된 거래 {unclassifiedCount}건 · {formatKRW(unclassifiedAmount)}원
+            분류 안 된 거래 {unclassifiedCount}건 · {formatKRW(unclassifiedAmount)}
           </span>
           <div className="flex items-center gap-3">
             {reviewMode ? (

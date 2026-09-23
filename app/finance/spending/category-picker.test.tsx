@@ -55,4 +55,17 @@ describe("CategoryPicker", () => {
 
     expect(onSelect).toHaveBeenCalledWith("자산수정");
   });
+
+  it("reopens when autoOpen flips from false to true on an already-mounted instance", () => {
+    // 분류 모드에서 같은 key(txnId)를 가진 컴포넌트가 재사용될 때(리마운트 없이) autoOpen이
+    // false→true로 바뀌어도 다시 열려야 한다(useState 초기값만으로는 반영되지 않는 버그 회귀 테스트).
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <CategoryPicker value={null} options={options} onSelect={onSelect} ariaLabel="카테고리 선택" autoOpen={false} />
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    rerender(<CategoryPicker value={null} options={options} onSelect={onSelect} ariaLabel="카테고리 선택" autoOpen={true} />);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
 });

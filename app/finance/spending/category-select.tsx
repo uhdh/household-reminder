@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ActionButton } from "@/components/ui";
 import { suggestKeywordFromDescription } from "@/lib/spending-derive";
 import { createKeywordRuleAndApplyAction, updateTransactionCategoryAction, updateTransactionsCategoryAction } from "./actions";
 import { CategoryPicker, type CategoryOption } from "./category-picker";
-import { displayCategoryLabel } from "./category-suggest";
+import { displayCategoryLabel, merchantCountKey } from "./category-suggest";
 
 export const UNMAPPED_VALUE = "__미분류__";
 
@@ -39,12 +40,12 @@ export function CategorySelect({
   function handleSelect(name: string | null) {
     if (name === (value ?? null)) return; // 값이 그대로면 저장하지 않음
 
-    // 같은 가맹점의 다른 거래가 있으면, 저장 후 돌아온 화면에서 일괄 적용 토스트를 띄우도록
-    // returnTo에 쿼리를 실어 보낸다(서버 액션이 redirect()로 이동하므로 클라이언트 상태로는 못 넘긴다).
-    // 실제로 몇 건이 바뀔지는 page.tsx가 정확 일치로 다시 계산하므로, 여기서는 후보가 있는지만
-    // merchantCounts로 가볍게 판단한다(부정확해도 토스트 노출 여부에만 영향).
+    // 같은 가맹점+같은 txnType의 다른 거래가 있으면, 저장 후 돌아온 화면에서 일괄 적용 토스트를
+    // 띄우도록 returnTo에 쿼리를 실어 보낸다(서버 액션이 redirect()로 이동하므로 클라이언트
+    // 상태로는 못 넘긴다). merchantCounts도 findMatchingTransactionIds와 같은 (가맹점 키, txnType)
+    // 기준으로 세므로, 여기서 0건이면 page.tsx가 계산하는 실제 대상도 0건이라 쿼리 자체를 안 붙인다.
     const merchantKey = suggestKeywordFromDescription(description);
-    const otherCount = merchantKey ? (merchantCounts[merchantKey] ?? 0) - 1 : 0;
+    const otherCount = merchantKey ? (merchantCounts[merchantCountKey(merchantKey, txnType)] ?? 0) - 1 : 0;
     const canSuggestMerge = name !== null && otherCount > 0;
     const toastQuery = canSuggestMerge
       ? `${returnTo.includes("?") ? "&" : "?"}toastMerchant=${encodeURIComponent(merchantKey)}&toastCategory=${encodeURIComponent(name)}&toastTxnType=${encodeURIComponent(txnType)}&toastTxnId=${encodeURIComponent(txnId)}`
@@ -83,7 +84,6 @@ export function CategorySelect({
 }
 
 const TOAST_AUTO_DISMISS_MS = 6000;
-const TOAST_PARAM_KEYS = ["toastMerchant", "toastCategory", "toastTxnType", "toastTxnId"];
 
 // [벤치마킹: Lunch Money] 카테고리 지정은 즉시 저장하고, 같은 가맹점의 다른 거래가 있을 때만
 // "모두 적용 / 앞으로도 자동" 토스트로 가볍게 제안한다(기존 모달 흐름 대체).
@@ -102,19 +102,23 @@ export function CategoryMergeToast({
   txnIds: string[];
   returnTo: string;
 }) {
+  const router = useRouter();
   const [visible, setVisible] = useState(true);
+
+  // 토스트 쿼리(toastMerchant 등)가 빠진 원래 returnTo로 돌아간다. 과거에는 raw
+  // window.history.replaceState를 직접 호출했는데, Next의 App Router가 history.replaceState를
+  // 가로채 ACTION_RESTORE를 디스패치하는 방식이라(app-router.js) 라우터 내부 트리 상태와
+  // 어긋나면서 이후 <Link> 클릭이 먹통이 되는 문제가 있었다. 이 코드베이스의 기존 패턴
+  // (monthly-navigator.tsx 등)과 동일하게 router.replace를 통해 이동한다.
+  const close = useCallback(() => {
+    setVisible(false);
+    router.replace(returnTo, { scroll: false });
+  }, [router, returnTo]);
 
   useEffect(() => {
     const timer = setTimeout(close, TOAST_AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
-  }, []);
-
-  function close() {
-    setVisible(false);
-    const url = new URL(window.location.href);
-    for (const key of TOAST_PARAM_KEYS) url.searchParams.delete(key);
-    window.history.replaceState(null, "", url.toString());
-  }
+  }, [close]);
 
   if (!visible) return null;
 
