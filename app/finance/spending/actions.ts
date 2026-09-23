@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { and, eq, ilike, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { categoryKeywordRules, transactions, uploads } from "@/lib/finance-db";
 import { isBeneficiary, isPersonId } from "@/lib/spending-queries";
@@ -92,44 +92,72 @@ export async function deleteTransactionsAction(formData: FormData) {
 
 const UNMAPPED_VALUE = "__미분류__";
 
+// 자기계좌이체 등을 제외한 집계 포함 여부(included)를 카테고리 변경에 맞춰 재계산하며 저장한다.
+// 단건/규칙 일괄적용/다건 일괄변경이 모두 이 로직을 공유한다.
+async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, txnId: string, stdCategory: string | null) {
+  const [transaction] = await db
+    .select({
+      stdCategory: transactions.stdCategory,
+      included: transactions.included,
+      isInternalTransfer: transactions.isInternalTransfer,
+    })
+    .from(transactions)
+    .where(eq(transactions.id, txnId))
+    .limit(1);
+
+  if (!transaction) return;
+
+  const included =
+    stdCategory === "자산수정"
+      ? false
+      : transaction.stdCategory === "자산수정" && stdCategory
+        ? !transaction.isInternalTransfer
+        : transaction.included;
+  await db.update(transactions).set({ stdCategory, included }).where(eq(transactions.id, txnId));
+}
+
 export async function updateTransactionCategoryAction(formData: FormData) {
   const txnId = String(formData.get("txnId") ?? "");
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
 
   if (txnId) {
-    const db = getDb();
     const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
-    const [transaction] = await db
-      .select({
-        stdCategory: transactions.stdCategory,
-        included: transactions.included,
-        isInternalTransfer: transactions.isInternalTransfer,
-      })
-      .from(transactions)
-      .where(eq(transactions.id, txnId))
-      .limit(1);
-
-    if (transaction) {
-      const included =
-        stdCategory === "자산수정"
-          ? false
-          : transaction.stdCategory === "자산수정" && stdCategory
-            ? !transaction.isInternalTransfer
-            : transaction.included;
-      await db.update(transactions).set({ stdCategory, included }).where(eq(transactions.id, txnId));
-    }
+    await applyStdCategoryToTransaction(getDb(), txnId, stdCategory);
   }
 
   redirect(returnTo);
 }
 
+export async function updateTransactionsCategoryAction(formData: FormData) {
+  const returnTo = spendingReturnTo(formData.get("returnTo"));
+  const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
+  const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
+  const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
+
+  if (ids.length > 0) {
+    const db = getDb();
+    await Promise.all(ids.map((id) => applyStdCategoryToTransaction(db, id, stdCategory)));
+  }
+
+  redirect(returnTo);
+}
+
+function normalizeTxnType(txnType: string): string {
+  return txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체";
+}
+
+// 토스트의 "앞으로도 자동": 키워드 규칙을 만들고(향후 자동분류용), 같은 가맹점의 기존
+// 거래에도 일괄 적용한다. 규칙 텍스트(keyword)는 향후 자동분류에만 쓰이고, 지금 당장 바꿀
+// 기존 거래는 page.tsx가 미리 정확 일치로 골라준 applyTxnId 목록만 사용한다
+// (ILIKE 부분일치로 무관한 거래까지 바뀌는 것을 막기 위함).
 export async function createKeywordRuleAndApplyAction(formData: FormData) {
   const txnId = String(formData.get("txnId") ?? "");
   const keyword = String(formData.get("keyword") ?? "").trim();
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "").trim();
-  const txnType = String(formData.get("txnType") ?? "지출").trim();
+  const txnType = normalizeTxnType(String(formData.get("txnType") ?? "지출").trim());
   const applyToExisting = formData.get("applyToExisting") === "true" || formData.get("applyToExisting") === "on";
+  const applyTxnIds = formData.getAll("applyTxnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
   const returnTo = spendingReturnTo(formData.get("returnTo"));
 
   const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
@@ -139,51 +167,18 @@ export async function createKeywordRuleAndApplyAction(formData: FormData) {
 
     await db
       .insert(categoryKeywordRules)
-      .values({
-        txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
-        keyword,
-        stdCategory,
-      })
+      .values({ txnType, keyword, stdCategory })
       .onConflictDoUpdate({
         target: categoryKeywordRules.keyword,
-        set: {
-          stdCategory,
-          txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
-        },
+        set: { stdCategory, txnType },
       });
 
     if (txnId) {
-      const [transaction] = await db
-        .select({
-          stdCategory: transactions.stdCategory,
-          included: transactions.included,
-          isInternalTransfer: transactions.isInternalTransfer,
-        })
-        .from(transactions)
-        .where(eq(transactions.id, txnId))
-        .limit(1);
-
-      if (transaction) {
-        const included =
-          stdCategory === "자산수정"
-            ? false
-            : transaction.stdCategory === "자산수정" && stdCategory
-              ? !transaction.isInternalTransfer
-              : transaction.included;
-        await db.update(transactions).set({ stdCategory, included }).where(eq(transactions.id, txnId));
-      }
+      await applyStdCategoryToTransaction(db, txnId, stdCategory);
     }
 
-    if (applyToExisting) {
-      const typeFilter = txnType !== "전체" ? eq(transactions.txnType, txnType) : undefined;
-      const descFilter = ilike(transactions.description, `%${keyword}%`);
-      const whereCondition = typeFilter ? and(typeFilter, descFilter) : descFilter;
-
-      if (stdCategory === "자산수정") {
-        await db.update(transactions).set({ stdCategory, included: false }).where(whereCondition);
-      } else {
-        await db.update(transactions).set({ stdCategory }).where(whereCondition);
-      }
+    if (applyToExisting && applyTxnIds.length > 0) {
+      await Promise.all(applyTxnIds.map((id) => applyStdCategoryToTransaction(db, id, stdCategory)));
     }
   }
 

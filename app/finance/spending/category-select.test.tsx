@@ -1,8 +1,14 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { CategorySelect } from "./category-select";
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("./actions", () => ({
+  updateTransactionCategoryAction: vi.fn(),
+  updateTransactionsCategoryAction: vi.fn(),
+  createKeywordRuleAndApplyAction: vi.fn(),
+}));
 
 describe("CategorySelect", () => {
   const options = [
@@ -11,37 +17,45 @@ describe("CategorySelect", () => {
     { name: "렌트카", kind: "변동비" },
   ];
 
-  it("shows rule registration modal when user selects a new category on a transaction with description", async () => {
-    const { user } = await import("@testing-library/user-event").then((m) => ({
-      user: m.default.setup(),
-    }));
+  it("opens the picker from the chip with the search box focused", async () => {
+    const user = userEvent.setup();
+    render(<CategorySelect txnId="tx-1" value="식비" options={options} returnTo="/finance/spending" description="스타벅스" />);
 
-    render(
-      <CategorySelect
-        txnId="tx-1"
-        value="식비"
-        options={options}
-        returnTo="/finance/spending"
-        description="(주)이니시스(빌링_일반)"
-        txnType="지출"
-      />
-    );
+    await user.click(screen.getByRole("button", { name: /카테고리 변경/ }));
 
-    const select = screen.getByRole("combobox");
-    expect(select).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    const search = screen.getByRole("textbox", { name: "카테고리 검색" });
+    expect(document.activeElement).toBe(search);
+  });
 
-    // Change category to 렌트카
-    await user.selectOptions(select, "렌트카");
+  it("filters options by search query", async () => {
+    const user = userEvent.setup();
+    render(<CategorySelect txnId="tx-1" value="식비" options={options} returnTo="/finance/spending" description="스타벅스" />);
 
-    // Modal should appear
-    expect(screen.getByText("카테고리 규칙으로 등록할까요?")).toBeTruthy();
-    expect(screen.getByDisplayValue("이니시스(빌링_일반)")).toBeTruthy();
-    expect(screen.getAllByText("렌트카").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole("button", { name: "규칙으로 저장 & 적용" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "이번 건만 변경" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /카테고리 변경/ }));
+    await user.type(screen.getByRole("textbox", { name: "카테고리 검색" }), "식");
 
-    // Cancel modal
-    await user.click(screen.getByRole("button", { name: "닫기" }));
-    expect(screen.queryByText("카테고리 규칙으로 등록할까요?")).toBeNull();
+    expect(screen.getByRole("option", { name: /식비/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /식재료/ })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /렌트카/ })).toBeNull();
+  });
+
+  it("closes the picker on Escape without saving", async () => {
+    const user = userEvent.setup();
+    render(<CategorySelect txnId="tx-1" value={null} options={options} returnTo="/finance/spending" description={null} />);
+
+    await user.click(screen.getByRole("button", { name: /카테고리 변경/ }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows the 집계 제외 button for excluding from totals", async () => {
+    const user = userEvent.setup();
+    render(<CategorySelect txnId="tx-1" value="식비" options={options} returnTo="/finance/spending" description={null} />);
+
+    await user.click(screen.getByRole("button", { name: /카테고리 변경/ }));
+    expect(screen.getByRole("button", { name: /집계 제외/ })).toBeTruthy();
   });
 });
