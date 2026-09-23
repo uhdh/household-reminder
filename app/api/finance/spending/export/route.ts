@@ -12,6 +12,7 @@ import {
 } from "@/lib/spending-queries";
 import { exportTransactionsToExcel } from "@/lib/spending-export";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
+import { FinanceAuthError, requireFinanceUser } from "@/lib/require-finance-user";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,13 @@ const sampleTransactions: Txn[] = [
 ];
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireFinanceUser();
+  } catch (error) {
+    if (error instanceof FinanceAuthError) return new Response(null, { status: 401 });
+    throw error;
+  }
+
   const { searchParams } = new URL(request.url);
   const monthParam = searchParams.get("month");
   const person = searchParams.get("person");

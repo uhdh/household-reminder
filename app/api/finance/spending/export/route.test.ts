@@ -10,6 +10,10 @@ import { GET } from "./route";
 vi.mock("@/lib/finance-viewer-server", () => ({
   isFinanceDemoMode: vi.fn().mockResolvedValue(false),
 }));
+vi.mock("@/lib/require-finance-user", () => ({
+  requireFinanceUser: vi.fn().mockResolvedValue({ email: "test@example.com" }),
+  FinanceAuthError: class FinanceAuthError extends Error {},
+}));
 
 describe("Spending Export API Route", () => {
   afterEach(() => {

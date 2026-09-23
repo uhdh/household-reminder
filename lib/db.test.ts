@@ -1,15 +1,6 @@
 import { drizzle } from "drizzle-orm/pglite";
 import { afterEach, describe, expect, test } from "vitest";
-import { getAllChores, initChoresSchema } from "./chores-db";
-import { getDb, initSchema, setDbForTesting } from "./db";
-
-describe("initSchema", () => {
-  test("creates the chores table", async () => {
-    const db = drizzle();
-    await initSchema(db);
-    expect(await getAllChores(db)).toEqual([]);
-  });
-});
+import { getDb, setDbForTesting } from "./db";
 
 describe("getDb", () => {
   afterEach(() => {

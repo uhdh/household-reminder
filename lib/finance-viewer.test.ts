@@ -19,10 +19,10 @@ describe("finance viewer access", () => {
     expect(isPublicFinancePath(pathname)).toBe(false);
   });
 
-  it("uses demo data only for signed-out viewers when Clerk is enabled", () => {
-    expect(shouldUseFinanceDemo({ clerkEnabled: true, userId: null })).toBe(true);
-    expect(shouldUseFinanceDemo({ clerkEnabled: true, userId: "user_123" })).toBe(false);
-    expect(shouldUseFinanceDemo({ clerkEnabled: false, userId: null })).toBe(false);
+  it("uses demo data only for signed-out viewers when auth is enabled", () => {
+    expect(shouldUseFinanceDemo({ authEnabled: true, userId: null })).toBe(true);
+    expect(shouldUseFinanceDemo({ authEnabled: true, userId: "user@example.com" })).toBe(false);
+    expect(shouldUseFinanceDemo({ authEnabled: false, userId: null })).toBe(false);
   });
 
   it("keeps public samples read-only while protecting mutations and private pages", () => {

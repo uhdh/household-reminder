@@ -1,24 +1,27 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { shouldProtectFinanceRequest } from "@/lib/finance-viewer";
 
-const isProtectedRoute = createRouteMatcher([
-  "/cleaning(.*)",
-  "/supplies(.*)",
-  "/emotion-cards(.*)",
-  "/family(.*)",
-  "/finance(.*)",
-]);
+function isFinanceRoute(pathname: string): boolean {
+  return pathname === "/finance" || pathname.startsWith("/finance/") || pathname.startsWith("/api/finance/");
+}
 
-export default clerkMiddleware(async (auth, request) => {
-  // layout.tsx/auth-controls.tsx already skip Clerk UI when no publishable key is configured
-  // (e.g. local dev without Clerk set up); mirror that here so those environments aren't 500s.
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return;
-  if (
-    isProtectedRoute(request) &&
-    shouldProtectFinanceRequest({ pathname: request.nextUrl.pathname, method: request.method })
-  ) {
-    await auth.protect();
+export default auth((request) => {
+  const { pathname } = request.nextUrl;
+  if (!isFinanceRoute(pathname)) return;
+  if (!shouldProtectFinanceRequest({ pathname, method: request.method })) return;
+
+  const isLoggedIn = Boolean(request.auth?.user);
+  if (isLoggedIn) return;
+
+  // API 요청/비GET(서버 액션, 업로드 등)은 401로, 일반 페이지 GET 요청은 로그인으로 보낸다.
+  if (pathname.startsWith("/api/") || request.method !== "GET") {
+    return new NextResponse(null, { status: 401 });
   }
+
+  const signInUrl = new URL("/api/auth/signin", request.url);
+  signInUrl.searchParams.set("callbackUrl", pathname);
+  return NextResponse.redirect(signInUrl);
 });
 
 export const config = {

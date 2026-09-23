@@ -5,11 +5,13 @@ config({ path: ".env.local" });
 
 export default defineConfig({
   out: "./drizzle",
+  // 청소/생필품/감정카드/가족 기능은 archive/lib/로 이관됨(가계부 외 기능). 테이블은 DB에 그대로
+  // 남아있고, 되살릴 때 이 스키마 파일들도 원래 경로(lib/)로 되돌리면 된다.
   schema: [
-    "./lib/chores-db.ts",
-    "./lib/supplies-db.ts",
-    "./lib/emotion-cards-db.ts",
-    "./lib/family-db.ts",
+    "./archive/lib/chores-db.ts",
+    "./archive/lib/supplies-db.ts",
+    "./archive/lib/emotion-cards-db.ts",
+    "./archive/lib/family-db.ts",
     "./lib/finance-db.ts",
   ],
   // This Neon project also contains the finance app's tables. Only manage

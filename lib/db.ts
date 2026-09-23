@@ -1,10 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import type { PgDatabase } from "drizzle-orm/pg-core";
-import { initChoresSchema } from "./chores-db";
-import { initSuppliesSchema } from "./supplies-db";
-import { initEmotionCardsSchema } from "./emotion-cards-db";
 
+// drizzle의 제네릭 스키마 타입을 요구하지 않는 범용 DB 핸들 타입(기존부터 any로 선언돼 있었음, 이번 작업 범위 밖).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AppDb = PgDatabase<any, any, any>;
 
 let dbInstance: AppDb | null = null;
@@ -24,10 +23,4 @@ export function getDb(): AppDb {
 
 export function setDbForTesting(database: AppDb | null): void {
   testOverride = database;
-}
-
-export async function initSchema(database: AppDb): Promise<void> {
-  await initChoresSchema(database);
-  await initSuppliesSchema(database);
-  await initEmotionCardsSchema(database);
 }

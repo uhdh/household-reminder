@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { categoryKeywordRules, transactions, uploads } from "@/lib/finance-db";
 import { isBeneficiary, isPersonId } from "@/lib/spending-queries";
+import { requireFinanceUser } from "@/lib/require-finance-user";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -15,6 +16,7 @@ function spendingReturnTo(value: FormDataEntryValue | null): string {
 }
 
 export async function addManualTransactionAction(formData: FormData) {
+  await requireFinanceUser();
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
   const personId = String(formData.get("personId") ?? "");
   const beneficiary = String(formData.get("beneficiary") ?? "");
@@ -60,6 +62,7 @@ export async function addManualTransactionAction(formData: FormData) {
 }
 
 export async function updateBeneficiaryAction(formData: FormData) {
+  await requireFinanceUser();
   const txnId = String(formData.get("txnId") ?? "");
   const beneficiary = String(formData.get("beneficiary") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
@@ -73,6 +76,7 @@ export async function updateBeneficiaryAction(formData: FormData) {
 }
 
 export async function deleteTransactionAction(formData: FormData) {
+  await requireFinanceUser();
   const txnId = String(formData.get("txnId") ?? "");
   const returnTo = spendingReturnTo(formData.get("returnTo"));
 
@@ -82,6 +86,7 @@ export async function deleteTransactionAction(formData: FormData) {
 }
 
 export async function deleteTransactionsAction(formData: FormData) {
+  await requireFinanceUser();
   const returnTo = spendingReturnTo(formData.get("returnTo"));
   const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
 
@@ -117,6 +122,7 @@ async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, txnId
 }
 
 export async function updateTransactionCategoryAction(formData: FormData) {
+  await requireFinanceUser();
   const txnId = String(formData.get("txnId") ?? "");
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
@@ -130,6 +136,7 @@ export async function updateTransactionCategoryAction(formData: FormData) {
 }
 
 export async function updateTransactionsCategoryAction(formData: FormData) {
+  await requireFinanceUser();
   const returnTo = spendingReturnTo(formData.get("returnTo"));
   const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
@@ -152,6 +159,7 @@ function normalizeTxnType(txnType: string): string {
 // 기존 거래는 page.tsx가 미리 정확 일치로 골라준 applyTxnId 목록만 사용한다
 // (ILIKE 부분일치로 무관한 거래까지 바뀌는 것을 막기 위함).
 export async function createKeywordRuleAndApplyAction(formData: FormData) {
+  await requireFinanceUser();
   const txnId = String(formData.get("txnId") ?? "");
   const keyword = String(formData.get("keyword") ?? "").trim();
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "").trim();

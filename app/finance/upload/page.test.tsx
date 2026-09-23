@@ -1,6 +1,10 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import UploadPage from "./page";
+
+vi.mock("@/lib/require-finance-user", () => ({
+  requireFinanceUser: vi.fn().mockResolvedValue({ email: "test@example.com" }),
+}));
 
 describe("UploadPage", () => {
   test("shows the official BankSalad spreadsheet download steps below the upload form", async () => {

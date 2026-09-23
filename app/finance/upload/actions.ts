@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { assetItems, categoryKeywordRules, categoryMappings, categoryRules, people, transactions, uploads } from "@/lib/finance-db";
 import { parseUploadFile, type ParsedUpload } from "@/lib/finance-parse";
 import { buildMappingIndex, buildRuleIndex, deriveTransactionFields } from "@/lib/spending-derive";
+import { requireFinanceUser } from "@/lib/require-finance-user";
 
 const PERSON_IDS = ["husband", "wife"] as const;
 type PersonId = (typeof PERSON_IDS)[number];
@@ -31,6 +32,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export async function uploadAction(formData: FormData) {
+  await requireFinanceUser();
   const personId = String(formData.get("personId") ?? "");
   const file = formData.get("file");
 

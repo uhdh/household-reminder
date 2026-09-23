@@ -6,6 +6,7 @@ import { transactions } from "@/lib/finance-db";
 import { deleteTransactionsAction } from "./actions";
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("@/lib/require-finance-user", () => ({ requireFinanceUser: vi.fn().mockResolvedValue({ email: "test@example.com" }) }));
 
 describe("deleteTransactionsAction", () => {
   afterEach(() => setDbForTesting(null));

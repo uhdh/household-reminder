@@ -18,6 +18,10 @@ vi.mock("@/lib/spending-queries", async (importOriginal) => ({
   getActiveTransactions: vi.fn(async () => ({ transactions: [] })),
 }));
 
+vi.mock("@/lib/require-finance-user", () => ({
+  requireFinanceUser: vi.fn().mockResolvedValue({ email: "test@example.com" }),
+}));
+
 describe("SettingsPage", () => {
   test("파일 업로드 탭에서 바로 업로드할 수 있다", async () => {
     render(await SettingsPage({ searchParams: Promise.resolve({ tab: "upload" }) }));

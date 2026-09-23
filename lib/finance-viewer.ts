@@ -14,11 +14,11 @@ export function shouldProtectFinanceRequest({ pathname, method }: { pathname: st
 }
 
 export function shouldUseFinanceDemo({
-  clerkEnabled,
+  authEnabled,
   userId,
 }: {
-  clerkEnabled: boolean;
+  authEnabled: boolean;
   userId: string | null;
 }): boolean {
-  return clerkEnabled && !userId;
+  return authEnabled && !userId;
 }

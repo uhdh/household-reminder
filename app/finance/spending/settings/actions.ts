@@ -4,11 +4,13 @@ import { redirect } from "next/navigation";
 import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, transactions } from "@/lib/finance-db";
+import { requireFinanceUser } from "@/lib/require-finance-user";
 
 const VALID_TXN_TYPES = new Set(["수입", "지출", "이체"]);
 const VALID_KINDS = new Set(["고정비", "변동비", "고정수입", "변동수입"]);
 
 export async function upsertCategoryMappingAction(formData: FormData) {
+  await requireFinanceUser();
   const txnType = String(formData.get("txnType") ?? "").trim();
   const rawCategory = String(formData.get("rawCategory") ?? "").trim();
   const rawSubcategory = String(formData.get("rawSubcategory") ?? "").trim() || "미분류";
@@ -44,6 +46,7 @@ export async function upsertCategoryMappingAction(formData: FormData) {
 }
 
 export async function deleteCategoryMappingAction(formData: FormData) {
+  await requireFinanceUser();
   const id = String(formData.get("id") ?? "");
   if (id) {
     const db = getDb();
@@ -53,6 +56,7 @@ export async function deleteCategoryMappingAction(formData: FormData) {
 }
 
 export async function upsertCategoryRuleAction(formData: FormData) {
+  await requireFinanceUser();
   const txnType = String(formData.get("txnType") ?? "").trim();
   const paymentMethod = String(formData.get("paymentMethod") ?? "").trim();
   const stdCategory = String(formData.get("stdCategory") ?? "").trim();
@@ -76,12 +80,14 @@ export async function upsertCategoryRuleAction(formData: FormData) {
 }
 
 export async function deleteCategoryRuleAction(formData: FormData) {
+  await requireFinanceUser();
   const id = String(formData.get("id") ?? "");
   if (id) await getDb().delete(categoryRules).where(eq(categoryRules.id, id));
   redirect("/finance/spending/settings?tab=rules");
 }
 
 export async function upsertCategoryKeywordRuleAction(formData: FormData) {
+  await requireFinanceUser();
   const txnType = String(formData.get("txnType") ?? "지출").trim();
   const keyword = String(formData.get("keyword") ?? "").trim();
   const stdCategory = String(formData.get("stdCategory") ?? "").trim();
@@ -120,6 +126,7 @@ export async function upsertCategoryKeywordRuleAction(formData: FormData) {
 }
 
 export async function deleteCategoryKeywordRuleAction(formData: FormData) {
+  await requireFinanceUser();
   const id = String(formData.get("id") ?? "");
   if (id) await getDb().delete(categoryKeywordRules).where(eq(categoryKeywordRules.id, id));
   redirect("/finance/spending/settings?tab=rules");
@@ -129,6 +136,7 @@ const KIND_FIELD_PREFIX = "kind:";
 const BUDGET_FIELD_PREFIX = "budget:";
 
 export async function updateBudgetCategoriesAction(formData: FormData) {
+  await requireFinanceUser();
   const db = getDb();
   const names = new Set<string>();
   for (const key of formData.keys()) {
@@ -151,6 +159,7 @@ export async function updateBudgetCategoriesAction(formData: FormData) {
 }
 
 export async function addBudgetCategoryAction(formData: FormData) {
+  await requireFinanceUser();
   const name = String(formData.get("name") ?? "").trim();
   const kind = String(formData.get("kind") ?? "");
   const budgetRaw = String(formData.get("monthlyBudget") ?? "").trim();
@@ -171,6 +180,7 @@ export async function addBudgetCategoryAction(formData: FormData) {
 }
 
 export async function deleteBudgetCategoryAction(name: string) {
+  await requireFinanceUser();
   if (name) {
     const db = getDb();
     await db.delete(budgetCategories).where(eq(budgetCategories.name, name));

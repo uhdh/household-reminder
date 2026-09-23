@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { allocationTargets } from "@/lib/finance-db";
 import { isAllocationTargetSumValid, sumTargetPct } from "@/lib/finance-format";
+import { requireFinanceUser } from "@/lib/require-finance-user";
 
 const TARGET_FIELD_PREFIX = "target:";
 
 export async function updateAllocationTargetsAction(formData: FormData) {
+  await requireFinanceUser();
   const db = getDb();
   const person = String(formData.get("person") ?? "all");
   const destination = person === "all" ? "/finance" : `/finance?person=${person}`;

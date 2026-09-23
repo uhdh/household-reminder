@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <section className="mb-6">
         <h2 className="mb-2 text-base font-semibold">1. 수집하는 개인정보 항목</h2>
         <ul className="list-disc space-y-1 pl-5">
-          <li>회원가입 및 로그인 시: 이메일 주소, 인증 식별자(Clerk 계정 정보)</li>
+          <li>회원가입 및 로그인 시: 이메일 주소, 인증 식별자(Google 계정 정보)</li>
           <li>서비스 이용 시: 사용자가 직접 입력하거나 연동한 가계부·자산·지출 내역</li>
           <li>자동 수집 정보: 접속 로그, 기기 및 브라우저 정보</li>
         </ul>
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
         <h2 className="mb-2 text-base font-semibold">3. 개인정보 처리 위탁 및 제3자 제공</h2>
         <p className="mb-2">서비스 운영을 위해 아래 업체에 개인정보 처리를 위탁하고 있으며, 위탁 목적 외 이용이나 제3자 제공은 하지 않습니다.</p>
         <ul className="list-disc space-y-1 pl-5">
-          <li>Clerk (회원 인증 처리)</li>
+          <li>Google (회원 인증 처리)</li>
           <li>Neon (데이터베이스 호스팅)</li>
           <li>Vercel (애플리케이션 호스팅)</li>
         </ul>
