@@ -1,4 +1,5 @@
-// 구성원 초대 액션 검증: owner만 초대를 만들 수 있고, 취소된 초대는 수락할 수 없다.
+// 구성원 초대 액션 검증: owner만 초대를 만들 수 있고, 원문 토큰은 반환값(state)으로만 오며,
+// 취소된 초대는 더 이상 유효하지 않다.
 import { drizzle } from "drizzle-orm/pglite";
 import { sql, eq } from "drizzle-orm";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -12,6 +13,7 @@ vi.mock("next/navigation", () => ({
     throw new Error(`REDIRECT:${url}`);
   }),
 }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 async function expectRedirect(promise: Promise<unknown>): Promise<string> {
   try {
@@ -28,8 +30,8 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
   await db.execute(sql`CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, name text, created_at timestamptz NOT NULL DEFAULT now())`);
   await db.execute(sql`
     CREATE TABLE household_members (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, user_id uuid NOT NULL, role text NOT NULL,
-      created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (household_id, user_id)
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, user_id uuid NOT NULL UNIQUE, role text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
     )
   `);
   await db.execute(sql`
@@ -46,7 +48,7 @@ describe("createInviteAction / cancelInviteAction", () => {
     mockAuth.mockReset();
   });
 
-  test("owner가 아니면 초대 링크를 만들 수 없다", async () => {
+  test("owner가 아니면 초대 링크를 만들 수 없다(에러는 state로 반환, redirect 없음)", async () => {
     const db = drizzle();
     setDbForTesting(db);
     await createSchema(db);
@@ -58,14 +60,15 @@ describe("createInviteAction / cancelInviteAction", () => {
     mockAuth.mockResolvedValue({ user: { email: "member@example.com" } });
     const { createInviteAction } = await import("./members-actions");
 
-    const redirectTo = await expectRedirect(createInviteAction());
-    expect(redirectTo).toContain("error=");
+    const state = await createInviteAction();
+    expect(state.error).toBeTruthy();
+    expect(state.token).toBeUndefined();
 
     const invites = await db.select().from(householdInvites).where(eq(householdInvites.householdId, household.id));
     expect(invites).toHaveLength(0);
   });
 
-  test("owner는 초대 링크를 만들 수 있고, 취소한 초대는 더 이상 유효하지 않다", async () => {
+  test("owner는 초대 링크를 만들 수 있고(토큰은 state로만 옴, URL에는 없음), 취소한 초대는 더 이상 유효하지 않다", async () => {
     const db = drizzle();
     setDbForTesting(db);
     await createSchema(db);
@@ -77,10 +80,10 @@ describe("createInviteAction / cancelInviteAction", () => {
     mockAuth.mockResolvedValue({ user: { email: "owner@example.com" } });
     const { createInviteAction, cancelInviteAction } = await import("./members-actions");
 
-    const redirectTo = await expectRedirect(createInviteAction());
-    expect(redirectTo).toContain("/finance/spending/settings?tab=members&invite=");
-    const token = redirectTo.split("invite=")[1];
-    expect(token).toHaveLength(64); // randomBytes(32).toString("hex")
+    const state = await createInviteAction();
+    expect(state.error).toBeUndefined();
+    expect(state.token).toBeDefined();
+    expect(state.token).toHaveLength(64); // randomBytes(32).toString("hex")
 
     const [invite] = await db.select().from(householdInvites).where(eq(householdInvites.householdId, household.id));
     expect(invite.usedAt).toBeNull();

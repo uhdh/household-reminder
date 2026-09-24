@@ -43,7 +43,17 @@ export async function acceptInviteAction(formData: FormData) {
 
   const { householdId } = claimed[0];
   const personId = randomUUID();
-  await db.insert(householdMembers).values({ householdId, userId: user.id, role: "member" });
+
+  try {
+    await db.insert(householdMembers).values({ householdId, userId: user.id, role: "member" });
+  } catch {
+    // household_members.user_id unique 위반 등(예: 이 사용자가 그 사이 다른 초대를 먼저 수락해
+    // 이미 다른 가구 소속이 된 경우) - 초대만 소모되고 아무도 못 들어오는 상황을 막기 위해
+    // 위에서 선점한 초대를 다시 미사용 상태로 되돌린다.
+    await db.update(householdInvites).set({ usedAt: null, usedBy: null }).where(eq(householdInvites.tokenHash, tokenHash));
+    redirect(`/invite/${token}?error=${encodeURIComponent("합류에 실패했습니다. 이미 다른 가구에 속해 있는지 확인해주세요.")}`);
+  }
+
   await db.insert(people).values({ id: personId, householdId, displayName });
 
   redirect("/finance");

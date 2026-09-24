@@ -29,11 +29,13 @@ export const householdMembers = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     householdId: uuid("household_id").notNull().references(() => households.id),
-    userId: uuid("user_id").notNull().references(() => users.id),
+    // user_id 단독 unique: 1인 1가구 정책을 DB로 강제한다(데이터 모델상 여러 가구 소속을 아예
+    // 막지는 않는 구조였지만, 초대 수락 경합 등에서 앱 로직만으로는 막을 수 없는 틈이 있어
+    // 제약으로 고정했다. 여러 가구 동시 소속을 지원하게 되면 이 제약을 풀어야 한다).
+    userId: uuid("user_id").notNull().references(() => users.id).unique(),
     role: text("role").notNull(), // 'owner' | 'member'
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [unique().on(table.householdId, table.userId)]
+  }
 );
 
 export const householdInvites = pgTable("household_invites", {

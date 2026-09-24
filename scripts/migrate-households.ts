@@ -94,8 +94,21 @@ export async function migrateHouseholds(db: AppDb, opts: { seedOwnerEmails?: str
       user_id uuid NOT NULL REFERENCES users(id),
       role text NOT NULL,
       created_at timestamp with time zone NOT NULL DEFAULT now(),
-      CONSTRAINT household_members_household_id_user_id_unique UNIQUE (household_id, user_id)
+      CONSTRAINT household_members_user_id_unique UNIQUE (user_id)
     );
+  `);
+  // 이 스크립트를 예전 버전(household_id+user_id 복합 unique)으로 이미 한 번 돌린 적이 있어도
+  // 안전하게 1인 1가구 제약(user_id 단독 unique)을 추가한다.
+  await db.execute(sql`
+    DO $$ BEGIN
+      ALTER TABLE household_members ADD CONSTRAINT household_members_user_id_unique UNIQUE (user_id);
+    -- 신설 테이블은 CREATE TABLE 단계에서 이미 이 이름으로 생겼으므로 duplicate_table(42P07)로,
+    -- 예전 버전 스크립트로 이미 추가된 적이 있다면 duplicate_object(42710)로 떨어질 수 있다.
+    EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
+    END $$;
+  `);
+  await db.execute(sql`
+    ALTER TABLE household_members DROP CONSTRAINT IF EXISTS household_members_household_id_user_id_unique;
   `);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS household_invites (
@@ -145,7 +158,7 @@ export async function migrateHouseholds(db: AppDb, opts: { seedOwnerEmails?: str
     await db.execute(sql`
       INSERT INTO household_members (household_id, user_id, role)
       VALUES (${householdId}, ${userId}, 'owner')
-      ON CONFLICT (household_id, user_id) DO NOTHING
+      ON CONFLICT (user_id) DO NOTHING
     `);
   }
   console.log(`owner 계정 ${emails.length}건 준비 완료`);

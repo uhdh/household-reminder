@@ -30,8 +30,8 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
   await db.execute(sql`CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, name text, created_at timestamptz NOT NULL DEFAULT now())`);
   await db.execute(sql`
     CREATE TABLE household_members (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, user_id uuid NOT NULL, role text NOT NULL,
-      created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (household_id, user_id)
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, user_id uuid NOT NULL UNIQUE, role text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
     )
   `);
   await db.execute(sql`
@@ -213,5 +213,47 @@ describe("acceptInviteAction", () => {
     const memberships = await db.select().from(householdMembers).where(eq(householdMembers.userId, existingUser.id));
     expect(memberships).toHaveLength(1); // 여전히 기존 가구 하나뿐
     expect(memberships[0].householdId).toBe(otherHousehold.id);
+  });
+
+  test("초대는 선점됐지만 household_members insert가 실패하면(예: user_id unique 위반) 선점을 되돌리고 안내 redirect한다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    const { household, token, invite } = await seedInvite(db);
+
+    // 사전 체크(existingMemberships)는 통과했지만, 그 직후(선점 이후) household_members insert만
+    // 실패하는 경합 상황을 재현한다 - users insert(upsert)는 그대로 두고 householdMembers insert만 가로챈다.
+    const realInsert = db.insert.bind(db);
+    const insertSpy = vi.spyOn(db, "insert").mockImplementation((table: unknown) => {
+      if (table === householdMembers) {
+        throw new Error("simulated unique violation on household_members.user_id");
+      }
+      return realInsert(table as Parameters<typeof db.insert>[0]);
+    });
+
+    mockAuth.mockResolvedValue({ user: { email: "race@example.com" } });
+    const { acceptInviteAction } = await import("./actions");
+
+    const form = new FormData();
+    form.set("token", token);
+    form.set("displayName", "경합사용자");
+    const redirectTo = await expectRedirect(acceptInviteAction(form));
+    expect(redirectTo).toContain(`/invite/${token}`);
+    expect(redirectTo).toContain("error=");
+
+    insertSpy.mockRestore();
+
+    // 초대가 "선점된 채로 낭비"되지 않고 다시 미사용 상태로 돌아와야 한다.
+    const [after] = await db.select().from(householdInvites).where(eq(householdInvites.id, invite.id));
+    expect(after.usedAt).toBeNull();
+    expect(after.usedBy).toBeNull();
+
+    // 실패한 사용자는 household_members에 들어가지 않는다(owner만 남아있음).
+    const membersOfHousehold = await db.select().from(householdMembers).where(eq(householdMembers.householdId, household.id));
+    expect(membersOfHousehold).toHaveLength(1);
+
+    // people 프로필도 생기지 않는다(멤버십이 없으니).
+    const peopleRows = await db.select().from(people).where(eq(people.householdId, household.id));
+    expect(peopleRows).toHaveLength(0);
   });
 });

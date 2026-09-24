@@ -30,8 +30,8 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
   await db.execute(sql`CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, name text, created_at timestamptz NOT NULL DEFAULT now())`);
   await db.execute(sql`
     CREATE TABLE household_members (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, user_id uuid NOT NULL, role text NOT NULL,
-      created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (household_id, user_id)
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, user_id uuid NOT NULL UNIQUE, role text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
     )
   `);
   await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);

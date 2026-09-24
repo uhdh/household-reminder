@@ -5,7 +5,7 @@ import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules
 import { formatKRW } from "@/lib/finance-format";
 import { getActiveTransactions, getHouseholdPeople, toNum } from "@/lib/spending-queries";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
-import { ActionButton, FeedbackMessage, SelectInput, TextInput } from "@/components/ui";
+import { ActionButton, SelectInput, TextInput } from "@/components/ui";
 import {
   addBudgetCategoryAction,
   deleteBudgetCategoryAction,
@@ -17,8 +17,8 @@ import {
   upsertCategoryMappingAction,
   upsertCategoryRuleAction,
 } from "./actions";
-import { cancelInviteAction, createInviteAction } from "./members-actions";
-import { InviteLink } from "./invite-link";
+import { cancelInviteAction } from "./members-actions";
+import { CreateInviteForm } from "./create-invite-form";
 import { UploadForm } from "@/app/finance/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -50,8 +50,8 @@ function guessStdCategory(rawCategory: string, rawSubcategory: string, knownName
   return knownNames.has("기타") ? "기타" : (knownNames.values().next().value ?? "기타");
 }
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string; invite?: string }> }) {
-  const { tab, error, success, invite } = await searchParams;
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string }> }) {
+  const { tab, error, success } = await searchParams;
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
   const { householdId, role } = await requireHouseholdOrOnboard();
   const db = getDb();
@@ -482,16 +482,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               ))}
             </ul>
 
-            {invite && <div className="mb-4"><InviteLink path={`/invite/${invite}`} /></div>}
-            {error && activeTab === "members" && <FeedbackMessage tone="critical" className="mb-4">{error}</FeedbackMessage>}
-
-            {role === "owner" && (
-              <form action={createInviteAction}>
-                <ActionButton type="submit" className="min-h-11 px-4 py-2">
-                  초대 링크 만들기
-                </ActionButton>
-              </form>
-            )}
+            {role === "owner" && <CreateInviteForm />}
           </div>
 
           {role === "owner" && activeInvites.length > 0 && (
