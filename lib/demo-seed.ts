@@ -188,14 +188,14 @@ function buildAssetItems(): AssetDraft[] {
     investment(DEMO_PERSON_A, "TIGER 미국S&P500", 8_000_000, 9_350_000),
     investment(DEMO_PERSON_A, "삼성전자", 4_200_000, 3_650_000),
     investment(DEMO_PERSON_A, "연금저축펀드", 6_000_000, 6_240_000),
-    { personId: DEMO_PERSON_A, side: "debt", category: "대출", productName: "전세자금대출", amount: 80_000_000 },
+    { personId: DEMO_PERSON_A, side: "debt", category: "대출", productName: "전세자금대출", amount: 20_000_000 },
 
     { personId: DEMO_PERSON_B, side: "asset", category: "자유입출금 자산", productName: "수아 입출금통장", amount: 2_800_000 },
     { personId: DEMO_PERSON_B, side: "asset", category: "저축성 자산", productName: "수아 청약저축", amount: 8_000_000 },
     investment(DEMO_PERSON_B, "TIGER 미국나스닥100", 6_500_000, 7_930_000),
     investment(DEMO_PERSON_B, "애플", 3_100_000, 2_790_000),
     investment(DEMO_PERSON_B, "엔비디아", 2_000_000, 4_380_000),
-    investment(DEMO_PERSON_B, "연금저축펀드", 3_000_000, 2_760_000),
+    investment(DEMO_PERSON_B, "연금저축펀드", 3_000_000, 3_300_000),
     { personId: DEMO_PERSON_B, side: "debt", category: "마이너스통장", productName: "마이너스통장", amount: 3_000_000 },
   ];
 }
