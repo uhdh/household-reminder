@@ -13,7 +13,8 @@ export default function AccountDeletionPage() {
       <section className="mb-6">
         <h2 className="mb-2 text-base font-semibold">삭제 요청 방법</h2>
         <p>
-          가계부탁 계정 삭제를 원하시면 아래 이메일로
+          앱 안에서 설정 → 구성원 탭의 위험 구역에서 직접 가구 나가기(탈퇴)·가구 삭제를 실행할 수
+          있습니다. 이메일로 요청하실 경우 아래 이메일로
           <strong> 가입하신 이메일 주소</strong>와 함께 삭제 요청을 보내주세요. 가구(가족) 전체의
           가계부 데이터 삭제를 원하시는 경우, 해당 가구의 owner가 요청해주셔야 합니다.
         </p>

@@ -3,7 +3,14 @@ import { describe, expect, test, vi } from "vitest";
 import SettingsPage from "./page";
 
 vi.mock("@/lib/db", () => ({
-  getDb: () => ({ select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }) }),
+  // where()는 직접 await(배열)되기도 하고, households 조회처럼 .limit(1)이 추가로 붙기도 한다.
+  getDb: () => ({
+    select: () => ({
+      from: () => ({
+        where: () => Object.assign(Promise.resolve([]), { limit: () => Promise.resolve([]) }),
+      }),
+    }),
+  }),
 }));
 
 vi.mock("@/lib/finance-db", () => ({
@@ -11,11 +18,16 @@ vi.mock("@/lib/finance-db", () => ({
   categoryKeywordRules: { householdId: "household_id" },
   categoryMappings: { householdId: "household_id" },
   categoryRules: { householdId: "household_id" },
+  households: { id: "id", name: "name" },
   householdMembers: { householdId: "household_id", userId: "user_id" },
   householdInvites: { householdId: "household_id" },
   users: { id: "id" },
   people: { id: "id", displayName: "display_name", householdId: "household_id" },
 }));
+
+// members-actions.ts가 signOut을 직접 import하므로, 이 페이지 테스트에서도 next-auth 실제
+// 모듈이 로드되지 않도록(엣지 런타임 관련 import 에러 방지) @/auth를 목으로 대체한다.
+vi.mock("@/auth", () => ({ auth: vi.fn(), signOut: vi.fn() }));
 
 vi.mock("@/lib/spending-queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/spending-queries")>()),

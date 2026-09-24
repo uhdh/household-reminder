@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, householdInvites, householdMembers, users } from "@/lib/finance-db";
+import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, households, householdInvites, householdMembers, users } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
 import { getActiveTransactions, getHouseholdPeople, toNum } from "@/lib/spending-queries";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
@@ -19,6 +19,7 @@ import {
 } from "./actions";
 import { cancelInviteAction } from "./members-actions";
 import { CreateInviteForm } from "./create-invite-form";
+import { DeleteHouseholdForm, LeaveHouseholdForm } from "./danger-zone";
 import { UploadForm } from "@/app/finance/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
   const { householdId, role } = await requireHouseholdOrOnboard();
   const db = getDb();
-  const [mappings, rules, keywordRules, budgets, { transactions: allTx }, memberRows, invites, householdPeople] = await Promise.all([
+  const [mappings, rules, keywordRules, budgets, { transactions: allTx }, memberRows, invites, householdPeople, [household]] = await Promise.all([
     db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
     db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
     db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
@@ -64,6 +65,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     db.select().from(householdMembers).where(eq(householdMembers.householdId, householdId)),
     db.select().from(householdInvites).where(eq(householdInvites.householdId, householdId)),
     getHouseholdPeople(householdId),
+    db.select().from(households).where(eq(households.id, householdId)).limit(1),
   ]);
 
   const memberUserIds = memberRows.map((m) => m.userId);
@@ -504,6 +506,22 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </ul>
             </div>
           )}
+
+          <div className="seed-card p-5 shadow-none sm:p-7">
+            <h2 className="mb-4 text-[18px] font-extrabold text-fg-critical">위험 구역</h2>
+            <div className="space-y-6">
+              <div>
+                <h3 className="mb-2 text-[14px] font-bold text-ink">가구 나가기</h3>
+                <LeaveHouseholdForm isOnlyMember={members.length <= 1} error={error} />
+              </div>
+              {role === "owner" && household && (
+                <div className="border-t border-hairline2 pt-6">
+                  <h3 className="mb-2 text-[14px] font-bold text-ink">가구 삭제</h3>
+                  <DeleteHouseholdForm householdName={household.name} error={error} />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
       </div>
