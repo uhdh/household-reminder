@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { people, transactions, uploads } from "@/lib/finance-db";
 
@@ -28,6 +28,32 @@ export async function getHouseholdPeople(householdId: string): Promise<{ id: str
   return db.select({ id: people.id, displayName: people.displayName }).from(people).where(eq(people.householdId, householdId));
 }
 
+type UploadMeta = { id: string; uploadedAt: Date };
+
+/**
+ * 같은 (personId, txnDate)에 대해 재업로드로 겹치는 행이 남아있어도 가장 최근 업로드(uploadedAt)
+ * 행만 남긴다. getActiveTransactions류 함수들이 전체 히스토리든 날짜 범위로 좁힌 행이든 동일하게
+ * 쓰는 공통 로직 - 날짜 범위로 좁혀 가져와도 경쟁하는 두 행은 항상 같은 날짜(같은 쿼리 범위)에
+ * 있으므로 결과가 전체를 불러와 필터링한 것과 같다.
+ */
+function dedupeActiveRows<T extends { personId: string; txnDate: string; uploadId: string }>(
+  rows: T[],
+  uploadRows: UploadMeta[]
+): T[] {
+  const uploadById = new Map(uploadRows.map((upload) => [upload.id, upload]));
+  const latestUploadByDate = new Map<string, string>();
+
+  for (const row of rows) {
+    const key = `${row.personId}|${row.txnDate}`;
+    const currentId = latestUploadByDate.get(key);
+    const candidate = uploadById.get(row.uploadId);
+    const current = currentId ? uploadById.get(currentId) : null;
+    if (!current || (candidate && candidate.uploadedAt > current.uploadedAt)) latestUploadByDate.set(key, row.uploadId);
+  }
+
+  return rows.filter((row) => latestUploadByDate.get(`${row.personId}|${row.txnDate}`) === row.uploadId);
+}
+
 /** 모든 업로드에서 누적된 거래 전체를 가져온다. 자산만 최신 업로드 스냅샷을 사용한다. */
 export async function getActiveTransactions(householdId: string): Promise<{
   transactions: Txn[];
@@ -40,21 +66,130 @@ export async function getActiveTransactions(householdId: string): Promise<{
     getHouseholdPeople(householdId),
   ]);
   const displayNameByPerson = new Map<string, string>(peopleRows.map((p) => [p.id, p.displayName]));
-  const uploadById = new Map(uploadRows.map((upload) => [upload.id, upload]));
-  const latestUploadByDate = new Map<string, string>();
+  return { transactions: dedupeActiveRows(rows, uploadRows), displayNameByPerson };
+}
 
-  for (const row of rows) {
-    const key = `${row.personId}|${row.txnDate}`;
-    const currentId = latestUploadByDate.get(key);
-    const candidate = uploadById.get(row.uploadId);
-    const current = currentId ? uploadById.get(currentId) : null;
-    if (!current || (candidate && candidate.uploadedAt > current.uploadedAt)) latestUploadByDate.set(key, row.uploadId);
-  }
+/**
+ * getActiveTransactions와 같지만 txn_date가 [fromDate, toDateExclusive) 범위인 행만 SQL WHERE로
+ * 가져온다(household_id + 날짜 범위). 월별/연간/세부 내역 화면이 필요한 기간만 조회할 때 쓴다.
+ * uploads는 가구당 행 수가 적어(파일 업로드 횟수만큼) 범위를 좁히지 않고 전체를 가져와도 무겁지 않다.
+ */
+export async function getActiveTransactionsInRange(
+  householdId: string,
+  fromDate: string,
+  toDateExclusive: string
+): Promise<{ transactions: Txn[]; displayNameByPerson: Map<string, string> }> {
+  const db = getDb();
+  const [rows, uploadRows, peopleRows] = await Promise.all([
+    db
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.householdId, householdId), gte(transactions.txnDate, fromDate), lt(transactions.txnDate, toDateExclusive))),
+    db.select().from(uploads).where(eq(uploads.householdId, householdId)),
+    getHouseholdPeople(householdId),
+  ]);
+  const displayNameByPerson = new Map<string, string>(peopleRows.map((p) => [p.id, p.displayName]));
+  return { transactions: dedupeActiveRows(rows, uploadRows), displayNameByPerson };
+}
 
-  return {
-    transactions: rows.filter((row) => latestUploadByDate.get(`${row.personId}|${row.txnDate}`) === row.uploadId),
-    displayNameByPerson,
-  };
+export type MerchantHistoryRow = {
+  id: string;
+  description: string | null;
+  category: string | null;
+  subcategory: string | null;
+  stdCategory: string | null;
+  txnType: string;
+};
+
+/**
+ * 세부 내역의 카테고리 추천/자주 쓰는/가맹점 건수/병합 토스트 대상 찾기는 가구 전체 과거
+ * 이력이 필요하지만(특정 월로 좁힐 수 없음), 행 표시에 안 쓰는 컬럼(금액·결제수단·수혜자 등)은
+ * 필요 없다. 필요한 컬럼만 select해 전송량을 줄인다.
+ */
+export async function getMerchantHistory(householdId: string): Promise<MerchantHistoryRow[]> {
+  const db = getDb();
+  const [rows, uploadRows] = await Promise.all([
+    db
+      .select({
+        id: transactions.id,
+        personId: transactions.personId,
+        txnDate: transactions.txnDate,
+        uploadId: transactions.uploadId,
+        description: transactions.description,
+        category: transactions.category,
+        subcategory: transactions.subcategory,
+        stdCategory: transactions.stdCategory,
+        txnType: transactions.txnType,
+      })
+      .from(transactions)
+      .where(eq(transactions.householdId, householdId)),
+    db.select().from(uploads).where(eq(uploads.householdId, householdId)),
+  ]);
+  return dedupeActiveRows(rows, uploadRows).map(({ id, description, category, subcategory, stdCategory, txnType }) => ({
+    id,
+    description,
+    category,
+    subcategory,
+    stdCategory,
+    txnType,
+  }));
+}
+
+/** 가구에 활성 거래가 하나라도 있는지(온보딩 빈 상태 판정용). 존재 여부만 필요하므로 dedup 없이 1행만 확인한다. */
+export async function hasAnyTransaction(householdId: string): Promise<boolean> {
+  const db = getDb();
+  const [row] = await db.select({ id: transactions.id }).from(transactions).where(eq(transactions.householdId, householdId)).limit(1);
+  return !!row;
+}
+
+function currentMonthYear(): { month: string; year: number } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return { month, year };
+}
+
+/**
+ * latestMonth/latestYear(includedTx)와 동치: 집계에 잡히는(included=true, 미분류 이체 제외) 거래 중
+ * 가장 최근 txn_date의 월/연. 전체 이력을 불러오지 않고 max(txn_date) 1행만 조회한다.
+ * ponytail: 같은 (personId, txnDate)에 재업로드 중복이 남아있고 그 중 하나만 조건에 맞는 극단적인
+ * 경우 이론상 오차가 날 수 있지만(업로드 시 델리트 후 재삽입이라 실사용에서 사실상 발생하지 않음),
+ * 정확한 dedup이 필요하면 getActiveTransactions 계열로 전환.
+ */
+export async function getLatestActivePeriod(householdId: string): Promise<{ month: string; year: number }> {
+  const db = getDb();
+  const [row] = await db
+    .select({ maxDate: sql<string | null>`max(${transactions.txnDate})` })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.householdId, householdId),
+        eq(transactions.included, true),
+        or(ne(transactions.txnType, "이체"), isNotNull(transactions.stdCategory))
+      )
+    );
+  const maxDate = row?.maxDate ?? null;
+  if (!maxDate) return currentMonthYear();
+  return { month: maxDate.slice(0, 7), year: Number(maxDate.slice(0, 4)) };
+}
+
+/**
+ * 세부 내역 화면의 기본 월 계산 기준(visibleTx: included이거나 자산수정)으로 가장 최근 txn_date의 월.
+ * getLatestActivePeriod와 필터 기준이 달라(자산수정 포함) 별도 함수로 둔다.
+ */
+export async function getLatestVisibleMonth(householdId: string): Promise<string> {
+  const db = getDb();
+  const [row] = await db
+    .select({ maxDate: sql<string | null>`max(${transactions.txnDate})` })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.householdId, householdId),
+        or(eq(transactions.included, true), eq(transactions.stdCategory, "자산수정"))
+      )
+    );
+  const maxDate = row?.maxDate ?? null;
+  return maxDate ? maxDate.slice(0, 7) : currentMonthYear().month;
 }
 
 export function beneficiaryLabel(value: string, displayNameByPerson: Map<string, string>): string {
@@ -102,6 +237,16 @@ export type SpendingEmptyState = "onboarding" | "period" | null;
  */
 export function classifySpendingEmptyState(allTx: readonly unknown[], periodTx: readonly unknown[]): SpendingEmptyState {
   if (allTx.length === 0) return "onboarding";
+  if (periodTx.length === 0) return "period";
+  return null;
+}
+
+/**
+ * classifySpendingEmptyState와 동치이지만, 가구 전체 이력을 불러오지 않고 hasAnyTransaction()으로
+ * 구한 존재 여부(householdHasAny)만으로 판정한다. 월별/연간 화면처럼 조회 기간만 SQL로 좁혀 가져올 때 쓴다.
+ */
+export function classifySpendingEmptyStateScoped(householdHasAny: boolean, periodTx: readonly unknown[]): SpendingEmptyState {
+  if (!householdHasAny) return "onboarding";
   if (periodTx.length === 0) return "period";
   return null;
 }

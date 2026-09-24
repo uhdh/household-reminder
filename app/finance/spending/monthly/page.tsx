@@ -4,14 +4,15 @@ import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import {
-  classifySpendingEmptyState,
+  classifySpendingEmptyStateScoped,
   compareMonthlySummaries,
   countsInTotals,
   MONTH_RE,
   flowLabel,
-  getActiveTransactions,
+  getActiveTransactionsInRange,
+  getLatestActivePeriod,
+  hasAnyTransaction,
   isPersonId,
-  latestMonth,
   monthKeyOf,
   shiftMonth,
   summarizeMonthlyTransactions,
@@ -88,15 +89,25 @@ export default async function MonthlyPage({
   }
 
   const { householdId } = await requireHouseholdOrOnboard();
-  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions(householdId);
+
+  // 월 파라미터가 없을 때만 가구 전체에서 최근 월을 조회한다(집계에 잡히는 거래 기준, latestMonth와 동치).
+  const monthNeedsLookup = !(monthParam && MONTH_RE.test(monthParam));
+  const [householdHasAny, latestPeriod] = await Promise.all([
+    hasAnyTransaction(householdId),
+    monthNeedsLookup ? getLatestActivePeriod(householdId) : Promise.resolve(null),
+  ]);
+  const month = monthNeedsLookup ? latestPeriod!.month : monthParam!;
+  const prevMonth = shiftMonth(month, -1);
+
+  // 이번 달 + 전월(비교용)만 SQL로 가져온다. household_id + txn_date 범위(전월 1일 ~ 이번 달 다음 달 1일 직전).
+  const { transactions: rangeTx, displayNameByPerson } = await getActiveTransactionsInRange(householdId, `${prevMonth}-01`, `${shiftMonth(month, 1)}-01`);
   const personIds = Array.from(displayNameByPerson.keys());
   const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
-  const includedTx = allTx.filter(countsInTotals);
-  const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(includedTx);
-  const periodTxAll = allTx.filter((t) => monthKeyOf(t.txnDate) === month && (personFilter === "all" || t.personId === personFilter));
+  const includedTx = rangeTx.filter(countsInTotals);
+  const periodTxAll = rangeTx.filter((t) => monthKeyOf(t.txnDate) === month && (personFilter === "all" || t.personId === personFilter));
   const monthTx = periodTxAll.filter(countsInTotals);
   const exclusion = unmappedTransferExclusion(periodTxAll);
-  const emptyState = classifySpendingEmptyState(allTx, periodTxAll);
+  const emptyState = classifySpendingEmptyStateScoped(householdHasAny, periodTxAll);
 
   const db = getDb();
   const budgetRows = await db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId));
@@ -112,7 +123,6 @@ export default async function MonthlyPage({
   const summary = summarizeMonthlyTransactions(monthTx, kindOf, personIds);
   const { categoryTotals } = summary;
 
-  const prevMonth = shiftMonth(month, -1);
   const prevMonthTx = includedTx.filter((t) => monthKeyOf(t.txnDate) === prevMonth && (personFilter === "all" || t.personId === personFilter));
   const prevSummary = prevMonthTx.length > 0 ? summarizeMonthlyTransactions(prevMonthTx, kindOf, personIds) : null;
   const comparison = compareMonthlySummaries(summary, prevSummary);

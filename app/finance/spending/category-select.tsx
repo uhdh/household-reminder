@@ -1,14 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ActionButton } from "@/components/ui";
 import { suggestKeywordFromDescription } from "@/lib/spending-derive";
 import { createKeywordRuleAndApplyAction, updateTransactionCategoryAction, updateTransactionsCategoryAction } from "./actions";
 import { CategoryPicker, type CategoryOption } from "./category-picker";
-import { displayCategoryLabel, merchantCountKey } from "./category-suggest";
+import { displayCategoryLabel } from "./category-suggest";
 
 export const UNMAPPED_VALUE = "__미분류__";
+
+// 세부 내역 목록처럼 같은 가구 공통 데이터(카테고리 목록·자주 쓰는 카테고리)를 행마다 반복해서
+// prop으로 내려보내지 않도록 Provider로 한 번만 전달한다. options/frequentCategories를 직접
+// 넘기면(테스트 등) 그 값을 우선하고, 없으면 이 컨텍스트 값을 쓴다.
+type CategoryOptionsValue = { options: CategoryOption[]; frequentCategories: string[] };
+const CategoryOptionsContext = createContext<CategoryOptionsValue | null>(null);
+
+export function CategoryOptionsProvider({
+  options,
+  frequentCategories = [],
+  children,
+}: {
+  options: CategoryOption[];
+  frequentCategories?: string[];
+  children: ReactNode;
+}) {
+  return <CategoryOptionsContext value={{ options, frequentCategories }}>{children}</CategoryOptionsContext>;
+}
 
 export function CategorySelect({
   txnId,
@@ -18,21 +36,25 @@ export function CategorySelect({
   description,
   txnType = "지출",
   recommendations = [],
-  frequentCategories = [],
-  merchantCounts = {},
+  frequentCategories,
+  sameMerchantCount = 0,
   autoOpen = false,
 }: {
   txnId: string;
   value: string | null;
-  options: CategoryOption[];
+  options?: CategoryOption[];
   returnTo: string;
   description?: string | null;
   txnType?: string;
   recommendations?: string[];
   frequentCategories?: string[];
-  merchantCounts?: Record<string, number>;
+  /** 같은 가맹점(설명 정규화)+같은 txnType의 다른 거래 건수(자기 자신 제외). 병합 토스트 노출 여부 판단용. */
+  sameMerchantCount?: number;
   autoOpen?: boolean;
 }) {
+  const shared = useContext(CategoryOptionsContext);
+  const resolvedOptions = options ?? shared?.options ?? [];
+  const resolvedFrequent = frequentCategories ?? shared?.frequentCategories ?? [];
   const formRef = useRef<HTMLFormElement>(null);
   const stdCategoryInputRef = useRef<HTMLInputElement>(null);
   const returnToInputRef = useRef<HTMLInputElement>(null);
@@ -42,11 +64,10 @@ export function CategorySelect({
 
     // 같은 가맹점+같은 txnType의 다른 거래가 있으면, 저장 후 돌아온 화면에서 일괄 적용 토스트를
     // 띄우도록 returnTo에 쿼리를 실어 보낸다(서버 액션이 redirect()로 이동하므로 클라이언트
-    // 상태로는 못 넘긴다). merchantCounts도 findMatchingTransactionIds와 같은 (가맹점 키, txnType)
-    // 기준으로 세므로, 여기서 0건이면 page.tsx가 계산하는 실제 대상도 0건이라 쿼리 자체를 안 붙인다.
+    // 상태로는 못 넘긴다). sameMerchantCount는 page.tsx가 findMatchingTransactionIds와 같은
+    // (가맹점 키, txnType) 기준으로 미리 세어 내려준 값이라, 여기서 0건이면 실제 대상도 0건이다.
     const merchantKey = suggestKeywordFromDescription(description);
-    const otherCount = merchantKey ? (merchantCounts[merchantCountKey(merchantKey, txnType)] ?? 0) - 1 : 0;
-    const canSuggestMerge = name !== null && otherCount > 0;
+    const canSuggestMerge = name !== null && sameMerchantCount > 0;
     const toastQuery = canSuggestMerge
       ? `${returnTo.includes("?") ? "&" : "?"}toastMerchant=${encodeURIComponent(merchantKey)}&toastCategory=${encodeURIComponent(name)}&toastTxnType=${encodeURIComponent(txnType)}&toastTxnId=${encodeURIComponent(txnId)}`
       : "";
@@ -71,9 +92,9 @@ export function CategorySelect({
       <input ref={returnToInputRef} type="hidden" name="returnTo" defaultValue={returnTo} />
       <CategoryPicker
         value={value}
-        options={options}
+        options={resolvedOptions}
         recommendations={recommendations}
-        frequentCategories={frequentCategories}
+        frequentCategories={resolvedFrequent}
         onSelect={handleSelect}
         ariaLabel={`카테고리 변경, 현재 ${displayCategoryLabel(value)}`}
         triggerClassName={chipClassName}

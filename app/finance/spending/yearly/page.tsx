@@ -5,12 +5,13 @@ import { budgetCategories } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import {
-  classifySpendingEmptyState,
+  classifySpendingEmptyStateScoped,
   countsInTotals,
   flowLabel,
-  getActiveTransactions,
+  getActiveTransactionsInRange,
+  getLatestActivePeriod,
+  hasAnyTransaction,
   isPersonId,
-  latestYear,
   monthOf,
   toNum,
   unmappedTransferExclusion,
@@ -92,16 +93,19 @@ export default async function YearlyPage({
   }
 
   const { householdId } = await requireHouseholdOrOnboard();
-  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions(householdId);
+  // maxYear(다음 해 이동 가능 여부)는 연도 파라미터 유무와 무관하게 항상 필요하므로 매번 조회한다.
+  const [householdHasAny, latestPeriod] = await Promise.all([hasAnyTransaction(householdId), getLatestActivePeriod(householdId)]);
+  const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : latestPeriod.year;
+  const maxYear = Math.max(new Date().getFullYear(), latestPeriod.year);
+
+  // 해당 연도만 SQL로 가져온다. household_id + txn_date 범위(그 해 1/1 ~ 다음 해 1/1 직전).
+  const { transactions: yearRangeTx, displayNameByPerson } = await getActiveTransactionsInRange(householdId, `${year}-01-01`, `${year + 1}-01-01`);
   const personIds = Array.from(displayNameByPerson.keys());
   const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
-  const includedTx = allTx.filter(countsInTotals);
-  const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : latestYear(includedTx);
-  const periodTxAll = allTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));
+  const periodTxAll = yearRangeTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));
   const yearTx = periodTxAll.filter(countsInTotals);
   const exclusion = unmappedTransferExclusion(periodTxAll);
-  const emptyState = classifySpendingEmptyState(allTx, periodTxAll);
-  const maxYear = Math.max(new Date().getFullYear(), latestYear(includedTx));
+  const emptyState = classifySpendingEmptyStateScoped(householdHasAny, periodTxAll);
 
   const db = getDb();
   const budgetRows = await db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId));

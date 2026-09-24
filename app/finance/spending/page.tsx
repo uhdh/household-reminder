@@ -3,29 +3,33 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
+import { suggestKeywordFromDescription } from "@/lib/spending-derive";
 import {
   MONTH_RE,
   beneficiaryLabel,
-  classifySpendingEmptyState,
+  classifySpendingEmptyStateScoped,
   flowLabel,
-  getActiveTransactions,
+  getActiveTransactionsInRange,
+  getLatestVisibleMonth,
+  getMerchantHistory,
+  hasAnyTransaction,
   isBeneficiary,
   isPersonId,
-  latestMonth,
-  monthKeyOf,
+  shiftMonth,
   toNum,
   type PersonId,
 } from "@/lib/spending-queries";
 import { formatKRW } from "@/lib/finance-format";
 import { ActionButton, SelectInput, TextInput } from "@/components/ui";
 import { BeneficiarySelect } from "./beneficiary-select";
-import { CategoryMergeToast, CategorySelect } from "./category-select";
+import { CategoryMergeToast, CategoryOptionsProvider, CategorySelect } from "./category-select";
 import {
   buildMerchantCategoryIndex,
   buildMerchantCounts,
   buildRawCategoryIndex,
   findMatchingTransactionIds,
   findNextUnclassifiedId,
+  merchantCountKey,
   recommendCategoriesForTransaction,
   topFrequentCategories,
 } from "./category-suggest";
@@ -83,10 +87,25 @@ export default async function SpendingPage({
 
   const { householdId } = await requireHouseholdOrOnboard();
   const db = getDb();
-  const [{ transactions: allTx, displayNameByPerson }, budgetRows] = await Promise.all([
-    getActiveTransactions(householdId),
+
+  // 월 파라미터가 없으면(기본값) 가구 전체에서 가장 최근 월을 찾아야 하므로 그때만 조회한다.
+  // 나머지(존재 여부·추천용 이력·카테고리 목록)는 월과 무관하게 항상 필요하므로 병렬로 가져온다.
+  const monthNeedsLookup = !(monthParam && MONTH_RE.test(monthParam));
+  const [householdHasAny, history, budgetRows, latestVisibleMonth] = await Promise.all([
+    hasAnyTransaction(householdId),
+    getMerchantHistory(householdId),
     db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
+    monthNeedsLookup ? getLatestVisibleMonth(householdId) : Promise.resolve(null),
   ]);
+  const month = monthNeedsLookup ? latestVisibleMonth! : monthParam!;
+
+  // 세부 내역은 조회 중인 월(+필터 조건)만 SQL로 가져온다. household_id + txn_date 범위 조건.
+  const { transactions: monthRowsAll, displayNameByPerson } = await getActiveTransactionsInRange(
+    householdId,
+    `${month}-01`,
+    `${shiftMonth(month, 1)}-01`
+  );
+
   const personIds = Array.from(displayNameByPerson.keys());
   const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
   const categoryOptions = [...budgetRows]
@@ -98,27 +117,24 @@ export default async function SpendingPage({
   const query = q?.trim().slice(0, 50) ?? "";
   // 자산수정은 집계에서는 제외하지만, 사용자가 다른 카테고리로 변경할 수 있도록
   // 세부 내역 화면에는 계속 노출한다.
-  const visibleTx = allTx.filter((t) => t.included || t.stdCategory === "자산수정");
+  const monthTx = monthRowsAll.filter((t) => t.included || t.stdCategory === "자산수정");
   // 가구 전체에 거래가 하나도 없을 때만 온보딩형 빈 상태를 보여준다. 필터·월 선택으로 인한
   // "이 조건엔 없음"은 아래 목록의 기존 안내 문구로 충분하다.
-  const isHouseholdEmpty = classifySpendingEmptyState(allTx, visibleTx) === "onboarding";
+  const isHouseholdEmpty = classifySpendingEmptyStateScoped(householdHasAny, monthTx) === "onboarding";
 
-  const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(visibleTx);
-
-  // 카테고리 추천/자주 쓰는 계산은 이미 불러온 전체 활성 거래(allTx)로 서버에서 한 번만 계산해
-  // prop으로 내려준다(행마다 추가 쿼리를 하지 않는다).
-  const merchantIndex = buildMerchantCategoryIndex(allTx);
-  const rawIndex = buildRawCategoryIndex(allTx);
-  const merchantCounts = buildMerchantCounts(allTx);
+  // 카테고리 추천/자주 쓰는/가맹점 건수 계산은 가구 전체 이력(history, 행 표시에 필요 없는
+  // 컬럼은 뺀 최소 컬럼)으로 서버에서 한 번만 계산해 각 행에는 결과값만 내려준다.
+  const merchantIndex = buildMerchantCategoryIndex(history);
+  const rawIndex = buildRawCategoryIndex(history);
+  const merchantCounts = buildMerchantCounts(history);
 
   // 병합 토스트가 실제로 바꿀 대상: 정규화 가맹점 키 + txnType이 정확히 같은 다른 거래만
   // (ILIKE 부분일치가 아님). 표시 건수 = 이 배열 길이이므로 항상 일치한다.
   const toastTxnIds =
     toastMerchant && toastCategory
-      ? findMatchingTransactionIds(allTx, toastMerchant, toastTxnType ?? "지출", toastTxnId)
+      ? findMatchingTransactionIds(history, toastMerchant, toastTxnType ?? "지출", toastTxnId)
       : [];
 
-  const monthTx = visibleTx.filter((t) => monthKeyOf(t.txnDate) === month);
   const monthPersonTx = personFilter === "all" ? monthTx : monthTx.filter((t) => t.personId === personFilter);
   const filtered = monthPersonTx
     .filter((t) => flowFilter === "all" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
@@ -276,6 +292,7 @@ export default async function SpendingPage({
       />
 
       {!isHouseholdEmpty && (
+      <CategoryOptionsProvider options={categoryOptions} frequentCategories={frequentCategories}>
       <TransactionBulkDeleteForm
         transactionIds={filtered.map((transaction) => transaction.id)}
         returnTo={returnTo}
@@ -313,6 +330,11 @@ export default async function SpendingPage({
               const displayedCategory = t.stdCategory ?? "미분류";
               const payerLabel = beneficiaryLabel(t.personId, displayNameByPerson);
               const amount = toNum(t.amount);
+              // 이 행 전용 값만 클라이언트로 내려보낸다: 추천 카테고리(최대 3개)와 같은 가맹점
+              // 건수(숫자 1개). categoryOptions/frequentCategories 같은 가구 공통 데이터는
+              // CategoryOptionsProvider가 한 번만 직렬화해 내려주므로 행마다 반복하지 않는다.
+              const merchantKey = suggestKeywordFromDescription(t.description);
+              const sameMerchantCount = merchantKey ? (merchantCounts[merchantCountKey(merchantKey, t.txnType)] ?? 0) - 1 : 0;
               return (
                 <tr
                   key={t.id}
@@ -325,13 +347,11 @@ export default async function SpendingPage({
                       <CategorySelect
                         txnId={t.id}
                         value={t.stdCategory}
-                        options={categoryOptions}
                         returnTo={returnTo}
                         description={t.description}
                         txnType={t.txnType}
                         recommendations={recommendCategoriesForTransaction(t, merchantIndex, rawIndex)}
-                        frequentCategories={frequentCategories}
-                        merchantCounts={merchantCounts}
+                        sameMerchantCount={sameMerchantCount}
                         autoOpen={reviewMode && t.id === autoOpenTxnId}
                       />
                       {rawCategory !== displayedCategory && <span className="text-[10px] text-ink-muted/70">원본: {rawCategory}</span>}
@@ -370,6 +390,7 @@ export default async function SpendingPage({
         </table>
       </div>
       </TransactionBulkDeleteForm>
+      </CategoryOptionsProvider>
       )}
     </div>
   );
