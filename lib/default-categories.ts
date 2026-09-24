@@ -145,9 +145,24 @@ export const CATEGORY_KEYWORD_RULES: {
   { txnType: "지출", keyword: "카카오모빌리티", stdCategory: "식비" },
 ];
 
-/** 새 가구 온보딩 시 기본 카테고리매핑·키워드규칙·예산카테고리를 시드한다. 멱등(onConflict 갱신). */
-export async function seedDefaultCategories(db: AppDb, householdId: string): Promise<void> {
-  for (const m of CATEGORY_MAPPINGS) {
+// 위 데이터는 "우리집" 원본이라, 다른 가구에 그대로 주면 안 되는 개인 항목이 섞여 있다.
+const HOUSEHOLD_SPECIFIC_CATEGORIES = new Set(["엄마용돈", "기프티콘당근", "부업 블로그"]);
+
+/**
+ * 기본 카테고리매핑·키워드규칙·예산카테고리를 시드한다. 멱등(onConflict 갱신).
+ * generic=true(새 가구 온보딩)면 우리집 전용 카테고리·예산 금액·키워드 규칙(실명·특정 가맹점)과
+ * 저축/투자 이체를 월급으로 보던 우리집 회계 규칙을 빼고 일반적인 기본값만 넣는다.
+ */
+export async function seedDefaultCategories(db: AppDb, householdId: string, { generic = false } = {}): Promise<void> {
+  const mappings = generic
+    ? CATEGORY_MAPPINGS.filter((m) => !HOUSEHOLD_SPECIFIC_CATEGORIES.has(m.stdCategory) && m.txnType !== "이체")
+    : CATEGORY_MAPPINGS;
+  const keywordRules = generic ? [] : CATEGORY_KEYWORD_RULES;
+  const budgets = generic
+    ? BUDGET_CATEGORIES.filter((b) => !HOUSEHOLD_SPECIFIC_CATEGORIES.has(b.name)).map((b) => ({ ...b, monthlyBudget: null }))
+    : BUDGET_CATEGORIES;
+
+  for (const m of mappings) {
     await db
       .insert(categoryMappings)
       .values({ ...m, householdId })
@@ -157,7 +172,7 @@ export async function seedDefaultCategories(db: AppDb, householdId: string): Pro
       });
   }
 
-  for (const kr of CATEGORY_KEYWORD_RULES) {
+  for (const kr of keywordRules) {
     await db
       .insert(categoryKeywordRules)
       .values({ ...kr, householdId })
@@ -167,7 +182,7 @@ export async function seedDefaultCategories(db: AppDb, householdId: string): Pro
       });
   }
 
-  for (const b of BUDGET_CATEGORIES) {
+  for (const b of budgets) {
     await db
       .insert(budgetCategories)
       .values({

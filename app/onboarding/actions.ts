@@ -41,7 +41,7 @@ export async function createHouseholdAction(formData: FormData) {
   await db.insert(households).values({ id: householdId, name: householdName });
   await db.insert(householdMembers).values({ householdId, userId: user.id, role: "owner" });
   await db.insert(people).values({ id: personId, householdId, displayName });
-  await seedDefaultCategories(db, householdId);
+  await seedDefaultCategories(db, householdId, { generic: true });
 
   redirect("/finance");
 }
