@@ -93,6 +93,19 @@ export function latestYear(rows: Txn[]): number {
   return Math.max(...rows.map((r) => yearOf(r.txnDate)));
 }
 
+export type SpendingEmptyState = "onboarding" | "period" | null;
+
+/**
+ * 가계부 빈 상태 판정. 가구 전체에 활성 거래가 하나도 없으면 온보딩 유도가 필요한
+ * "onboarding", 가구 전체는 데이터가 있지만 조회 중인 기간(월/연)에만 없으면 짧은
+ * 안내만 필요한 "period", 둘 다 아니면 null(정상 렌더).
+ */
+export function classifySpendingEmptyState(allTx: readonly unknown[], periodTx: readonly unknown[]): SpendingEmptyState {
+  if (allTx.length === 0) return "onboarding";
+  if (periodTx.length === 0) return "period";
+  return null;
+}
+
 export const MONTH_RE = /^\d{4}-\d{2}$/;
 
 export function shiftMonth(month: string, delta: number): string {

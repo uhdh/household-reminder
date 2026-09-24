@@ -11,6 +11,7 @@ import { DashboardCharts } from "./_components/charts";
 import { TargetAllocationCard } from "./_components/target-allocation";
 import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
 import { AppShell } from "@/components/ui";
+import { FinanceEmptyState } from "./_components/empty-state";
 import { DemoFinanceDashboard } from "./_components/demo-pages";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
@@ -273,17 +274,7 @@ export default async function DashboardPage({
         )}
 
         {!hasAnyData ? (
-          <div className="seed-card p-10 text-center shadow-none">
-            <p className="mb-4 text-[13px] text-ink-muted">
-              아직 업로드된 자산 데이터가 없습니다. 뱅크샐러드 엑셀 파일을 업로드해 주세요.
-            </p>
-            <Link
-              href="/finance/upload"
-              className="inline-block bg-legend1 px-4 py-2 text-[13px] font-medium text-canvas transition-opacity hover:opacity-90"
-            >
-              파일 업로드하러 가기
-            </Link>
-          </div>
+          <FinanceEmptyState secondaryHref="/finance/spending#manual-entry" secondaryLabel="직접 입력하기" />
         ) : (
           <>
             <HeroRow

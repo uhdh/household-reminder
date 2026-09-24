@@ -6,6 +6,7 @@ import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import {
   MONTH_RE,
   beneficiaryLabel,
+  classifySpendingEmptyState,
   flowLabel,
   getActiveTransactions,
   isBeneficiary,
@@ -34,6 +35,7 @@ import { ManualTransactionForm } from "./manual-transaction-form";
 import { TransactionDeleteButton } from "./transaction-delete-button";
 import { SelectAllTransactions, TransactionBulkDeleteForm, TransactionCheckbox } from "./transaction-bulk-delete";
 import { DemoTransactionList } from "@/app/finance/_components/demo-pages";
+import { FinanceEmptyState } from "@/app/finance/_components/empty-state";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +97,9 @@ export default async function SpendingPage({
   // 자산수정은 집계에서는 제외하지만, 사용자가 다른 카테고리로 변경할 수 있도록
   // 세부 내역 화면에는 계속 노출한다.
   const visibleTx = allTx.filter((t) => t.included || t.stdCategory === "자산수정");
+  // 가구 전체에 거래가 하나도 없을 때만 온보딩형 빈 상태를 보여준다. 필터·월 선택으로 인한
+  // "이 조건엔 없음"은 아래 목록의 기존 안내 문구로 충분하다.
+  const isHouseholdEmpty = classifySpendingEmptyState(allTx, visibleTx) === "onboarding";
 
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(visibleTx);
 
@@ -168,6 +173,10 @@ export default async function SpendingPage({
         <PersonFilter pathname="/finance/spending" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} extraParams={activeFilterParams} />
       </div>
 
+      {isHouseholdEmpty && <FinanceEmptyState secondaryHref="/finance/spending#manual-entry" secondaryLabel="직접 입력하기" />}
+
+      {!isHouseholdEmpty && (
+      <>
       <form method="get" className="seed-card mb-4 flex flex-wrap items-end gap-3 p-4 shadow-none sm:p-5">
         <input type="hidden" name="month" value={month} />
         {personFilter !== "all" && <input type="hidden" name="person" value={personFilter} />}
@@ -252,6 +261,8 @@ export default async function SpendingPage({
       )}
 
       {addError && <div className="mb-3 rounded-r2 bg-bg-critical-weak px-3 py-2 text-[12px] text-fg-critical">{addError}</div>}
+      </>
+      )}
 
       <ManualTransactionForm
         month={month}
@@ -261,6 +272,7 @@ export default async function SpendingPage({
         returnTo={returnTo}
       />
 
+      {!isHouseholdEmpty && (
       <TransactionBulkDeleteForm
         transactionIds={filtered.map((transaction) => transaction.id)}
         returnTo={returnTo}
@@ -355,6 +367,7 @@ export default async function SpendingPage({
         </table>
       </div>
       </TransactionBulkDeleteForm>
+      )}
     </div>
   );
 }

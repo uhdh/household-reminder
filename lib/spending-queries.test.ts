@@ -1,5 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { compareMonthlySummaries, countsInTotals, flowLabel, summarizeMonthlyTransactions, unmappedTransferExclusion, type Txn } from "./spending-queries";
+import {
+  classifySpendingEmptyState,
+  compareMonthlySummaries,
+  countsInTotals,
+  flowLabel,
+  summarizeMonthlyTransactions,
+  unmappedTransferExclusion,
+  type Txn,
+} from "./spending-queries";
 
 function makeTxn(overrides: Partial<Txn>): Txn {
   return {
@@ -155,5 +163,21 @@ describe("compareMonthlySummaries", () => {
     expect(comparison!.totalIncomeDelta).toBe(0);
     expect(comparison!.totalExpenseDelta).toBe(1080000);
     expect(comparison!.topIncreaseCategory).toEqual({ name: "월세", delta: 1000000 });
+  });
+});
+
+describe("classifySpendingEmptyState", () => {
+  const householdTx = [makeTxn({ txnDate: "2026-06-15" })];
+
+  test("returns onboarding when the household has no transactions at all", () => {
+    expect(classifySpendingEmptyState([], [])).toBe("onboarding");
+  });
+
+  test("returns period when the household has data but not for the viewed period", () => {
+    expect(classifySpendingEmptyState(householdTx, [])).toBe("period");
+  });
+
+  test("returns null when the viewed period has data", () => {
+    expect(classifySpendingEmptyState(householdTx, householdTx)).toBeNull();
   });
 });

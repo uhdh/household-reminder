@@ -5,6 +5,7 @@ import { budgetCategories } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import {
+  classifySpendingEmptyState,
   countsInTotals,
   flowLabel,
   getActiveTransactions,
@@ -19,6 +20,7 @@ import {
 import { PersonFilter } from "../person-filter";
 import { YearlyView } from "./yearly-view";
 import { DemoYearlySpending } from "@/app/finance/_components/demo-pages";
+import { FinanceEmptyState, PeriodEmptyNote } from "@/app/finance/_components/empty-state";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +100,7 @@ export default async function YearlyPage({
   const periodTxAll = allTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));
   const yearTx = periodTxAll.filter(countsInTotals);
   const exclusion = unmappedTransferExclusion(periodTxAll);
+  const emptyState = classifySpendingEmptyState(allTx, periodTxAll);
   const maxYear = Math.max(new Date().getFullYear(), latestYear(includedTx));
 
   const db = getDb();
@@ -210,6 +213,12 @@ export default async function YearlyPage({
         <PersonFilter pathname="/finance/spending/yearly" periodKey="year" periodValue={String(year)} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
+      {emptyState === "onboarding" ? (
+        <FinanceEmptyState secondaryHref="/finance/spending#manual-entry" secondaryLabel="직접 입력하기" />
+      ) : emptyState === "period" ? (
+        <PeriodEmptyNote label="이 해" />
+      ) : (
+      <>
       {exclusion.count > 0 && (
         <div className="mb-4 rounded-r3 bg-bg-warning-weak px-4 py-2.5 text-[13px] text-ink-muted">
           분류 안 된 이체 {exclusion.count}건 · {formatKRW(exclusion.total)}은 집계에서 뺐어요 →{" "}
@@ -256,6 +265,8 @@ export default async function YearlyPage({
         </table>
       </div>
       </YearlyView>
+      </>
+      )}
     </div>
   );
 }

@@ -18,7 +18,7 @@ export function ManualTransactionForm({
   const defaultDate = today.startsWith(month) ? today : `${month}-01`;
 
   return (
-    <details className="seed-card mb-3 shadow-none">
+    <details id="manual-entry" className="seed-card mb-3 shadow-none">
       <summary className="cursor-pointer list-none px-5 py-4 text-[14px] font-extrabold text-fg-brand">
         + 세부 내역 추가
       </summary>

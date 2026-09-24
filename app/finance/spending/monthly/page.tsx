@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import {
+  classifySpendingEmptyState,
   compareMonthlySummaries,
   countsInTotals,
   MONTH_RE,
@@ -25,6 +26,7 @@ import { CategoryPie } from "./chart";
 import { PersonFilter } from "../person-filter";
 import { CategoryRow, UsageAmount } from "./category-row";
 import { DemoMonthlySpending } from "@/app/finance/_components/demo-pages";
+import { FinanceEmptyState, PeriodEmptyNote } from "@/app/finance/_components/empty-state";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 import { MonthlyNavigator } from "./monthly-navigator";
 
@@ -94,6 +96,7 @@ export default async function MonthlyPage({
   const periodTxAll = allTx.filter((t) => monthKeyOf(t.txnDate) === month && (personFilter === "all" || t.personId === personFilter));
   const monthTx = periodTxAll.filter(countsInTotals);
   const exclusion = unmappedTransferExclusion(periodTxAll);
+  const emptyState = classifySpendingEmptyState(allTx, periodTxAll);
 
   const db = getDb();
   const budgetRows = await db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId));
@@ -165,6 +168,12 @@ export default async function MonthlyPage({
         <PersonFilter pathname="/finance/spending/monthly" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
+      {emptyState === "onboarding" ? (
+        <FinanceEmptyState secondaryHref="/finance/spending#manual-entry" secondaryLabel="직접 입력하기" />
+      ) : emptyState === "period" ? (
+        <PeriodEmptyNote label="이 달" />
+      ) : (
+      <>
       {exclusion.count > 0 && (
         <div className="mb-4 rounded-r3 bg-bg-warning-weak px-4 py-2.5 text-[13px] text-ink-muted">
           분류 안 된 이체 {exclusion.count}건 · {formatKRW(exclusion.total)}은 집계에서 뺐어요 →{" "}
@@ -275,6 +284,8 @@ export default async function MonthlyPage({
           </ul>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
