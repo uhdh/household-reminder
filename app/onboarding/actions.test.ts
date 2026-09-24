@@ -111,7 +111,10 @@ describe("createHouseholdAction", () => {
     const keywordRules = await db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId));
     expect(mappings.length).toBeGreaterThan(0);
     expect(budgets.length).toBeGreaterThan(0);
-    expect(keywordRules.length).toBeGreaterThan(0);
+    // 새 가구에는 우리집 전용 정보(실명·가맹점 키워드 규칙, 예산 금액, 개인 카테고리)가 들어가면 안 된다.
+    expect(keywordRules).toHaveLength(0);
+    expect(budgets.every((b) => b.monthlyBudget === null)).toBe(true);
+    expect(budgets.some((b) => b.name === "엄마용돈")).toBe(false);
 
     // 새로 만든 가구에서 거래 하나를 넣고, 기존 월별/설정 페이지가 쓰는 getActiveTransactions가
     // 정상 동작하는지(다른 가구와 섞이지 않고) 확인한다.
