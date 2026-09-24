@@ -68,14 +68,12 @@ export default function PrivacyPage() {
             보유기간: 서비스 이용 기간 및 위탁계약 종료 시까지 / 이전 방법: 네트워크를 통한 전송
           </li>
           <li>
-            <span className="font-medium">Vercel</span> — 이전받는 국가: 미국 등 Vercel의 데이터센터
-            소재 국가 / 이전 항목: 접속 로그, 서비스 이용 중 발생하는 요청·응답 데이터 / 목적:
+            <span className="font-medium">Vercel</span> — 이전받는 국가: 미국(Vercel 서버 실행 지역) 및 요청을 전달하는 Vercel 엣지 네트워크 소재 국가 / 이전 항목: 접속 로그, 서비스 이용 중 발생하는 요청·응답 데이터 / 목적:
             애플리케이션 호스팅 및 실행 / 보유기간: 서비스 이용 기간 및 위탁계약 종료 시까지 /
             이전 방법: 네트워크를 통한 전송
           </li>
           <li>
-            <span className="font-medium">Neon</span> — 이전받는 국가: 미국 등 Neon의 데이터센터
-            소재 국가 / 이전 항목: 가입 정보 및 가구·가계부 관련 데이터 전체(2. 항목 참고) / 목적:
+            <span className="font-medium">Neon</span> — 이전받는 국가: 미국(버지니아 북부, AWS us-east-1) / 이전 항목: 가입 정보 및 가구·가계부 관련 데이터 전체(2. 항목 참고) / 목적:
             데이터베이스 호스팅 및 저장 / 보유기간: 서비스 이용 기간 및 위탁계약 종료 시까지 /
             이전 방법: 네트워크를 통한 전송
           </li>
