@@ -1,178 +1,41 @@
 import Link from "next/link";
 import { IconArrowUpBracketDownLine, IconLinechartUpXaxisLine, IconPerson2Line } from "@karrotmarket/react-monochrome-icon";
-import { and, eq, inArray } from "drizzle-orm";
 import { AppShell, Card } from "@/components/ui";
-import { getDb } from "@/lib/db";
-import { assetItems, budgetCategories, uploads } from "@/lib/finance-db";
-import { CATEGORY_PALETTE, formatManwon, toNumber } from "@/lib/finance-format";
-import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
-import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
-import { countsInTotals, flowLabel, getActiveTransactions, getHouseholdPeople, latestMonth, monthKeyOf, toNum } from "@/lib/spending-queries";
 import { SummaryCard } from "@/app/finance/_components/summary-card";
-import { AllocationCharts } from "@/app/finance/_components/charts";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 import { BrandHero } from "@/app/brand-hero";
-import { requireHousehold } from "@/lib/require-household";
+
+// 비로그인 방문자용 소개 페이지. 실데이터를 절대 쿼리하지 않는다 - 아래 숫자는 모두 가상의 예시다.
 
 const benefits = [
-  { Icon: IconArrowUpBracketDownLine, title: "한 번만 올리면", description: "정리는 자동" },
-  { Icon: IconPerson2Line, title: "각자 올리면", description: "한 화면에 합쳐서" },
-  { Icon: IconLinechartUpXaxisLine, title: "소비부터 투자까지", description: "한눈에 확인" },
+  { Icon: IconArrowUpBracketDownLine, title: "한 번만 올리면", description: "카테고리 분류·집계는 자동" },
+  { Icon: IconPerson2Line, title: "각자 올리면", description: "가족 데이터를 한 화면에 합쳐서" },
+  { Icon: IconLinechartUpXaxisLine, title: "소비부터 투자까지", description: "월별·연간 흐름을 한눈에" },
 ];
 
-const EXCLUDED_ASSET_CATEGORIES = new Set(["부동산", "동산", "전자금융 자산", "보험 자산"]);
-const EXCLUDED_DEBT_ITEMS = new Set(["husband|분양주택입주잔금대출"]);
-const ASSET_CATEGORY_OVERRIDES: Record<string, string> = {
-  "자유입출금 자산": "현금",
-  "현금 자산": "현금",
-  "저축성 자산": "예적금",
-};
+const steps = [
+  { title: "Google로 가입", description: "가구 이름과 표시 이름만 정하면 끝이에요." },
+  { title: "뱅크샐러드 엑셀 올리기", description: "앱에서 내려받은 파일을 그대로 올리면 자동으로 분류돼요." },
+  { title: "가족 초대(선택)", description: "초대 링크를 보내면 각자 올린 내역이 한 가계부로 합쳐져요." },
+];
 
-type ChartSlice = { label: string; value: number; color: string };
+const privacyPoints = [
+  "업로드한 엑셀 원본은 저장하지 않고, 필요한 거래·자산 항목만 저장해요.",
+  "가구별로 데이터가 분리되어 우리 가족만 볼 수 있어요.",
+  "모든 통신은 HTTPS로 암호화되고, 언제든 탈퇴·가구 삭제가 가능해요.",
+];
 
-function chartSlices(totals: Map<string, number>, limit = 5): ChartSlice[] {
-  const entries = Array.from(totals.entries()).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]);
-  const leading = entries.slice(0, limit);
-  const rest = entries.slice(limit).reduce((sum, [, value]) => sum + value, 0);
-  if (rest > 0) leading.push(["기타", rest]);
-  return leading.map(([label, value], index) => ({ label, value, color: CATEGORY_PALETTE[index % CATEGORY_PALETTE.length] }));
-}
+const sampleVariable = [
+  { name: "식비", value: 820_000, fill: "#2E7DD7" },
+  { name: "생필품", value: 460_000, fill: "#F36B2A" },
+  { name: "교통", value: 180_000, fill: "#17A875" },
+  { name: "문화", value: 140_000, fill: "#F2A900" },
+  { name: "기타", value: 210_000, fill: "#DD6B9A" },
+];
 
-function CompositionCard({ title, items }: { title: string; items: { label: string; value: number; color: string }[] }) {
-  const total = items.reduce((sum, item) => sum + item.value, 0);
-  return (
-    <section className="seed-card p-5 shadow-none sm:p-7">
-      <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-[18px] font-extrabold text-ink">{title}</h2>
-        <span className="text-[17px] font-bold tabular-nums text-ink">{formatManwon(total)}</span>
-      </div>
-      <div className="mb-4 flex h-3 gap-[3px] overflow-hidden rounded-full" aria-hidden="true">
-        {items.map((item, index) => <span key={`${item.label}-${index}`} className={`rounded-full ${item.color}`} style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }} />)}
-      </div>
-      <ul className="flex flex-wrap justify-between gap-x-6 gap-y-2">
-        {items.map((item, index) => (
-          <li key={`${item.label}-${index}`} className="flex items-center gap-2 text-[14px]">
-            <span className={`h-2.5 w-2.5 rounded-[3px] ${item.color}`} aria-hidden="true" />
-            <span className="text-ink">{item.label}</span>
-            <span className="font-bold tabular-nums text-ink">{formatManwon(item.value)}</span>
-            <span className="tabular-nums text-ink-muted">{total > 0 ? ((item.value / total) * 100).toFixed(0) : 0}%</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-export async function StartView({ showHomeLink = false, personFilter = "all" }: { showHomeLink?: boolean; personFilter?: string }) {
-  // "/"는 로그인 없이도 열리는 공개 페이지라 가구를 알 수 없다. 데모 모드거나(비로그인) 소속 가구가
-  // 없으면 실데이터를 절대 쿼리하지 않고 빈 미리보기 상태로 내려간다(타 가구 데이터 노출 방지).
-  const demo = await isFinanceDemoMode();
-  let householdId: string | null = null;
-  if (!demo) {
-    try {
-      householdId = (await requireHousehold()).householdId;
-    } catch {
-      householdId = null;
-    }
-  }
-
-  const db = getDb();
-  const [activeUploads, { transactions }, budgetRows, householdPeople] = householdId
-    ? await Promise.all([
-        db.select().from(uploads).where(and(eq(uploads.householdId, householdId), eq(uploads.isActive, true))),
-        getActiveTransactions(householdId),
-        db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
-        getHouseholdPeople(householdId),
-      ])
-    : [
-        [] as (typeof uploads.$inferSelect)[],
-        { transactions: [] as import("@/lib/spending-queries").Txn[] },
-        [] as (typeof budgetCategories.$inferSelect)[],
-        [] as { id: string; displayName: string }[],
-      ];
-  if (personFilter !== "all" && !householdPeople.some((p) => p.id === personFilter)) personFilter = "all";
-  const activeUploadIds = activeUploads.map((upload) => upload.id);
-  const rawAssets = householdId && activeUploadIds.length
-    ? await db.select().from(assetItems).where(and(eq(assetItems.householdId, householdId), inArray(assetItems.uploadId, activeUploadIds)))
-    : [];
-  const allAssets = rawAssets.filter((item) =>
-    item.side === "asset"
-      ? !EXCLUDED_ASSET_CATEGORIES.has(item.category)
-      : !EXCLUDED_DEBT_ITEMS.has(`${item.personId}|${item.productName ?? ""}`)
-  );
-  const assets = personFilter === "all" ? allAssets : allAssets.filter((item) => item.personId === personFilter);
-  const totalAsset = assets.filter((item) => item.side === "asset").reduce((sum, item) => sum + toNumber(item.amount), 0);
-  const totalDebt = assets.filter((item) => item.side === "debt").reduce((sum, item) => sum + toNumber(item.amount), 0);
-  const netByPerson = new Map<string, number>();
-  const assetTotals = new Map<string, number>();
-  const sectorTotals = new Map<string, number>();
-  for (const item of assets) {
-    const amount = toNumber(item.amount);
-    netByPerson.set(item.personId, (netByPerson.get(item.personId) ?? 0) + (item.side === "asset" ? amount : -amount));
-    if (item.side !== "asset") continue;
-    const category = ASSET_CATEGORY_OVERRIDES[item.category] ?? item.category;
-    assetTotals.set(category, (assetTotals.get(category) ?? 0) + amount);
-    if (item.costBasis !== null) {
-      const sector = item.sector ?? classifyInvestmentSector(item.productName ?? item.category);
-      sectorTotals.set(sector, (sectorTotals.get(sector) ?? 0) + amount);
-    }
-  }
-  const assetSlices = chartSlices(assetTotals);
-  const sectorSlices = chartSlices(sectorTotals);
-
-  const includedTx = transactions.filter((transaction) => countsInTotals(transaction) && (personFilter === "all" || transaction.personId === personFilter));
-  const month = latestMonth(includedTx);
-  const monthTx = includedTx.filter((transaction) => monthKeyOf(transaction.txnDate) === month && flowLabel(transaction) === "지출");
-  const monthlyExpense = monthTx.reduce((sum, transaction) => sum + Math.abs(toNum(transaction.amount)), 0);
-  const categoryTotals = new Map<string, number>();
-  for (const transaction of monthTx) {
-    const category = transaction.stdCategory ?? "미분류";
-    categoryTotals.set(category, (categoryTotals.get(category) ?? 0) + Math.abs(toNum(transaction.amount)));
-  }
-  const budgetByName = new Map(budgetRows.map((row) => [row.name, row]));
-  const kindOf = (category: string | null, flow: "입금" | "지출") => budgetByName.get(category ?? "")?.kind ?? (flow === "입금" ? "변동수입" : "변동비");
-  const monthlyIncome = includedTx
-    .filter((transaction) => monthKeyOf(transaction.txnDate) === month && flowLabel(transaction) === "입금")
-    .reduce((sum, transaction) => sum + Math.abs(toNum(transaction.amount)), 0);
-  let fixedIncome = 0;
-  let variableIncome = 0;
-  let fixedExpense = 0;
-  let variableExpense = 0;
-  const fixedCategoryTotals = new Map<string, number>();
-  const variableCategoryTotals = new Map<string, number>();
-  for (const transaction of includedTx.filter((item) => monthKeyOf(item.txnDate) === month)) {
-    const flow = flowLabel(transaction);
-    const amount = Math.abs(toNum(transaction.amount));
-    const kind = kindOf(transaction.stdCategory, flow);
-    if (flow === "입금") {
-      if (kind === "고정수입") fixedIncome += amount;
-      else variableIncome += amount;
-      continue;
-    }
-    const category = transaction.stdCategory ?? "미분류";
-    if (kind === "고정비") {
-      fixedExpense += amount;
-      fixedCategoryTotals.set(category, (fixedCategoryTotals.get(category) ?? 0) + amount);
-    } else {
-      variableExpense += amount;
-      variableCategoryTotals.set(category, (variableCategoryTotals.get(category) ?? 0) + amount);
-    }
-  }
-  const fixedSlices = chartSlices(fixedCategoryTotals);
-  const variableSlices = chartSlices(variableCategoryTotals);
-  const monthlyBalance = monthlyIncome - monthlyExpense;
-  const savingsRate = monthlyIncome > 0 ? (monthlyBalance / monthlyIncome) * 100 : 0;
-
-  const hasPreviewData = totalAsset > 0 || monthlyExpense > 0;
-
+export function StartView() {
   return (
     <AppShell size="wide" className="font-sans">
-      {showHomeLink && (
-        <Link href="/" className="mb-6 text-sm font-semibold text-fg-neutral-muted hover:text-fg-neutral">
-          ← 홈으로
-        </Link>
-      )}
-
       <BrandHero />
 
       <section className="py-6 sm:py-8" aria-label="가계부탁의 주요 기능">
@@ -189,58 +52,69 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
         </div>
       </section>
 
-      <section className="border-y border-stroke-neutral-muted py-10">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold text-fg-brand">가계부탁이 만든 결과</p>
-            <h2 className="mt-2 text-3xl font-extrabold tracking-[-0.03em] text-fg-neutral">입력은 한 번, 이후에는 확인만 하세요</h2>
+      <section className="border-t border-stroke-neutral-muted py-10" aria-labelledby="preview-heading">
+        <p className="text-sm font-bold text-fg-brand">가계부탁이 만든 결과</p>
+        <h2 id="preview-heading" className="mt-2 text-3xl font-extrabold tracking-[-0.03em] text-fg-neutral">입력은 한 번, 이후에는 확인만 하세요</h2>
+        <Card className="mt-6 overflow-hidden p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">이번 달 가계부</h3>
+            <span className="rounded-r2 bg-bg-neutral-weak px-3 py-1.5 text-[13px] font-medium text-fg-neutral-muted">예시 화면 · 가상의 숫자</span>
           </div>
-        </div>
-
-        {hasPreviewData ? (
-          <div className="mt-6 space-y-6">
-            <Card className="overflow-hidden p-5 sm:p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">자산 현황(샘플)</h3>{householdPeople.length > 1 && <div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">{["all", ...householdPeople.map((p) => p.id)].map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${personFilter === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : (householdPeople.find((p) => p.id === person)?.displayName ?? person)}</Link>)}</div>}</div>
-                <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-                  <SummaryCard variant="feature" className="col-span-2 lg:col-span-4" label="순자산" value={totalAsset - totalDebt} format="manwon" breakdown={[{ label: "자산", value: totalAsset }]} />
-                  <SummaryCard label="총자산" value={totalAsset} format="manwon" />
-                  <SummaryCard label="총부채" value={totalDebt} format="manwon" />
-                  {householdPeople.map((p) => (
-                    <SummaryCard key={p.id} label={`${p.displayName} 순자산`} value={netByPerson.get(p.id) ?? 0} format="manwon" />
-                  ))}
-                </div>
-                <div className="mt-3">
-                  <AllocationCharts assetComposition={assetSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} sectorComposition={sectorSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
-                </div>
-            </Card>
-
-            <Card className="overflow-hidden p-5 sm:p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">월별 지출(샘플)</h3>{householdPeople.length > 1 && <div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">{["all", ...householdPeople.map((p) => p.id)].map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${personFilter === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : (householdPeople.find((p) => p.id === person)?.displayName ?? person)}</Link>)}</div>}</div>
-                <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-                  <SummaryCard label="총수입" value={monthlyIncome} format="compactKrw" />
-                  <SummaryCard label="총지출" value={monthlyExpense} format="compactKrw" />
-                  <SummaryCard label="당월 저축" value={monthlyBalance} format="compactKrw" />
-                  <SummaryCard label="저축률" value={savingsRate} format="signedPct" />
-                </div>
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <CompositionCard title="수입 구성" items={[{ label: "고정수입", value: fixedIncome, color: "bg-bg-brand-solid" }, { label: "변동수입", value: variableIncome, color: "bg-bg-positive-solid" }]} />
-                  <CompositionCard title="지출 구성" items={[{ label: "고정비", value: fixedExpense, color: "bg-bg-informative-solid" }, { label: "변동비", value: variableExpense, color: "bg-bg-warning-solid" }]} />
-                </div>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <CategoryPie title="고정비" data={fixedSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
-                  <CategoryPie title="변동비" data={variableSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
-                </div>
-            </Card>
+          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+            <SummaryCard label="총수입" value={6_200_000} format="compactKrw" />
+            <SummaryCard label="총지출" value={3_610_000} format="compactKrw" />
+            <SummaryCard label="당월 저축" value={2_590_000} format="compactKrw" />
+            <SummaryCard label="저축률" value={41.8} format="signedPct" />
           </div>
-        ) : (
-          <Card className="mt-6 p-6 text-center shadow-none">
-            <p className="font-bold text-fg-neutral">아직 보여드릴 데이터가 없어요</p>
-            <p className="mt-2 text-sm text-fg-neutral-muted">뱅크샐러드 파일을 업로드하면 가계부탁이 자산과 지출 현황을 자동으로 정리해요.</p>
-            <Link href="/finance/upload" className="seed-button seed-button-primary mt-5">파일 업로드하기</Link>
-          </Card>
-        )}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <CategoryPie title="변동비" data={sampleVariable} />
+            <div className="flex flex-col justify-center gap-3 rounded-r3 bg-bg-neutral-weak p-5 text-sm leading-6 text-fg-neutral-muted">
+              <p><b className="text-fg-neutral">자동 분류</b> — 뱅크샐러드 분류를 우리집 카테고리로 바꾸고, 가족 간 이체는 지출에서 빼요.</p>
+              <p><b className="text-fg-neutral">한 번 고치면 기억</b> — 분류를 고칠 때 같은 가맹점 거래도 한 번에 바꿀 수 있어요.</p>
+              <p><b className="text-fg-neutral">예산·연간 흐름</b> — 카테고리별 예산과 월별 추이를 한 화면에서 봐요.</p>
+            </div>
+          </div>
+        </Card>
+        <Link href="/finance" className="mt-4 inline-block text-sm font-bold text-fg-brand hover:underline">
+          샘플 가계부 전체 둘러보기 →
+        </Link>
       </section>
 
+      <section className="border-t border-stroke-neutral-muted py-10" aria-labelledby="steps-heading">
+        <h2 id="steps-heading" className="text-3xl font-extrabold tracking-[-0.03em] text-fg-neutral">3분이면 시작해요</h2>
+        <ol className="mt-6 grid gap-3 sm:grid-cols-3">
+          {steps.map((step, index) => (
+            <li key={step.title} className="seed-card p-6 shadow-none">
+              <span className="flex size-9 items-center justify-center rounded-full bg-bg-brand-solid text-sm font-black text-fg-neutral-inverted">{index + 1}</span>
+              <h3 className="mt-4 text-lg font-extrabold text-fg-neutral">{step.title}</h3>
+              <p className="mt-1 text-sm leading-6 text-fg-neutral-muted">{step.description}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="border-t border-stroke-neutral-muted py-10" aria-labelledby="privacy-heading">
+        <h2 id="privacy-heading" className="text-3xl font-extrabold tracking-[-0.03em] text-fg-neutral">돈 이야기라 더 조심해요</h2>
+        <ul className="mt-6 space-y-3">
+          {privacyPoints.map((point) => (
+            <li key={point} className="flex gap-3 text-base text-fg-neutral">
+              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-bg-positive-solid" aria-hidden="true" />
+              {point}
+            </li>
+          ))}
+        </ul>
+        <Link href="/privacy" className="mt-4 inline-block text-sm font-bold text-fg-neutral-muted hover:text-fg-neutral hover:underline">
+          개인정보처리방침 보기
+        </Link>
+      </section>
+
+      <section className="rounded-r5 bg-bg-brand-weak px-6 py-10 text-center">
+        <h2 className="text-2xl font-extrabold tracking-[-0.03em] text-fg-neutral sm:text-3xl">이번 달 가계부, 가계부탁에 맡겨 보세요</h2>
+        <p className="mt-2 text-fg-neutral-muted">무료로 시작하고, 필요 없으면 언제든 탈퇴할 수 있어요.</p>
+        <Link href="/login" className="seed-button seed-button-primary mt-6 min-h-14 rounded-r3 px-8 text-base">
+          Google로 무료 시작하기
+        </Link>
+      </section>
     </AppShell>
   );
 }

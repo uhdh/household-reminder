@@ -12,7 +12,7 @@ function SourceChip({ label, tone }: { label: string; tone: "husband" | "wife" }
       </span>
       <div className="min-w-0">
         <p className="text-sm font-bold text-fg-neutral">{label}</p>
-        <p className="mt-0.5 text-xs text-fg-neutral-muted">엑셀 파일</p>
+        <p className="mt-0.5 text-xs text-fg-neutral-muted">뱅크샐러드 엑셀</p>
       </div>
     </div>
   );
@@ -33,17 +33,22 @@ export function BrandHero() {
             각자 올리면, 알아서 합쳐져요.
           </p>
           <p className="mt-3 max-w-md text-sm leading-6 text-fg-neutral-muted sm:text-base sm:leading-7">
-            남편과 아내의 뱅크샐러드 파일을 올리면 소비·자산·투자가 한 화면에 정리돼요.
+            뱅크샐러드에서 내려받은 엑셀 파일만 올리면 소비·자산·투자가 한 화면에 정리돼요. 혼자 써도, 가족을 초대해 함께 써도 좋아요.
           </p>
-          <Link href="/finance/upload" className="seed-button seed-button-primary mt-8 min-h-14 min-w-48 rounded-r3 px-8 text-base">
-            파일 올리고 시작하기
-          </Link>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/login" className="seed-button seed-button-primary min-h-14 min-w-48 rounded-r3 px-8 text-base">
+              Google로 무료 시작하기
+            </Link>
+            <Link href="/finance" className="seed-button seed-button-secondary min-h-14 rounded-r3 px-6 text-base">
+              로그인 없이 둘러보기
+            </Link>
+          </div>
         </div>
 
-        <div role="group" aria-label="남편과 아내 데이터 통합 과정" className="flex flex-col gap-3">
+        <div role="group" aria-label="가족 데이터 통합 과정" className="flex flex-col gap-3">
           <div className="grid gap-3 sm:grid-cols-2">
-            <SourceChip label="남편 데이터" tone="husband" />
-            <SourceChip label="아내 데이터" tone="wife" />
+            <SourceChip label="내 파일" tone="husband" />
+            <SourceChip label="가족 파일" tone="wife" />
           </div>
 
           <div className="flex justify-center text-fg-brand" aria-hidden="true">
