@@ -31,6 +31,9 @@ export function CategoryPicker({
   autoOpen = false,
   disabled = false,
   allowUnclassified = true,
+  clearLabel = "미분류로 되돌리기",
+  showExclude = true,
+  className = "relative inline-block",
 }: {
   value: string | null;
   options: CategoryOption[];
@@ -43,6 +46,9 @@ export function CategoryPicker({
   autoOpen?: boolean;
   disabled?: boolean;
   allowUnclassified?: boolean;
+  clearLabel?: string;
+  showExclude?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(autoOpen);
   // 분류 모드에서 행을 저장→redirect하면 목록이 바뀌면서 "다음 미분류" 행이 이전과 같은 key(txnId)를
@@ -143,7 +149,7 @@ export function CategoryPicker({
   }
 
   return (
-    <div ref={containerRef} className="relative inline-block">
+    <div ref={containerRef} className={`relative ${className}`}>
       <button
         type="button"
         onClick={() => {
@@ -193,7 +199,7 @@ export function CategoryPicker({
                 onClick={() => choose(null)}
                 className="self-start text-[11px] font-medium text-ink-muted hover:text-ink"
               >
-                미분류로 되돌리기
+                {clearLabel}
               </button>
             )}
 
@@ -231,13 +237,13 @@ export function CategoryPicker({
               )}
             </div>
 
-            <button
+            {showExclude && <button
               type="button"
               onClick={() => choose(EXCLUDE_VALUE)}
               className="mt-1 rounded-r2 border border-dashed border-stroke-neutral-muted px-2 py-1.5 text-[12px] font-semibold text-ink-muted hover:border-fg-brand hover:text-fg-brand"
             >
               집계 제외 (내 계좌 이동·투자)
-            </button>
+            </button>}
           </div>
         </>
       )}

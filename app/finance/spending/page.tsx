@@ -34,6 +34,7 @@ import {
   topFrequentCategories,
 } from "./category-suggest";
 import { PersonFilter } from "./person-filter";
+import { CategoryFilter } from "./category-filter";
 import { MonthlyNavigator } from "./monthly/monthly-navigator";
 import { ManualTransactionForm } from "./manual-transaction-form";
 import { TransactionDeleteButton } from "./transaction-delete-button";
@@ -322,14 +323,11 @@ export default async function SpendingPage({
             <option value="joint">우리</option>
           </SelectInput>
         </label>
-        <label className="min-w-32 flex-1 text-[12px] font-medium text-ink-muted sm:flex-none">
+        {/* label로 감싸면 팝오버 안을 클릭해도 트리거 버튼이 눌려 닫히므로 div를 쓴다. */}
+        <div className="min-w-40 flex-1 text-[12px] font-medium text-ink-muted sm:flex-none">
           카테고리
-          <SelectInput name="category" defaultValue={categoryFilter} className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]">
-            <option value="all">전체</option>
-            <option value="미분류">미분류</option>
-            {categoryOptions.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}
-          </SelectInput>
-        </label>
+          <CategoryFilter defaultValue={categoryFilter} options={categoryOptions} frequentCategories={frequentCategories} />
+        </div>
         <label className="min-w-44 flex-[2] text-[12px] font-medium text-ink-muted">
           검색
           <TextInput name="q" defaultValue={query} placeholder="메모·결제수단·원본 분류" className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]" />
