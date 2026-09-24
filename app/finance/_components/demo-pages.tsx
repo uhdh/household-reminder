@@ -69,7 +69,7 @@ export function DemoFinanceDashboard({ personFilter }: { personFilter: PersonFil
   const totalAsset = amountFor(254_000_000, personFilter);
   const totalDebt = amountFor(34_000_000, personFilter);
   return (
-    <AppShell>
+    <AppShell size="wide" className="font-office text-ink">
       <DemoBanner title="자산관리 샘플" />
       <div className="mb-3 flex justify-end"><DemoPersonFilter pathname="/finance" selected={personFilter} /></div>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
@@ -110,7 +110,7 @@ export function DemoMonthlySpending({ personFilter, month }: { personFilter: Per
   const fixed = fixedCategories.map((item) => ({ ...item, value: amountFor(item.value, personFilter) }));
   const variable = variableCategories.map((item) => ({ ...item, value: amountFor(item.value, personFilter) }));
   return (
-    <AppShell>
+    <>
       <DemoBanner title="월별지출 샘플" />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <MonthlyNavigator month={month} personFilter={personFilter} />
@@ -126,7 +126,7 @@ export function DemoMonthlySpending({ personFilter, month }: { personFilter: Per
         <CategoryPie title="고정비" data={fixed} amountFormat="manwon" />
         <CategoryPie title="변동비" data={variable} amountFormat="manwon" />
       </div>
-    </AppShell>
+    </>
   );
 }
 
@@ -141,7 +141,7 @@ const sampleTransactions = [
 export function DemoTransactionList({ personFilter }: { personFilter: PersonFilterValue }) {
   const rows = sampleTransactions.filter((row) => personFilter === "all" || row.person === personFilter);
   return (
-    <AppShell>
+    <>
       <DemoBanner title="세부 내역 샘플" />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -179,7 +179,7 @@ export function DemoTransactionList({ personFilter }: { personFilter: PersonFilt
           </tbody>
         </table>
       </div>
-    </AppShell>
+    </>
   );
 }
 
@@ -216,12 +216,12 @@ export function DemoYearlySpending({ personFilter }: { personFilter: PersonFilte
     "variable:other": Math.round(variableExpense * 0.24 * scale),
   }));
   return (
-    <AppShell>
+    <>
       <DemoBanner title="연간 내역 샘플" />
       <div className="mb-3 flex justify-end"><DemoPersonFilter pathname="/finance/spending/yearly" selected={personFilter} /></div>
       <YearlyView data={data} fixedCategories={fixedSeries} variableCategories={variableSeries} annualCategory={null}>
         <div className="seed-card p-5 text-sm text-ink-muted shadow-none sm:p-7">샘플 연간 내역은 그래프로 먼저 보여드려요.</div>
       </YearlyView>
-    </AppShell>
+    </>
   );
 }
