@@ -72,9 +72,9 @@ describe("rederiveTransactions", () => {
       .values(txnRow({ stdCategory: "식비", categoryLocked: true }))
       .returning();
 
-    const changed = await rederiveTransactions(db, HOUSEHOLD_ID, eq(transactions.id, row.id));
+    const result = await rederiveTransactions(db, HOUSEHOLD_ID, eq(transactions.id, row.id));
 
-    expect(changed).toBe(0);
+    expect(result.changed).toBe(0);
     const [after] = await db.select().from(transactions).where(eq(transactions.id, row.id));
     expect(after.stdCategory).toBe("식비"); // 새 매핑("기타")이 아니라 기존 값 그대로
   });
@@ -89,13 +89,13 @@ describe("rederiveTransactions", () => {
       .values(txnRow({ category: "온라인쇼핑", subcategory: "인터넷쇼핑", description: "코스트코", stdCategory: "식재료" }))
       .returning();
 
-    const changed = await rederiveTransactions(
+    const result = await rederiveTransactions(
       db,
       HOUSEHOLD_ID,
       and(eq(transactions.txnType, "지출"), eq(transactions.category, "온라인쇼핑"), eq(transactions.subcategory, "인터넷쇼핑"))
     );
 
-    expect(changed).toBe(0);
+    expect(result.changed).toBe(0);
     const [after] = await db.select().from(transactions).where(eq(transactions.id, row.id));
     expect(after.stdCategory).toBe("식재료"); // 매핑("쇼핑")이 아니라 키워드 규칙이 이긴다
   });
@@ -111,13 +111,16 @@ describe("rederiveTransactions", () => {
 
     // 매핑을 지운 뒤(설정 액션이 하는 것과 동일) 재계산한다.
     await db.delete(categoryMappings).where(eq(categoryMappings.householdId, HOUSEHOLD_ID));
-    const changed = await rederiveTransactions(
+    const result = await rederiveTransactions(
       db,
       HOUSEHOLD_ID,
       and(eq(transactions.txnType, "지출"), eq(transactions.category, "여행/숙박"), eq(transactions.subcategory, "미분류"))
     );
 
-    expect(changed).toBe(1);
+    expect(result.changed).toBe(1);
+    expect(result.categoryChanged).toBe(1);
+    expect(result.reclassified).toBe(0); // 분류→미분류라 반대 방향이므로 재분류 카운트에는 안 잡힘
+    expect(result.includedChanged).toBe(0);
     const [after] = await db.select().from(transactions).where(eq(transactions.id, row.id));
     expect(after.stdCategory).toBeNull();
     expect(after.included).toBe(true); // 이체 후보가 아니므로 집계에는 그대로 포함
@@ -136,9 +139,9 @@ describe("rederiveTransactions", () => {
       .returning();
 
     const escapedFilter = ilike(transactions.description, `%${escapeIlikePattern("50%")}%`);
-    const changed = await rederiveTransactions(db, HOUSEHOLD_ID, escapedFilter);
+    const result = await rederiveTransactions(db, HOUSEHOLD_ID, escapedFilter);
 
-    expect(changed).toBe(1);
+    expect(result.changed).toBe(1);
     const [afterLiteral] = await db.select().from(transactions).where(eq(transactions.id, literalMatch.id));
     const [afterUnrelated] = await db.select().from(transactions).where(eq(transactions.id, unrelated.id));
     expect(afterLiteral.stdCategory).toBe("할인");
@@ -155,10 +158,62 @@ describe("rederiveTransactions", () => {
       .values(txnRow({ householdId: OTHER_HOUSEHOLD, stdCategory: null }))
       .returning();
 
-    const changed = await rederiveTransactions(db, HOUSEHOLD_ID);
+    const result = await rederiveTransactions(db, HOUSEHOLD_ID);
 
-    expect(changed).toBe(0);
+    expect(result.changed).toBe(0);
     const [after] = await db.select().from(transactions).where(eq(transactions.id, otherRow.id));
     expect(after.stdCategory).toBeNull();
+  });
+
+  test("(v) 매핑을 나중에 추가한 뒤 candidateFilter 없이(가구 전체) 재계산하면, 과거 미분류 거래는 재분류되고 잠긴 거래는 그대로다", async () => {
+    const db = drizzle();
+    await createSchema(db);
+    // 매핑이 없던 시절 올라온 과거 거래(미분류) + 사용자가 직접 고쳐서 잠근 거래.
+    const [unclassified, locked] = await db
+      .insert(transactions)
+      .values([
+        txnRow({ category: "금융", subcategory: "은행", description: "이자", stdCategory: null, categoryLocked: false }),
+        txnRow({ category: "금융", subcategory: "은행", description: "이자2", stdCategory: "기타", categoryLocked: true }),
+      ])
+      .returning();
+    // 규칙이 나중에 추가됨(업로드 이후 시나리오).
+    await db.insert(categoryMappings).values({ householdId: HOUSEHOLD_ID, txnType: "지출", rawCategory: "금융", rawSubcategory: "은행", stdCategory: "금융/보험" });
+
+    const result = await rederiveTransactions(db, HOUSEHOLD_ID);
+
+    expect(result.changed).toBe(1);
+    expect(result.reclassified).toBe(1); // 미분류 -> 분류
+    const [afterUnclassified] = await db.select().from(transactions).where(eq(transactions.id, unclassified.id));
+    const [afterLocked] = await db.select().from(transactions).where(eq(transactions.id, locked.id));
+    expect(afterUnclassified.stdCategory).toBe("금융/보험");
+    expect(afterLocked.stdCategory).toBe("기타"); // 잠긴 거래는 그대로
+  });
+
+  test("(vi) 서로 다른 (std_category, included) 조합으로 바뀌는 500건 초과 행도 배치 UPDATE로 행별 UPDATE와 동일한 결과를 낸다", async () => {
+    const db = drizzle();
+    await createSchema(db);
+    await db.insert(categoryMappings).values([
+      { householdId: HOUSEHOLD_ID, txnType: "지출", rawCategory: "금융", rawSubcategory: "은행", stdCategory: "금융/보험" },
+      { householdId: HOUSEHOLD_ID, txnType: "지출", rawCategory: "문화", rawSubcategory: "미분류", stdCategory: "문화/여가" },
+    ]);
+    // 청크 크기(500)를 넘는 첫 번째 그룹 + 별도 (std_category, included) 조합인 두 번째 그룹.
+    const rows = [
+      ...Array.from({ length: 520 }, (_, i) =>
+        txnRow({ category: "금융", subcategory: "은행", description: `이자${i}`, stdCategory: null })
+      ),
+      ...Array.from({ length: 3 }, (_, i) => txnRow({ category: "문화", subcategory: "미분류", description: `영화${i}`, stdCategory: null })),
+    ];
+    await db.insert(transactions).values(rows);
+
+    const result = await rederiveTransactions(db, HOUSEHOLD_ID);
+
+    expect(result.changed).toBe(523);
+    expect(result.reclassified).toBe(523);
+    const bankRows = await db.select().from(transactions).where(eq(transactions.category, "금융"));
+    const cultureRows = await db.select().from(transactions).where(eq(transactions.category, "문화"));
+    expect(bankRows).toHaveLength(520);
+    expect(bankRows.every((r) => r.stdCategory === "금융/보험")).toBe(true);
+    expect(cultureRows).toHaveLength(3);
+    expect(cultureRows.every((r) => r.stdCategory === "문화/여가")).toBe(true);
   });
 });

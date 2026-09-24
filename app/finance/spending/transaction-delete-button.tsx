@@ -14,7 +14,7 @@ export function TransactionDeleteButton({ txnId, returnTo }: { txnId: string; re
       <input type="hidden" name="returnTo" value={returnTo} />
       <button
         type="submit"
-        className="rounded-r2 px-2 py-1 text-[11px] font-semibold text-fg-critical hover:bg-bg-critical-weak focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-critical"
+        className="inline-flex min-h-9 items-center rounded-r2 px-3 py-1.5 text-[11px] font-semibold text-fg-critical hover:bg-bg-critical-weak focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-critical"
       >
         삭제
       </button>

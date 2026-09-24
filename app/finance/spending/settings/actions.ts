@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, transactions } from "@/lib/finance-db";
@@ -150,6 +151,19 @@ export async function deleteCategoryKeywordRuleAction(formData: FormData) {
     if (rule) await rederiveTransactions(db, householdId, keywordCandidateFilter(rule.txnType, rule.keyword));
   }
   redirect("/finance/spending/settings?tab=rules");
+}
+
+export type RederiveState = { changed?: number; categoryChanged?: number; reclassified?: number; includedChanged?: number; error?: string };
+
+// useActionState로 호출된다(prevState, formData). 매핑·규칙을 나중에 추가해 과거 거래에는
+// 반영되지 않은 경우를 위해, 가구 전체를 candidateFilter 없이(household 전체) 재계산한다.
+export async function rederiveAllAction(): Promise<RederiveState> {
+  const { householdId } = await requireHousehold();
+  const db = getDb();
+  const summary = await rederiveTransactions(db, householdId);
+  // 미분류 목록·집계가 방금 바뀐 값을 반영하도록 새로고침.
+  revalidatePath("/finance/spending/settings");
+  return summary;
 }
 
 const KIND_FIELD_PREFIX = "kind:";

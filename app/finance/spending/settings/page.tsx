@@ -20,6 +20,7 @@ import {
 import { cancelInviteAction } from "./members-actions";
 import { CreateInviteForm } from "./create-invite-form";
 import { DeleteHouseholdForm, LeaveHouseholdForm } from "./danger-zone";
+import { RederiveCard } from "./rederive-card";
 import { UploadForm } from "@/app/finance/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -130,60 +131,65 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       {activeTab === "upload" && <UploadForm error={error} success={success} people={householdPeople} />}
 
-      {activeTab === "unmapped" && (unmapped.length > 0 ? (
-        <div className="seed-card bg-bg-critical-weak p-5 shadow-none sm:p-7">
-          <h2 className="mb-1 text-[18px] font-extrabold text-fg-critical">매핑되지 않은 카테고리 ({unmapped.length}건)</h2>
-          <p className="mb-4 text-[14px] text-ink-muted">
-            금액이 큰 순서로 정렬했습니다. 목록에서 카테고리를 고르고 저장하면 되고, 잘 모르겠으면 일단
-            &quot;기타&quot;로 두었다가 나중에 바꿔도 됩니다. 분류되지 않은 이체는 카테고리를 지정하기 전까지
-            월별·연간 집계에서 빠져요.
-          </p>
-          <div className="space-y-2">
-            {unmapped.map((u) => {
-              const guess = guessStdCategory(u.rawCategory, u.rawSubcategory, knownNames);
-              const grouped = groupByKind(categoryOptions);
-              return (
-                <form
-                  key={`${u.txnType}|${u.rawCategory}|${u.rawSubcategory}`}
-                  action={upsertCategoryMappingAction}
-                  className="flex flex-wrap items-center gap-2 text-[14px]"
-                >
-                  <input type="hidden" name="txnType" value={u.txnType} />
-                  <input type="hidden" name="rawCategory" value={u.rawCategory} />
-                  <input type="hidden" name="rawSubcategory" value={u.rawSubcategory} />
-                  <span className="rounded-r2 bg-bg-layer-default px-2.5 py-1 font-medium text-ink">
-                    {u.txnType} · {u.rawCategory} · {u.rawSubcategory}
-                  </span>
-                  <span className="text-ink-muted">
-                    {u.count}건 · {formatKRW(u.totalAmount)}
-                  </span>
-                  <span className="text-ink-muted">→</span>
-                  <SelectInput
-                    name="stdCategory"
-                    defaultValue={guess}
-                    className="min-h-11 w-auto px-3 py-2"
-                  >
-                    {Object.entries(grouped).map(([kind, names]) => (
-                      <optgroup key={kind} label={kind}>
-                        {names.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
+      {activeTab === "unmapped" && (
+        <div className="space-y-6">
+          <RederiveCard />
+          {unmapped.length > 0 ? (
+            <div className="seed-card bg-bg-critical-weak p-5 shadow-none sm:p-7">
+              <h2 className="mb-1 text-[18px] font-extrabold text-fg-critical">매핑되지 않은 카테고리 ({unmapped.length}건)</h2>
+              <p className="mb-4 text-[14px] text-ink-muted">
+                금액이 큰 순서로 정렬했습니다. 목록에서 카테고리를 고르고 저장하면 되고, 잘 모르겠으면 일단
+                &quot;기타&quot;로 두었다가 나중에 바꿔도 됩니다. 분류되지 않은 이체는 카테고리를 지정하기 전까지
+                월별·연간 집계에서 빠져요.
+              </p>
+              <div className="space-y-2">
+                {unmapped.map((u) => {
+                  const guess = guessStdCategory(u.rawCategory, u.rawSubcategory, knownNames);
+                  const grouped = groupByKind(categoryOptions);
+                  return (
+                    <form
+                      key={`${u.txnType}|${u.rawCategory}|${u.rawSubcategory}`}
+                      action={upsertCategoryMappingAction}
+                      className="flex flex-wrap items-center gap-2 text-[14px]"
+                    >
+                      <input type="hidden" name="txnType" value={u.txnType} />
+                      <input type="hidden" name="rawCategory" value={u.rawCategory} />
+                      <input type="hidden" name="rawSubcategory" value={u.rawSubcategory} />
+                      <span className="rounded-r2 bg-bg-layer-default px-2.5 py-1 font-medium text-ink">
+                        {u.txnType} · {u.rawCategory} · {u.rawSubcategory}
+                      </span>
+                      <span className="text-ink-muted">
+                        {u.count}건 · {formatKRW(u.totalAmount)}
+                      </span>
+                      <span className="text-ink-muted">→</span>
+                      <SelectInput
+                        name="stdCategory"
+                        defaultValue={guess}
+                        className="min-h-11 w-auto px-3 py-2"
+                      >
+                        {Object.entries(grouped).map(([kind, names]) => (
+                          <optgroup key={kind} label={kind}>
+                            {names.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
-                      </optgroup>
-                    ))}
-                  </SelectInput>
-                  <ActionButton type="submit" className="min-h-11 px-4 py-2">
-                    저장
-                  </ActionButton>
-                </form>
-              );
-            })}
-          </div>
+                      </SelectInput>
+                      <ActionButton type="submit" className="min-h-11 px-4 py-2">
+                        저장
+                      </ActionButton>
+                    </form>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="seed-card p-5 sm:p-7 text-[13px] text-ink-muted">현재 관리할 미분류 항목이 없습니다.</div>
+          )}
         </div>
-      ) : (
-        <div className="seed-card p-5 sm:p-7 text-[13px] text-ink-muted">현재 관리할 미분류 항목이 없습니다.</div>
-      ))}
+      )}
 
       {activeTab === "mappings" && <div className="seed-card p-5 sm:p-7">
         <h2 className="mb-3 text-[18px] font-extrabold text-ink">카테고리 매핑</h2>
