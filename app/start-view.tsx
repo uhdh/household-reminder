@@ -122,6 +122,9 @@ export function StartView() {
           <p>
             <b className="font-semibold text-fg-neutral">가계부탁은 각자 올린 뱅크샐러드 파일을 하나의 가계부로 합쳐요.</b> 분류, 이체 정리, 집계는 알아서 합니다. 혼자 써도 좋아요.
           </p>
+          <p>
+            <b className="font-semibold text-fg-neutral">주식, 적금 등 자산도 같이 봐요.</b> 쓰는 돈만이 아니라 예적금·주식·연금까지 모아 순자산과 투자 비중을 한눈에 보여줘요.
+          </p>
         </div>
       </section>
 
