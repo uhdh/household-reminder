@@ -56,6 +56,7 @@ export default async function SpendingPage({
     toastCategory?: string;
     toastTxnType?: string;
     toastTxnId?: string;
+    manual?: string;
   }>;
 }) {
   const {
@@ -71,6 +72,7 @@ export default async function SpendingPage({
     toastCategory,
     toastTxnType,
     toastTxnId,
+    manual,
   } = await searchParams;
   const reviewMode = review === "1";
 
@@ -173,7 +175,7 @@ export default async function SpendingPage({
         <PersonFilter pathname="/finance/spending" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} extraParams={activeFilterParams} />
       </div>
 
-      {isHouseholdEmpty && <FinanceEmptyState secondaryHref="/finance/spending#manual-entry" secondaryLabel="직접 입력하기" />}
+      {isHouseholdEmpty && <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />}
 
       {!isHouseholdEmpty && (
       <>
@@ -270,6 +272,7 @@ export default async function SpendingPage({
         people={personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }))}
         categories={categoryOptions}
         returnTo={returnTo}
+        open={manual === "1"}
       />
 
       {!isHouseholdEmpty && (

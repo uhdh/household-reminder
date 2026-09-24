@@ -169,7 +169,7 @@ export default async function MonthlyPage({
       </div>
 
       {emptyState === "onboarding" ? (
-        <FinanceEmptyState secondaryHref="/finance/spending#manual-entry" secondaryLabel="직접 입력하기" />
+        <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />
       ) : emptyState === "period" ? (
         <PeriodEmptyNote label="이 달" />
       ) : (

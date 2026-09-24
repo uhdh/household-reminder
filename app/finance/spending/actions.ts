@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
@@ -9,6 +10,12 @@ import { requireHousehold } from "@/lib/require-household";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// 수동 입력 전용 업로드의 표시용 파일명. app/finance/upload/actions.ts가 이 사람의 실제
+// 엑셀을 업로드하면 category/subcategory="직접 입력" 거래를 새 업로드로 재연결하므로,
+// 이 업로드 자체는 재사용 전까지만 거래를 담아두는 자리표시자다.
+// ("use server" 파일은 async 함수 외의 export를 허용하지 않아 상수는 내보내지 않는다.)
+const MANUAL_UPLOAD_FILENAME = "수동 입력";
 
 function spendingReturnTo(value: FormDataEntryValue | null): string {
   const path = String(value ?? "");
@@ -39,14 +46,29 @@ export async function addManualTransactionAction(formData: FormData) {
     .where(and(eq(uploads.householdId, householdId), eq(uploads.personId, personId), eq(uploads.isActive, true)))
     .limit(1);
 
-  if (!activeUpload) {
-    const personLabel = householdPeople.find((p) => p.id === personId)?.displayName ?? "선택한 사람";
-    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}addError=${encodeURIComponent(`${personLabel}의 파일을 먼저 업로드해주세요.`)}`);
+  // 아직 이 사람 명의로 업로드한 엑셀이 하나도 없어도 수동 입력은 막지 않는다: 수동 입력 전용
+  // 업로드 행을 하나 만들어(또는 기존 것을 재사용해) 그 id로 저장한다. 나중에 실제 엑셀을
+  // 업로드하면 uploadAction이 이 거래들을 새 업로드로 재연결한다.
+  let uploadId = activeUpload?.id;
+  if (!uploadId) {
+    const [manualUpload] = await db
+      .select({ id: uploads.id })
+      .from(uploads)
+      .where(and(eq(uploads.householdId, householdId), eq(uploads.personId, personId), eq(uploads.sourceFilename, MANUAL_UPLOAD_FILENAME)))
+      .limit(1);
+
+    if (manualUpload) {
+      uploadId = manualUpload.id;
+      await db.update(uploads).set({ isActive: true }).where(eq(uploads.id, uploadId));
+    } else {
+      uploadId = randomUUID();
+      await db.insert(uploads).values({ id: uploadId, householdId, personId, sourceFilename: MANUAL_UPLOAD_FILENAME, isActive: true });
+    }
   }
 
   await db.insert(transactions).values({
     householdId,
-    uploadId: activeUpload.id,
+    uploadId,
     personId,
     txnDate,
     txnTime: null,

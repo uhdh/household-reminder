@@ -7,18 +7,20 @@ export function ManualTransactionForm({
   people,
   categories,
   returnTo,
+  open = false,
 }: {
   month: string;
   defaultPerson: PersonId;
   people: { id: string; displayName: string }[];
   categories: { name: string; kind: string }[];
   returnTo: string;
+  open?: boolean;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const defaultDate = today.startsWith(month) ? today : `${month}-01`;
 
   return (
-    <details id="manual-entry" className="seed-card mb-3 shadow-none">
+    <details id="manual-entry" open={open} className="seed-card mb-3 shadow-none">
       <summary className="cursor-pointer list-none px-5 py-4 text-[14px] font-extrabold text-fg-brand">
         + 세부 내역 추가
       </summary>
