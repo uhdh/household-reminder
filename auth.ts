@@ -8,7 +8,8 @@ import { users } from "@/lib/finance-db";
 // (ALLOWED_EMAILS)에 없는 계정을 signIn 단계에서 바로 거부(fail-closed). AUTH_OPEN_SIGNUP=true면
 // 명단 없이도(이메일 인증만 되면) 가입을 허용한다 - 초대 링크로 새 사람을 들이려면 이 플래그가 필요.
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: [Google],
+  // 한 브라우저에서 여러 Google 계정을 쓰는 가족도 계정을 고를 수 있도록 매번 계정 선택 화면을 띄운다.
+  providers: [Google({ authorization: { params: { prompt: "select_account" } } })],
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
