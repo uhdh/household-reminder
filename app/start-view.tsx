@@ -4,21 +4,85 @@ import { BrandHero } from "@/app/brand-hero";
 
 // 비로그인 방문자용 소개 페이지. 실데이터를 절대 쿼리하지 않는다.
 
+// 기능 카드 안의 작은 화면 목업(가상의 값).
+function MockPanel({ children }: { children: React.ReactNode }) {
+  return <div className="w-[82%] rounded-[14px] bg-bg-layer-default/90 p-3 text-[12px] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)] backdrop-blur">{children}</div>;
+}
+
+function ClassifyMock() {
+  const rows = [
+    { name: "동네 카페", amount: "5,800원", tag: "식비" },
+    { name: "편의점", amount: "3,200원", tag: "생필품" },
+    { name: "온라인 마트", amount: "42,300원", tag: "생필품" },
+  ];
+  return (
+    <MockPanel>
+      <ul className="space-y-2">
+        {rows.map((row) => (
+          <li key={row.name} className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-medium text-fg-neutral">{row.name}</span>
+            <span className="tabular-nums text-fg-neutral-muted">-{row.amount}</span>
+            <span className="rounded-full bg-bg-brand-weak px-2 py-0.5 text-[11px] font-semibold text-fg-brand">{row.tag}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 rounded-[10px] bg-[#141414] px-2.5 py-2 text-[11px] font-medium text-white dark:bg-white dark:text-[#141414]">같은 가맹점 3건도 식비로 바꿨어요</p>
+    </MockPanel>
+  );
+}
+
+function MergeMock() {
+  return (
+    <MockPanel>
+      <div className="grid grid-cols-2 gap-2">
+        <span className="rounded-[10px] bg-husband/15 px-2 py-1.5 font-semibold text-husband">내 파일 · 128건</span>
+        <span className="rounded-[10px] bg-wife/15 px-2 py-1.5 font-semibold text-wife">가족 파일 · 96건</span>
+      </div>
+      <p className="my-1.5 text-center text-fg-neutral-muted" aria-hidden="true">↓</p>
+      <div className="rounded-[10px] border border-stroke-neutral-muted px-2.5 py-2">
+        <p className="font-semibold text-fg-neutral">우리집 가계부 · 212건</p>
+        <p className="mt-0.5 text-[11px] text-fg-neutral-muted">가족 간 이체 12건은 지출에서 제외</p>
+      </div>
+    </MockPanel>
+  );
+}
+
+function TrendMock() {
+  const bars = [42, 55, 48, 62, 58, 70, 66, 74, 69, 80, 77, 88];
+  return (
+    <MockPanel>
+      <div className="flex items-baseline justify-between">
+        <span className="font-semibold text-fg-neutral">순자산 추이</span>
+        <span className="rounded-full bg-bg-positive-weak px-2 py-0.5 text-[11px] font-semibold text-fg-positive">+12.4%</span>
+      </div>
+      <div className="mt-3 flex h-16 items-end gap-1" aria-hidden="true">
+        {bars.map((height, index) => (
+          <span key={index} className={`flex-1 rounded-t-[3px] ${index === bars.length - 1 ? "bg-bg-brand-solid" : "bg-bg-brand-solid/30"}`} style={{ height: `${height}%` }} />
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-fg-neutral-muted">1월 → 12월</p>
+    </MockPanel>
+  );
+}
+
 const features = [
   {
     title: "자동 분류",
     description: "뱅크샐러드 분류를 우리집 카테고리로 바꾸고, 한 번 고친 가맹점은 다음부터 알아서 분류해요.",
     art: "from-[#ffd6b0] via-[#ffc4d6] to-[#e6d4ff]",
+    Mock: ClassifyMock,
   },
   {
     title: "가족 합산",
     description: "각자 올린 파일이 한 가계부로 합쳐지고, 가족끼리 보낸 돈은 지출에서 빠져요.",
     art: "from-[#bfe7ff] via-[#c9f0e4] to-[#fff1c2]",
+    Mock: MergeMock,
   },
   {
     title: "자산·연간 흐름",
     description: "순자산, 투자 비중, 월별 추이와 예산 대비 지출을 한 화면에서 확인해요.",
     art: "from-[#d7f5c8] via-[#c8ecf5] to-[#d9d6ff]",
+    Mock: TrendMock,
   },
 ];
 
@@ -74,7 +138,9 @@ export function StartView() {
           <div className="mt-14 grid gap-5 sm:grid-cols-3">
             {features.map((feature) => (
               <div key={feature.title}>
-                <div className={`aspect-[4/3] rounded-[20px] bg-gradient-to-br ${feature.art}`} aria-hidden="true" />
+                <div className={`flex aspect-[4/3] items-center justify-center rounded-[20px] bg-gradient-to-br ${feature.art}`} aria-hidden="true">
+                  <feature.Mock />
+                </div>
                 <p className="mt-4 text-[15px] leading-6 text-fg-neutral-muted">
                   <b className="font-semibold text-fg-neutral">{feature.title}</b> {feature.description}
                 </p>
