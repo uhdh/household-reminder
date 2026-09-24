@@ -3,7 +3,15 @@ import { describe, expect, test, vi } from "vitest";
 import UploadPage from "./page";
 
 vi.mock("@/lib/require-household", () => ({
-  requireHousehold: vi.fn().mockResolvedValue({ userId: "test-user", householdId: "00000000-0000-4000-8000-000000000099", role: "owner", email: "test@example.com" }),
+  requireHouseholdOrOnboard: vi.fn().mockResolvedValue({ userId: "test-user", householdId: "00000000-0000-4000-8000-000000000099", role: "owner", email: "test@example.com" }),
+}));
+
+vi.mock("@/lib/spending-queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/spending-queries")>()),
+  getHouseholdPeople: vi.fn().mockResolvedValue([
+    { id: "husband", displayName: "남편" },
+    { id: "wife", displayName: "아내" },
+  ]),
 }));
 
 describe("UploadPage", () => {

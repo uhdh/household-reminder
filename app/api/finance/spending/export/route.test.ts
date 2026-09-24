@@ -26,6 +26,7 @@ describe("Spending Export API Route", () => {
     const db = drizzle();
     setDbForTesting(db);
 
+    await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
     await db.execute(sql`
       CREATE TABLE uploads (
         id uuid PRIMARY KEY, household_id uuid NOT NULL, person_id text NOT NULL, source_filename text NOT NULL,

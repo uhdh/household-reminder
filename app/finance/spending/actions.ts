@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { categoryKeywordRules, transactions, uploads } from "@/lib/finance-db";
-import { isBeneficiary, isPersonId } from "@/lib/spending-queries";
+import { getHouseholdPeople, isBeneficiary, isPersonId } from "@/lib/spending-queries";
 import { requireHousehold } from "@/lib/require-household";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -26,7 +26,9 @@ export async function addManualTransactionAction(formData: FormData) {
   const paymentMethod = String(formData.get("paymentMethod") ?? "").trim().slice(0, 50);
   const amount = Number(String(formData.get("amount") ?? "").replaceAll(",", ""));
 
-  if (!isPersonId(personId) || !isBeneficiary(beneficiary) || !ISO_DATE_RE.test(txnDate) || !stdCategory || !Number.isFinite(amount) || amount <= 0) {
+  const householdPeople = await getHouseholdPeople(householdId);
+  const knownIds = householdPeople.map((p) => p.id);
+  if (!isPersonId(personId, knownIds) || !isBeneficiary(beneficiary, knownIds) || !ISO_DATE_RE.test(txnDate) || !stdCategory || !Number.isFinite(amount) || amount <= 0) {
     redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}addError=${encodeURIComponent("입력 내용을 다시 확인해주세요.")}`);
   }
 
@@ -38,7 +40,8 @@ export async function addManualTransactionAction(formData: FormData) {
     .limit(1);
 
   if (!activeUpload) {
-    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}addError=${encodeURIComponent(`${personId === "husband" ? "남편" : "아내"}의 파일을 먼저 업로드해주세요.`)}`);
+    const personLabel = householdPeople.find((p) => p.id === personId)?.displayName ?? "선택한 사람";
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}addError=${encodeURIComponent(`${personLabel}의 파일을 먼저 업로드해주세요.`)}`);
   }
 
   await db.insert(transactions).values({
@@ -68,7 +71,8 @@ export async function updateBeneficiaryAction(formData: FormData) {
   const beneficiary = String(formData.get("beneficiary") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
 
-  if (txnId && isBeneficiary(beneficiary)) {
+  const knownIds = (await getHouseholdPeople(householdId)).map((p) => p.id);
+  if (txnId && isBeneficiary(beneficiary, knownIds)) {
     const db = getDb();
     await db.update(transactions).set({ beneficiary }).where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
   }

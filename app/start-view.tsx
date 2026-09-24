@@ -7,7 +7,7 @@ import { assetItems, budgetCategories, uploads } from "@/lib/finance-db";
 import { CATEGORY_PALETTE, formatManwon, toNumber } from "@/lib/finance-format";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
-import { countsInTotals, flowLabel, getActiveTransactions, latestMonth, monthKeyOf, toNum } from "@/lib/spending-queries";
+import { countsInTotals, flowLabel, getActiveTransactions, getHouseholdPeople, latestMonth, monthKeyOf, toNum } from "@/lib/spending-queries";
 import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { AllocationCharts } from "@/app/finance/_components/charts";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
@@ -63,7 +63,7 @@ function CompositionCard({ title, items }: { title: string; items: { label: stri
   );
 }
 
-export async function StartView({ showHomeLink = false, personFilter = "all" }: { showHomeLink?: boolean; personFilter?: "all" | "husband" | "wife" }) {
+export async function StartView({ showHomeLink = false, personFilter = "all" }: { showHomeLink?: boolean; personFilter?: string }) {
   // "/"는 로그인 없이도 열리는 공개 페이지라 가구를 알 수 없다. 데모 모드거나(비로그인) 소속 가구가
   // 없으면 실데이터를 절대 쿼리하지 않고 빈 미리보기 상태로 내려간다(타 가구 데이터 노출 방지).
   const demo = await isFinanceDemoMode();
@@ -77,13 +77,20 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
   }
 
   const db = getDb();
-  const [activeUploads, { transactions }, budgetRows] = householdId
+  const [activeUploads, { transactions }, budgetRows, householdPeople] = householdId
     ? await Promise.all([
         db.select().from(uploads).where(and(eq(uploads.householdId, householdId), eq(uploads.isActive, true))),
         getActiveTransactions(householdId),
         db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
+        getHouseholdPeople(householdId),
       ])
-    : [[] as (typeof uploads.$inferSelect)[], { transactions: [] as import("@/lib/spending-queries").Txn[] }, [] as (typeof budgetCategories.$inferSelect)[]];
+    : [
+        [] as (typeof uploads.$inferSelect)[],
+        { transactions: [] as import("@/lib/spending-queries").Txn[] },
+        [] as (typeof budgetCategories.$inferSelect)[],
+        [] as { id: string; displayName: string }[],
+      ];
+  if (personFilter !== "all" && !householdPeople.some((p) => p.id === personFilter)) personFilter = "all";
   const activeUploadIds = activeUploads.map((upload) => upload.id);
   const rawAssets = householdId && activeUploadIds.length
     ? await db.select().from(assetItems).where(and(eq(assetItems.householdId, householdId), inArray(assetItems.uploadId, activeUploadIds)))
@@ -193,13 +200,14 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
         {hasPreviewData ? (
           <div className="mt-6 space-y-6">
             <Card className="overflow-hidden p-5 sm:p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">자산 현황(샘플)</h3><div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">{(["all", "husband", "wife"] as const).map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${personFilter === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}</Link>)}</div></div>
+                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">자산 현황(샘플)</h3>{householdPeople.length > 1 && <div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">{["all", ...householdPeople.map((p) => p.id)].map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${personFilter === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : (householdPeople.find((p) => p.id === person)?.displayName ?? person)}</Link>)}</div>}</div>
                 <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
                   <SummaryCard variant="feature" className="col-span-2 lg:col-span-4" label="순자산" value={totalAsset - totalDebt} format="manwon" breakdown={[{ label: "자산", value: totalAsset }]} />
                   <SummaryCard label="총자산" value={totalAsset} format="manwon" />
                   <SummaryCard label="총부채" value={totalDebt} format="manwon" />
-                  <SummaryCard label="남편 순자산" value={netByPerson.get("husband") ?? 0} format="manwon" />
-                  <SummaryCard label="아내 순자산" value={netByPerson.get("wife") ?? 0} format="manwon" />
+                  {householdPeople.map((p) => (
+                    <SummaryCard key={p.id} label={`${p.displayName} 순자산`} value={netByPerson.get(p.id) ?? 0} format="manwon" />
+                  ))}
                 </div>
                 <div className="mt-3">
                   <AllocationCharts assetComposition={assetSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} sectorComposition={sectorSlices.map((slice) => ({ name: slice.label, value: slice.value, fill: slice.color }))} />
@@ -207,7 +215,7 @@ export async function StartView({ showHomeLink = false, personFilter = "all" }: 
             </Card>
 
             <Card className="overflow-hidden p-5 sm:p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">월별 지출(샘플)</h3><div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">{(["all", "husband", "wife"] as const).map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${personFilter === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : person === "husband" ? "남편" : "아내"}</Link>)}</div></div>
+                <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">월별 지출(샘플)</h3>{householdPeople.length > 1 && <div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">{["all", ...householdPeople.map((p) => p.id)].map((person) => <Link key={person} href={person === "all" ? "/" : `/?person=${person}`} className={`flex h-9 items-center rounded-r2 px-4 text-[14px] ${personFilter === person ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-fg-neutral-muted hover:text-fg-neutral"}`}>{person === "all" ? "전체" : (householdPeople.find((p) => p.id === person)?.displayName ?? person)}</Link>)}</div>}</div>
                 <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
                   <SummaryCard label="총수입" value={monthlyIncome} format="compactKrw" />
                   <SummaryCard label="총지출" value={monthlyExpense} format="compactKrw" />

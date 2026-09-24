@@ -13,20 +13,14 @@ import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-u
 import { AppShell } from "@/components/ui";
 import { DemoFinanceDashboard } from "./_components/demo-pages";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
-import { requireHousehold } from "@/lib/require-household";
+import { requireHouseholdOrOnboard } from "@/lib/require-household";
+import { getHouseholdPeople, isPersonId, type PersonId } from "@/lib/spending-queries";
 
 export const dynamic = "force-dynamic";
 
-const PERSON_IDS = ["husband", "wife"] as const;
-type PersonId = (typeof PERSON_IDS)[number];
-
-const PERSON_LABELS: Record<PersonId, string> = {
-  husband: "남편",
-  wife: "아내",
-};
-
 // 부동산/차량, 전자금융/보험 자산은 순자산 계산 및 분류에서 제외하기로 함
 const EXCLUDED_ASSET_CATEGORIES = new Set(["부동산", "동산", "전자금융 자산", "보험 자산"]);
+// 기존 우리집 한정 예외 규칙(특정 대출 상품). 새 가구에는 해당 personId/상품명 조합이 없어 그냥 무시된다.
 const EXCLUDED_DEBT_ITEMS = [{ personId: "husband", productName: "분양주택입주잔금대출" }];
 
 // 뱅크샐러드 원본 카테고리를 대시보드 표시용으로 재분류: 입출금 통장은 현금, 예적금 통장은 예적금으로 묶는다
@@ -52,29 +46,28 @@ function isExcludedItem(item: { side: string; personId: string; category: string
   return EXCLUDED_DEBT_ITEMS.some((e) => e.personId === item.personId && e.productName === item.productName);
 }
 
-function isPersonId(value: string | undefined): value is PersonId {
-  return !!value && (PERSON_IDS as readonly string[]).includes(value);
-}
-
 export default async function DashboardPage({
   searchParams,
 }: {
   searchParams: Promise<{ person?: string }>;
 }) {
   const { person } = await searchParams;
-  const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
 
   if (await isFinanceDemoMode()) {
+    const personFilter: "all" | PersonId = person === "husband" || person === "wife" ? person : "all";
     return <DemoFinanceDashboard personFilter={personFilter} />;
   }
 
-  const { householdId } = await requireHousehold();
+  const { householdId } = await requireHouseholdOrOnboard();
   const db = getDb();
 
-  const [activeUploads, allocationTargetRows] = await Promise.all([
+  const [activeUploads, allocationTargetRows, householdPeople] = await Promise.all([
     db.select().from(uploads).where(and(eq(uploads.householdId, householdId), eq(uploads.isActive, true))),
     db.select().from(allocationTargets).where(eq(allocationTargets.householdId, householdId)),
+    getHouseholdPeople(householdId),
   ]);
+  const personIds = householdPeople.map((p) => p.id);
+  const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
 
   if (activeUploads.length === 0) {
     redirect("/finance/upload");
@@ -86,7 +79,7 @@ export default async function DashboardPage({
 
   const activeUploadIds = activeUploads.map((u) => u.id);
   const peopleWithData = new Set(activeUploads.map((u) => u.personId));
-  const displayNameByPerson = new Map<string, string>(PERSON_IDS.map((id) => [id, PERSON_LABELS[id]]));
+  const displayNameByPerson = new Map<string, string>(householdPeople.map((p) => [p.id, p.displayName]));
 
   const rawAssets = activeUploadIds.length
     ? await db.select().from(assetItems).where(and(eq(assetItems.householdId, householdId), inArray(assetItems.uploadId, activeUploadIds)))
@@ -94,7 +87,7 @@ export default async function DashboardPage({
 
   const assets = rawAssets.filter((item) => !isExcludedItem(item));
 
-  const summary = PERSON_IDS.map((personId) => {
+  const summary = householdPeople.map(({ id: personId }) => {
     const items = assets.filter((a) => a.personId === personId);
     const totalAsset = items
       .filter((i) => i.side === "asset")
@@ -104,7 +97,7 @@ export default async function DashboardPage({
       .reduce((s, i) => s + toNumber(i.amount), 0);
     return {
       personId,
-      label: displayNameByPerson.get(personId) ?? PERSON_LABELS[personId],
+      label: displayNameByPerson.get(personId) ?? personId,
       hasData: peopleWithData.has(personId),
       totalAsset,
       totalDebt,
@@ -224,9 +217,7 @@ export default async function DashboardPage({
     investmentByProduct.set(productKey, {
       id: existing?.id ?? item.id,
       productName,
-      personLabel: existing ? "공동" : (
-        displayNameByPerson.get(item.personId) ?? PERSON_LABELS[item.personId as PersonId] ?? item.personId
-      ),
+      personLabel: existing ? "공동" : (displayNameByPerson.get(item.personId) ?? item.personId),
       sector: existing?.sector ?? item.sector ?? classifyInvestmentSector(productName),
       costBasis: (existing?.costBasis ?? 0) + costBasis,
       value: (existing?.value ?? 0) + value,
@@ -276,11 +267,7 @@ export default async function DashboardPage({
     <AppShell size="wide" className="font-office text-ink">
         {hasAnyData && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <PersonFilterTabs
-              current={personFilter}
-              husbandLabel={displayNameByPerson.get("husband") ?? PERSON_LABELS.husband}
-              wifeLabel={displayNameByPerson.get("wife") ?? PERSON_LABELS.wife}
-            />
+            <PersonFilterTabs current={personFilter} people={householdPeople.map((p) => ({ id: p.id, label: displayNameByPerson.get(p.id) ?? p.displayName }))} />
             <span className="text-[11px] text-ink-muted">단위: 만원</span>
           </div>
         )}
@@ -344,8 +331,6 @@ function HeroRow({
   totalDebt: number;
   totalNet: number;
 }) {
-  const [husband, wife] = summary;
-
   if (personFilter !== "all") {
     return (
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
@@ -356,29 +341,40 @@ function HeroRow({
     );
   }
 
+  // 기존 우리집(정확히 2인)은 화면을 그대로 유지한다. 1인/3인 이상은 일반 레이아웃으로 대응.
+  if (summary.length === 2) {
+    const [first, second] = summary;
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+        <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="우리집 자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]} />
+        <SummaryCard label={`${first.label} 순자산`} value={first.net} format="manwon" />
+        <SummaryCard label={`${second.label} 순자산`} value={second.net} format="manwon" />
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
-      <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="우리집 자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]} />
-      <SummaryCard label={`${husband.label} 순자산`} value={husband.net} format="manwon" />
-      <SummaryCard label={`${wife.label} 순자산`} value={wife.net} format="manwon" />
+    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <SummaryCard
+        variant="feature"
+        className="col-span-2"
+        label="우리집 자산"
+        value={totalNet}
+        format="manwon"
+        breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]}
+      />
+      {summary.map((s) => (
+        <SummaryCard key={s.personId} label={`${s.label} 순자산`} value={s.net} format="manwon" />
+      ))}
     </div>
   );
 }
 
-function PersonFilterTabs({
-  current,
-  husbandLabel,
-  wifeLabel,
-}: {
-  current: "all" | PersonId;
-  husbandLabel: string;
-  wifeLabel: string;
-}) {
-  const tabs: { key: "all" | PersonId; label: string; dotColor?: string }[] = [
-    { key: "all", label: "전체" },
-    { key: "husband", label: husbandLabel, dotColor: "bg-husband" },
-    { key: "wife", label: wifeLabel, dotColor: "bg-wife" },
-  ];
+function PersonFilterTabs({ current, people }: { current: "all" | PersonId; people: { id: string; label: string }[] }) {
+  // 1인 가구는 필터를 보여줄 이유가 없다(늘 "전체"와 같은 결과).
+  if (people.length <= 1) return null;
+
+  const tabs: { key: "all" | PersonId; label: string }[] = [{ key: "all", label: "전체" }, ...people.map((p) => ({ key: p.id, label: p.label }))];
   return (
     <div className="inline-flex gap-0.5 rounded-r3 bg-bg-neutral-weak p-1">
       {tabs.map((tab) => {
@@ -392,7 +388,9 @@ function PersonFilterTabs({
               active ? "bg-bg-brand-solid font-bold text-fg-neutral-inverted" : "font-medium text-ink-muted hover:text-ink"
             }`}
           >
-            {tab.dotColor && <span className={`h-1.5 w-1.5 rounded-full ${tab.dotColor}`} />}
+            {/* 기존 우리집(husband/wife)은 점 색깔을 그대로 유지, 새 가구 구성원은 점 없이 */}
+            {tab.key === "husband" && <span className="h-1.5 w-1.5 rounded-full bg-husband" />}
+            {tab.key === "wife" && <span className="h-1.5 w-1.5 rounded-full bg-wife" />}
             {tab.label}
           </Link>
         );

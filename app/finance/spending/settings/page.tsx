@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules } from "@/lib/finance-db";
+import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, householdInvites, householdMembers, users } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
-import { getActiveTransactions, toNum } from "@/lib/spending-queries";
-import { requireHousehold } from "@/lib/require-household";
-import { ActionButton, SelectInput, TextInput } from "@/components/ui";
+import { getActiveTransactions, getHouseholdPeople, toNum } from "@/lib/spending-queries";
+import { requireHouseholdOrOnboard } from "@/lib/require-household";
+import { ActionButton, FeedbackMessage, SelectInput, TextInput } from "@/components/ui";
 import {
   addBudgetCategoryAction,
   deleteBudgetCategoryAction,
@@ -17,6 +17,8 @@ import {
   upsertCategoryMappingAction,
   upsertCategoryRuleAction,
 } from "./actions";
+import { cancelInviteAction, createInviteAction } from "./members-actions";
+import { InviteLink } from "./invite-link";
 import { UploadForm } from "@/app/finance/upload/upload-form";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,7 @@ const SETTING_TABS = [
   { id: "rules", label: "사용자 규칙" },
   { id: "categories", label: "카테고리 · 예산" },
   { id: "unmapped", label: "미분류 관리" },
+  { id: "members", label: "구성원" },
 ] as const;
 
 function groupByKind(options: { name: string; kind: string }[]): Record<string, string[]> {
@@ -47,18 +50,29 @@ function guessStdCategory(rawCategory: string, rawSubcategory: string, knownName
   return knownNames.has("기타") ? "기타" : (knownNames.values().next().value ?? "기타");
 }
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string }> }) {
-  const { tab, error, success } = await searchParams;
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string; invite?: string }> }) {
+  const { tab, error, success, invite } = await searchParams;
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
-  const { householdId } = await requireHousehold();
+  const { householdId, role } = await requireHouseholdOrOnboard();
   const db = getDb();
-  const [mappings, rules, keywordRules, budgets, { transactions: allTx }] = await Promise.all([
+  const [mappings, rules, keywordRules, budgets, { transactions: allTx }, memberRows, invites, householdPeople] = await Promise.all([
     db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
     db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
     db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
     db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
     getActiveTransactions(householdId),
+    db.select().from(householdMembers).where(eq(householdMembers.householdId, householdId)),
+    db.select().from(householdInvites).where(eq(householdInvites.householdId, householdId)),
+    getHouseholdPeople(householdId),
   ]);
+
+  const memberUserIds = memberRows.map((m) => m.userId);
+  const memberUsers = memberUserIds.length ? await db.select().from(users).where(inArray(users.id, memberUserIds)) : [];
+  const userById = new Map(memberUsers.map((u) => [u.id, u]));
+  const members = memberRows
+    .map((m) => ({ ...m, user: userById.get(m.userId) }))
+    .sort((a, b) => (a.role === b.role ? 0 : a.role === "owner" ? -1 : 1));
+  const activeInvites = invites.filter((i) => !i.usedAt && i.expiresAt > new Date());
 
   const sortedBudgets = [...budgets].sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder));
   const categoryOptions = sortedBudgets.map((b) => ({ name: b.name, kind: b.kind }));
@@ -112,7 +126,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <div className="min-w-0 space-y-6">
 
-      {activeTab === "upload" && <UploadForm error={error} success={success} />}
+      {activeTab === "upload" && <UploadForm error={error} success={success} people={householdPeople} />}
 
       {activeTab === "unmapped" && (unmapped.length > 0 ? (
         <div className="seed-card bg-bg-critical-weak p-5 shadow-none sm:p-7">
@@ -449,6 +463,58 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </ActionButton>
         </form>
       </div>}
+
+      {activeTab === "members" && (
+        <div className="space-y-6">
+          <div className="seed-card p-5 shadow-none sm:p-7">
+            <h2 className="mb-4 text-[18px] font-extrabold text-ink">구성원</h2>
+            <ul className="mb-4 divide-y divide-hairline2 text-[14px]">
+              {members.map((m) => (
+                <li key={m.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-ink">{m.user?.name || m.user?.email || "알 수 없음"}</p>
+                    {m.user?.name && <p className="truncate text-[12px] text-ink-muted">{m.user.email}</p>}
+                  </div>
+                  <span className="shrink-0 rounded-r2 bg-bg-neutral-weak px-2.5 py-1 text-[12px] font-semibold text-ink-muted">
+                    {m.role === "owner" ? "owner" : "member"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {invite && <div className="mb-4"><InviteLink path={`/invite/${invite}`} /></div>}
+            {error && activeTab === "members" && <FeedbackMessage tone="critical" className="mb-4">{error}</FeedbackMessage>}
+
+            {role === "owner" && (
+              <form action={createInviteAction}>
+                <ActionButton type="submit" className="min-h-11 px-4 py-2">
+                  초대 링크 만들기
+                </ActionButton>
+              </form>
+            )}
+          </div>
+
+          {role === "owner" && activeInvites.length > 0 && (
+            <div className="seed-card p-5 shadow-none sm:p-7">
+              <h2 className="mb-1 text-[18px] font-extrabold text-ink">활성 초대</h2>
+              <p className="mb-4 text-[13px] text-ink-muted">7일 후 자동 만료되고, 1회만 사용할 수 있습니다.</p>
+              <ul className="divide-y divide-hairline2 text-[14px]">
+                {activeInvites.map((i) => (
+                  <li key={i.id} className="flex items-center justify-between gap-3 py-2.5">
+                    <span className="text-ink-muted">{i.expiresAt.toISOString().slice(0, 10)}까지 유효</span>
+                    <form action={cancelInviteAction}>
+                      <input type="hidden" name="id" value={i.id} />
+                      <ActionButton type="submit" variant="ghost" className="min-h-9 px-3 py-1.5 text-fg-critical">
+                        취소
+                      </ActionButton>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
       </div>
     </div>
   );

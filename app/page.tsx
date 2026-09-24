@@ -8,5 +8,6 @@ export const revalidate = 3600;
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ person?: string }> }) {
   const { person } = await searchParams;
-  return <StartView personFilter={person === "husband" || person === "wife" ? person : "all"} />;
+  // 실제 유효성 검사(가구의 people 목록 기준)는 StartView 안에서 한다 - 여기서는 값만 전달.
+  return <StartView personFilter={person ?? "all"} />;
 }

@@ -1,5 +1,6 @@
 import "server-only";
 import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getDb } from "./db";
 import { householdMembers, users } from "./finance-db";
@@ -39,4 +40,24 @@ export async function requireHousehold(): Promise<HouseholdContext> {
   const membership = memberships.find((m) => m.role === "owner") ?? memberships[0];
 
   return { userId: user.id, householdId: membership.householdId, role: membership.role, email };
+}
+
+/** requireHousehold()와 같지만 소속 가구가 없으면 예외 대신 null을 반환한다(온보딩 화면 등에서 사용). */
+export async function getCurrentHousehold(): Promise<HouseholdContext | null> {
+  try {
+    return await requireHousehold();
+  } catch (error) {
+    if (error instanceof NoHouseholdError) return null;
+    throw error;
+  }
+}
+
+/** 페이지 컴포넌트 전용: 소속 가구가 없으면 예외를 던지는 대신 /onboarding으로 보낸다. */
+export async function requireHouseholdOrOnboard(): Promise<HouseholdContext> {
+  try {
+    return await requireHousehold();
+  } catch (error) {
+    if (error instanceof NoHouseholdError) redirect("/onboarding");
+    throw error;
+  }
 }

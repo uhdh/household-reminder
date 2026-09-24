@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
-import { requireHousehold } from "@/lib/require-household";
+import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import {
   countsInTotals,
   flowLabel,
@@ -83,14 +83,16 @@ export default async function YearlyPage({
   searchParams: Promise<{ year?: string; person?: string }>;
 }) {
   const { year: yearParam, person } = await searchParams;
-  const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
 
   if (await isFinanceDemoMode()) {
+    const personFilter: "all" | PersonId = person === "husband" || person === "wife" ? person : "all";
     return <DemoYearlySpending personFilter={personFilter} />;
   }
 
-  const { householdId } = await requireHousehold();
+  const { householdId } = await requireHouseholdOrOnboard();
   const { transactions: allTx, displayNameByPerson } = await getActiveTransactions(householdId);
+  const personIds = Array.from(displayNameByPerson.keys());
+  const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
   const includedTx = allTx.filter(countsInTotals);
   const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : latestYear(includedTx);
   const periodTxAll = allTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));

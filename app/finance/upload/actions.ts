@@ -4,22 +4,11 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { and, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assetItems, categoryKeywordRules, categoryMappings, categoryRules, people, transactions, uploads } from "@/lib/finance-db";
+import { assetItems, categoryKeywordRules, categoryMappings, categoryRules, transactions, uploads } from "@/lib/finance-db";
 import { parseUploadFile, type ParsedUpload } from "@/lib/finance-parse";
 import { buildMappingIndex, buildRuleIndex, deriveTransactionFields } from "@/lib/spending-derive";
 import { requireHousehold } from "@/lib/require-household";
-
-const PERSON_IDS = ["husband", "wife"] as const;
-type PersonId = (typeof PERSON_IDS)[number];
-
-const PERSON_LABELS: Record<PersonId, string> = {
-  husband: "남편",
-  wife: "아내",
-};
-
-function isPersonId(value: string): value is PersonId {
-  return (PERSON_IDS as readonly string[]).includes(value);
-}
+import { getHouseholdPeople, isPersonId } from "@/lib/spending-queries";
 
 // neon-http는 요청 하나에 실어보낼 수 있는 페이로드 크기에 한도가 있어
 // 거래 내역이 많은 파일은 한 번에 insert하면 "value too large to transmit" 오류가 난다.
@@ -36,7 +25,9 @@ export async function uploadAction(formData: FormData) {
   const personId = String(formData.get("personId") ?? "");
   const file = formData.get("file");
 
-  if (!isPersonId(personId)) {
+  const householdPeople = await getHouseholdPeople(householdId);
+  const knownIds = householdPeople.map((p) => p.id);
+  if (!isPersonId(personId, knownIds)) {
     redirect("/finance/upload?error=" + encodeURIComponent("보유자를 선택해 주세요."));
   }
   if (!(file instanceof File) || file.size === 0) {
@@ -54,16 +45,10 @@ export async function uploadAction(formData: FormData) {
   }
 
   const db = getDb();
-  const displayName = PERSON_LABELS[personId];
+  // 표시 이름은 온보딩/초대 수락 때 그 사람이 직접 정한 것을 그대로 쓴다(여기서 덮어쓰지 않는다).
+  const displayName = householdPeople.find((p) => p.id === personId)?.displayName ?? personId;
   const uploadId = randomUUID();
 
-  await db
-    .insert(people)
-    .values({ id: personId, householdId, displayName })
-    .onConflictDoUpdate({
-      target: people.id,
-      set: { displayName, updatedAt: new Date() },
-    });
   await db
     .update(uploads)
     .set({ isActive: false })

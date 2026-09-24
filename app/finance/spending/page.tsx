@@ -2,12 +2,13 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
-import { requireHousehold } from "@/lib/require-household";
+import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import {
   MONTH_RE,
-  PERSON_LABELS,
+  beneficiaryLabel,
   flowLabel,
   getActiveTransactions,
+  isBeneficiary,
   isPersonId,
   latestMonth,
   monthKeyOf,
@@ -69,24 +70,26 @@ export default async function SpendingPage({
     toastTxnType,
     toastTxnId,
   } = await searchParams;
-  const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
   const reviewMode = review === "1";
 
   if (await isFinanceDemoMode()) {
+    const personFilter: "all" | PersonId = person === "husband" || person === "wife" ? person : "all";
     return <DemoTransactionList personFilter={personFilter} />;
   }
 
-  const { householdId } = await requireHousehold();
+  const { householdId } = await requireHouseholdOrOnboard();
   const db = getDb();
   const [{ transactions: allTx, displayNameByPerson }, budgetRows] = await Promise.all([
     getActiveTransactions(householdId),
     db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
   ]);
+  const personIds = Array.from(displayNameByPerson.keys());
+  const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
   const categoryOptions = [...budgetRows]
     .sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder))
     .map((b) => ({ name: b.name, kind: b.kind }));
   const flowFilter = flow === "income" || flow === "expense" ? flow : "all";
-  const beneficiaryFilter = beneficiary === "husband" || beneficiary === "wife" || beneficiary === "joint" ? beneficiary : "all";
+  const beneficiaryFilter = isBeneficiary(beneficiary, personIds) ? beneficiary : "all";
   const categoryFilter = category === "미분류" ? "미분류" : categoryOptions.some((option) => option.name === category) ? category! : "all";
   const query = q?.trim().slice(0, 50) ?? "";
   // 자산수정은 집계에서는 제외하지만, 사용자가 다른 카테고리로 변경할 수 있도록
@@ -180,8 +183,11 @@ export default async function SpendingPage({
           사용 대상
           <SelectInput name="beneficiary" defaultValue={beneficiaryFilter} className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]">
             <option value="all">전체</option>
-            <option value="husband">남편</option>
-            <option value="wife">아내</option>
+            {personIds.map((id) => (
+              <option key={id} value={id}>
+                {displayNameByPerson.get(id) ?? id}
+              </option>
+            ))}
             <option value="joint">우리</option>
           </SelectInput>
         </label>
@@ -249,7 +255,8 @@ export default async function SpendingPage({
 
       <ManualTransactionForm
         month={month}
-        defaultPerson={personFilter === "all" ? "husband" : personFilter}
+        defaultPerson={personFilter === "all" ? personIds[0] : personFilter}
+        people={personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }))}
         categories={categoryOptions}
         returnTo={returnTo}
       />
@@ -289,7 +296,7 @@ export default async function SpendingPage({
               const flow = flowLabel(t);
               const rawCategory = t.category ?? "미분류";
               const displayedCategory = t.stdCategory ?? "미분류";
-              const payerLabel = displayNameByPerson.get(t.personId) ?? PERSON_LABELS[t.personId as PersonId] ?? t.personId;
+              const payerLabel = beneficiaryLabel(t.personId, displayNameByPerson);
               const amount = toNum(t.amount);
               return (
                 <tr
@@ -323,7 +330,7 @@ export default async function SpendingPage({
                           <span className="mx-1 text-ink-muted/60">→</span>
                         </span>
                       )}
-                      <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} />
+                      <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} people={personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }))} />
                     </div>
                   </td>
                   <td className="col-span-2 col-start-2 row-start-4 md:table-cell md:px-3">

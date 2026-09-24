@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { flowLabel, PERSON_LABELS, toNum, type PersonId, type Txn } from "./spending-queries";
+import { beneficiaryLabel, flowLabel, toNum, type Txn } from "./spending-queries";
 
 export async function exportTransactionsToExcel(
   transactions: Txn[],
@@ -52,11 +52,8 @@ export async function exportTransactionsToExcel(
   for (const t of transactions) {
     const flow = flowLabel(t);
     const amountVal = toNum(t.amount);
-    const payer = displayNameByPerson.get(t.personId) ?? PERSON_LABELS[t.personId as PersonId] ?? t.personId;
-    const beneficiaryLabel =
-      t.beneficiary === "joint"
-        ? "우리"
-        : (displayNameByPerson.get(t.beneficiary) ?? PERSON_LABELS[t.beneficiary as PersonId] ?? t.beneficiary);
+    const payer = beneficiaryLabel(t.personId, displayNameByPerson);
+    const beneficiaryText = beneficiaryLabel(t.beneficiary, displayNameByPerson);
 
     const row = worksheet.addRow({
       txnDate: t.txnDate,
@@ -67,7 +64,7 @@ export async function exportTransactionsToExcel(
       description: t.description ?? "",
       paymentMethod: t.paymentMethod ?? "",
       payer,
-      beneficiary: beneficiaryLabel,
+      beneficiary: beneficiaryText,
       rawCategory: t.category ?? "",
       rawSubcategory: t.subcategory ?? "",
       included: t.included ? "Y" : "N",

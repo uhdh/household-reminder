@@ -1,26 +1,32 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { transactions, uploads } from "@/lib/finance-db";
+import { people, transactions, uploads } from "@/lib/finance-db";
 
-export const PERSON_IDS = ["husband", "wife"] as const;
-export type PersonId = (typeof PERSON_IDS)[number];
+// 기존 "우리집" 가구는 이 두 id를 그대로 쓴다(마이그레이션으로 이미 people 행이 있음). 새 가구는
+// 온보딩/초대에서 uuid 문자열 id를 받는다 - PersonId는 이제 가구별 people.id 아무거나를 뜻하는
+// 일반 문자열이고, 유효성 검사는 항상 그 가구의 실제 people 목록(knownIds)을 기준으로 한다.
+export type PersonId = string;
 
-export const PERSON_LABELS: Record<PersonId, string> = {
-  husband: "남편",
-  wife: "아내",
-};
+export type Beneficiary = string; // people.id 또는 'joint'
 
-export type Beneficiary = PersonId | "joint";
-
-export function isPersonId(value: string | undefined): value is PersonId {
-  return !!value && (PERSON_IDS as readonly string[]).includes(value);
+export function isPersonId(value: string | undefined | null, knownIds: Iterable<string>): value is string {
+  if (!value) return false;
+  const set = knownIds instanceof Set ? knownIds : new Set(knownIds);
+  return set.has(value);
 }
 
-export function isBeneficiary(value: string | undefined | null): value is Beneficiary {
-  return value === "husband" || value === "wife" || value === "joint";
+export function isBeneficiary(value: string | undefined | null, knownIds: Iterable<string>): value is string {
+  if (value === "joint") return true;
+  return isPersonId(value, knownIds);
 }
 
 export type Txn = typeof transactions.$inferSelect;
+
+/** 가구 구성원(people) 목록. 자산·거래의 personId, beneficiary 유효성 검사와 화면 표시 이름의 기준이다. */
+export async function getHouseholdPeople(householdId: string): Promise<{ id: string; displayName: string }[]> {
+  const db = getDb();
+  return db.select({ id: people.id, displayName: people.displayName }).from(people).where(eq(people.householdId, householdId));
+}
 
 /** 모든 업로드에서 누적된 거래 전체를 가져온다. 자산만 최신 업로드 스냅샷을 사용한다. */
 export async function getActiveTransactions(householdId: string): Promise<{
@@ -28,11 +34,12 @@ export async function getActiveTransactions(householdId: string): Promise<{
   displayNameByPerson: Map<string, string>;
 }> {
   const db = getDb();
-  const displayNameByPerson = new Map<string, string>(PERSON_IDS.map((id) => [id, PERSON_LABELS[id]]));
-  const [rows, uploadRows] = await Promise.all([
+  const [rows, uploadRows, peopleRows] = await Promise.all([
     db.select().from(transactions).where(eq(transactions.householdId, householdId)),
     db.select().from(uploads).where(eq(uploads.householdId, householdId)),
+    getHouseholdPeople(householdId),
   ]);
+  const displayNameByPerson = new Map<string, string>(peopleRows.map((p) => [p.id, p.displayName]));
   const uploadById = new Map(uploadRows.map((upload) => [upload.id, upload]));
   const latestUploadByDate = new Map<string, string>();
 
@@ -52,7 +59,7 @@ export async function getActiveTransactions(householdId: string): Promise<{
 
 export function beneficiaryLabel(value: string, displayNameByPerson: Map<string, string>): string {
   if (value === "joint") return "우리";
-  return PERSON_LABELS[value as PersonId] ?? displayNameByPerson.get(value) ?? value;
+  return displayNameByPerson.get(value) ?? value;
 }
 
 export function monthKeyOf(txnDate: string): string {
@@ -127,10 +134,10 @@ export function unmappedTransferExclusion(rows: { included: boolean; txnType: st
   return { count: excluded.length, total: excluded.reduce((sum, t) => sum + Math.abs(toNum(t.amount)), 0) };
 }
 
-export type PersonSplit = Record<PersonId, number>;
+export type PersonSplit = Record<string, number>;
 
-function emptySplit(): PersonSplit {
-  return { husband: 0, wife: 0 };
+function emptySplit(personIds: readonly string[]): PersonSplit {
+  return Object.fromEntries(personIds.map((id) => [id, 0]));
 }
 
 export interface MonthlySummary {
@@ -152,19 +159,21 @@ export interface MonthlySummary {
   savingsRateByPerson: PersonSplit;
   categoryTotals: Map<string, number>;
   categoryByPerson: Map<string, PersonSplit>;
-  categoryByBeneficiary: Map<string, Record<Beneficiary, number>>;
+  categoryByBeneficiary: Map<string, Record<string, number>>;
 }
 
 export const UNMAPPED_CATEGORY = "미분류";
 
 /**
- * 한 달치 거래를 집계해서 가구 전체 합계와 남편/아내 개인별 합계를 함께 반환한다.
+ * 한 달치 거래를 집계해서 가구 전체 합계와 구성원별(personIds) 개인별 합계를 함께 반환한다.
  * kindOf는 표준카테고리(+수입/지출 흐름)로부터 '고정비/변동비/고정수입/변동수입' 성격을 결정하는 함수로,
- * budgetCategories 테이블 내용에 의존하므로 페이지 쪽에서 주입한다.
+ * budgetCategories 테이블 내용에 의존하므로 페이지 쪽에서 주입한다. personIds는 이 가구의 people.id
+ * 전체 목록(1인 이상) - 결과의 *ByPerson 레코드가 이 id들을 키로 갖는다.
  */
 export function summarizeMonthlyTransactions(
   monthTx: Txn[],
-  kindOf: (stdCategory: string | null, flow: "입금" | "지출") => string
+  kindOf: (stdCategory: string | null, flow: "입금" | "지출") => string,
+  personIds: readonly string[]
 ): MonthlySummary {
   let totalIncome = 0;
   let fixedIncome = 0;
@@ -173,69 +182,67 @@ export function summarizeMonthlyTransactions(
   let fixedExpense = 0;
   let variableExpense = 0;
 
-  const totalIncomeByPerson = emptySplit();
-  const fixedIncomeByPerson = emptySplit();
-  const variableIncomeByPerson = emptySplit();
-  const totalExpenseByPerson = emptySplit();
-  const fixedExpenseByPerson = emptySplit();
-  const variableExpenseByPerson = emptySplit();
+  const totalIncomeByPerson = emptySplit(personIds);
+  const fixedIncomeByPerson = emptySplit(personIds);
+  const variableIncomeByPerson = emptySplit(personIds);
+  const totalExpenseByPerson = emptySplit(personIds);
+  const fixedExpenseByPerson = emptySplit(personIds);
+  const variableExpenseByPerson = emptySplit(personIds);
 
   const categoryTotals = new Map<string, number>();
   const categoryByPerson = new Map<string, PersonSplit>();
-  const categoryByBeneficiary = new Map<string, Record<Beneficiary, number>>();
+  const categoryByBeneficiary = new Map<string, Record<string, number>>();
 
   for (const t of monthTx) {
     const flow = flowLabel(t);
     const amt = Math.abs(toNum(t.amount));
     const kind = kindOf(t.stdCategory, flow);
-    const personId = t.personId as PersonId;
+    const personId = t.personId;
 
     if (flow === "입금") {
       totalIncome += amt;
-      totalIncomeByPerson[personId] += amt;
+      totalIncomeByPerson[personId] = (totalIncomeByPerson[personId] ?? 0) + amt;
       if (kind === "고정수입") {
         fixedIncome += amt;
-        fixedIncomeByPerson[personId] += amt;
+        fixedIncomeByPerson[personId] = (fixedIncomeByPerson[personId] ?? 0) + amt;
       } else {
         variableIncome += amt;
-        variableIncomeByPerson[personId] += amt;
+        variableIncomeByPerson[personId] = (variableIncomeByPerson[personId] ?? 0) + amt;
       }
       continue;
     }
 
     totalExpense += amt;
-    totalExpenseByPerson[personId] += amt;
+    totalExpenseByPerson[personId] = (totalExpenseByPerson[personId] ?? 0) + amt;
     if (kind === "고정비") {
       fixedExpense += amt;
-      fixedExpenseByPerson[personId] += amt;
+      fixedExpenseByPerson[personId] = (fixedExpenseByPerson[personId] ?? 0) + amt;
     } else {
       variableExpense += amt;
-      variableExpenseByPerson[personId] += amt;
+      variableExpenseByPerson[personId] = (variableExpenseByPerson[personId] ?? 0) + amt;
     }
 
     const cat = t.stdCategory ?? UNMAPPED_CATEGORY;
     categoryTotals.set(cat, (categoryTotals.get(cat) ?? 0) + amt);
 
-    const byPerson = categoryByPerson.get(cat) ?? emptySplit();
-    byPerson[personId] += amt;
+    const byPerson = categoryByPerson.get(cat) ?? emptySplit(personIds);
+    byPerson[personId] = (byPerson[personId] ?? 0) + amt;
     categoryByPerson.set(cat, byPerson);
 
-    const byBen = categoryByBeneficiary.get(cat) ?? { husband: 0, wife: 0, joint: 0 };
-    const ben = t.beneficiary as Beneficiary;
+    const byBen = categoryByBeneficiary.get(cat) ?? { ...emptySplit(personIds), joint: 0 };
+    const ben = t.beneficiary;
     byBen[ben] = (byBen[ben] ?? 0) + amt;
     categoryByBeneficiary.set(cat, byBen);
   }
 
   const balance = totalIncome - totalExpense;
-  const balanceByPerson: PersonSplit = {
-    husband: totalIncomeByPerson.husband - totalExpenseByPerson.husband,
-    wife: totalIncomeByPerson.wife - totalExpenseByPerson.wife,
-  };
+  const balanceByPerson: PersonSplit = Object.fromEntries(
+    personIds.map((id) => [id, (totalIncomeByPerson[id] ?? 0) - (totalExpenseByPerson[id] ?? 0)])
+  );
   const savingsRate = totalIncome > 0 ? (balance / totalIncome) * 100 : 0;
-  const savingsRateByPerson: PersonSplit = {
-    husband: totalIncomeByPerson.husband > 0 ? (balanceByPerson.husband / totalIncomeByPerson.husband) * 100 : 0,
-    wife: totalIncomeByPerson.wife > 0 ? (balanceByPerson.wife / totalIncomeByPerson.wife) * 100 : 0,
-  };
+  const savingsRateByPerson: PersonSplit = Object.fromEntries(
+    personIds.map((id) => [id, (totalIncomeByPerson[id] ?? 0) > 0 ? ((balanceByPerson[id] ?? 0) / totalIncomeByPerson[id]) * 100 : 0])
+  );
 
   return {
     totalIncome,

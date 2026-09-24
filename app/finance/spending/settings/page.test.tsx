@@ -11,6 +11,10 @@ vi.mock("@/lib/finance-db", () => ({
   categoryKeywordRules: { householdId: "household_id" },
   categoryMappings: { householdId: "household_id" },
   categoryRules: { householdId: "household_id" },
+  householdMembers: { householdId: "household_id", userId: "user_id" },
+  householdInvites: { householdId: "household_id" },
+  users: { id: "id" },
+  people: { id: "id", displayName: "display_name", householdId: "household_id" },
 }));
 
 vi.mock("@/lib/spending-queries", async (importOriginal) => ({
@@ -19,7 +23,7 @@ vi.mock("@/lib/spending-queries", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/require-household", () => ({
-  requireHousehold: vi.fn().mockResolvedValue({ userId: "test-user", householdId: "00000000-0000-4000-8000-000000000099", role: "owner", email: "test@example.com" }),
+  requireHouseholdOrOnboard: vi.fn().mockResolvedValue({ userId: "test-user", householdId: "00000000-0000-4000-8000-000000000099", role: "owner", email: "test@example.com" }),
 }));
 
 describe("SettingsPage", () => {

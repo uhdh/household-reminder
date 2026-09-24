@@ -4,24 +4,21 @@ import { useRef, useState } from "react";
 import { SelectInput } from "@/components/ui";
 import { updateBeneficiaryAction } from "./actions";
 
-const OPTIONS: { value: string; label: string }[] = [
-  { value: "husband", label: "남편" },
-  { value: "wife", label: "아내" },
-  { value: "joint", label: "우리" },
-];
-
 export function BeneficiarySelect({
   txnId,
   value,
   returnTo,
+  people,
 }: {
   txnId: string;
   value: string;
   returnTo: string;
+  people: { id: string; displayName: string }[];
 }) {
+  const options = [...people.map((p) => ({ value: p.id, label: p.displayName })), { value: "joint", label: "우리" }];
   const formRef = useRef<HTMLFormElement>(null);
   const [editing, setEditing] = useState(false);
-  const label = OPTIONS.find((o) => o.value === value)?.label ?? value;
+  const label = options.find((o) => o.value === value)?.label ?? value;
 
   if (!editing) {
     return (
@@ -48,7 +45,7 @@ export function BeneficiarySelect({
         onBlur={() => setEditing(false)}
         className="min-h-9 appearance-none rounded-r2 border-transparent bg-transparent [background-image:none] px-1 py-1 text-[14px] font-medium text-ink"
       >
-        {OPTIONS.map((o) => (
+        {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AppShell, PageHeader } from "@/components/ui";
+import { getHouseholdPeople } from "@/lib/spending-queries";
+import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import { UploadForm } from "./upload-form";
 
 export default async function UploadPage({
@@ -8,6 +10,8 @@ export default async function UploadPage({
   searchParams: Promise<{ error?: string; success?: string }>;
 }) {
   const { error, success } = await searchParams;
+  const { householdId } = await requireHouseholdOrOnboard();
+  const people = await getHouseholdPeople(householdId);
 
   return (
     <AppShell size="compact" className="font-office">
@@ -20,7 +24,7 @@ export default async function UploadPage({
             </Link>
           </div>} />
 
-        <UploadForm error={error} success={success} />
+        <UploadForm error={error} success={success} people={people} />
     </AppShell>
   );
 }

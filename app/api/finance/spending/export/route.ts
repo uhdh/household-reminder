@@ -2,10 +2,10 @@ import { NextRequest } from "next/server";
 import {
   flowLabel,
   getActiveTransactions,
+  isBeneficiary,
   isPersonId,
   latestMonth,
   monthKeyOf,
-  PERSON_LABELS,
   MONTH_RE,
   type PersonId,
   type Txn,
@@ -45,16 +45,14 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get("category");
   const q = searchParams.get("q");
 
-  const personFilter: "all" | PersonId = isPersonId(person ?? undefined) ? (person as PersonId) : "all";
   const flowFilter = flow === "income" || flow === "expense" ? flow : "all";
-  const beneficiaryFilter = beneficiary === "husband" || beneficiary === "wife" || beneficiary === "joint" ? beneficiary : "all";
   const categoryFilter = category && category !== "all" ? category : "all";
   const query = q?.trim().slice(0, 50) ?? "";
 
   let allTx: Txn[];
   let displayNameByPerson: Map<string, string>;
 
-  if (await isFinanceDemoMode()) {
+  if (isDemo) {
     allTx = sampleTransactions;
     displayNameByPerson = new Map([
       ["husband", "남편"],
@@ -65,6 +63,10 @@ export async function GET(request: NextRequest) {
     allTx = result.transactions;
     displayNameByPerson = result.displayNameByPerson;
   }
+
+  const personIds = Array.from(displayNameByPerson.keys());
+  const personFilter: "all" | PersonId = isPersonId(person ?? undefined, personIds) ? (person as PersonId) : "all";
+  const beneficiaryFilter = isBeneficiary(beneficiary, personIds) ? beneficiary! : "all";
 
   const visibleTx = allTx.filter((t) => t.included || t.stdCategory === "자산수정");
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(visibleTx);
@@ -86,7 +88,7 @@ export async function GET(request: NextRequest) {
 
   const buffer = await exportTransactionsToExcel(filtered, displayNameByPerson);
 
-  const personSuffix = personFilter === "all" ? "" : `_${PERSON_LABELS[personFilter] ?? personFilter}`;
+  const personSuffix = personFilter === "all" ? "" : `_${displayNameByPerson.get(personFilter) ?? personFilter}`;
   const filename = `가계부_세부내역_${month}${personSuffix}.xlsx`;
   const asciiFilename = `spending_${month}${personFilter === "all" ? "" : `_${personFilter}`}.xlsx`;
   const utf8Filename = encodeURIComponent(filename);

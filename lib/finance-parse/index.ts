@@ -23,7 +23,10 @@ export function transactionDateRange(transactions: { txnDate: string }[]): { sta
 export async function parseUploadFile(
   buffer: ArrayBuffer,
   filename: string,
-  personId?: "husband" | "wife",
+  // 뱅크샐러드 엑셀 시트명 규칙("_본인_원본"/"_배우자_원본")은 파일 형식 자체가 2인(본인/배우자)
+  // 기준이라 personId가 기존 우리집의 'husband'/'wife'일 때만 힌트로 쓴다. 그 외(3인 이상 가구,
+  // 새 가구의 uuid id 등)는 힌트 없이 일반 폴백("_원본"으로 끝나는 시트)으로 찾는다.
+  personId?: string,
 ): Promise<ParsedUpload> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);

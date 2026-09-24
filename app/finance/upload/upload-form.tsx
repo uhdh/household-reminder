@@ -1,7 +1,15 @@
 import { ActionButton, FeedbackMessage, FormField, TextInput } from "@/components/ui";
 import { uploadAction } from "./actions";
 
-export function UploadForm({ error, success }: { error?: string; success?: string }) {
+export function UploadForm({
+  error,
+  success,
+  people,
+}: {
+  error?: string;
+  success?: string;
+  people: { id: string; displayName: string }[];
+}) {
   return (
     <>
       <form action={uploadAction} className="seed-card p-6">
@@ -14,14 +22,15 @@ export function UploadForm({ error, success }: { error?: string; success?: strin
 
         <p className="mb-2 text-sm font-medium text-fg-neutral">보유자</p>
         <div className="mb-4 flex gap-3">
-          <label className="flex flex-1 items-center gap-2 rounded-r3 border border-stroke-neutral-subtle px-3 py-2.5 text-sm text-fg-neutral transition-colors has-[:checked]:border-stroke-brand-solid has-[:checked]:bg-bg-brand-weak">
-            <input type="radio" name="personId" value="husband" defaultChecked />
-            남편
-          </label>
-          <label className="flex flex-1 items-center gap-2 rounded-r3 border border-stroke-neutral-subtle px-3 py-2.5 text-sm text-fg-neutral transition-colors has-[:checked]:border-stroke-brand-solid has-[:checked]:bg-bg-brand-weak">
-            <input type="radio" name="personId" value="wife" />
-            아내
-          </label>
+          {people.map((person, index) => (
+            <label
+              key={person.id}
+              className="flex flex-1 items-center gap-2 rounded-r3 border border-stroke-neutral-subtle px-3 py-2.5 text-sm text-fg-neutral transition-colors has-[:checked]:border-stroke-brand-solid has-[:checked]:bg-bg-brand-weak"
+            >
+              <input type="radio" name="personId" value={person.id} defaultChecked={index === 0} />
+              {person.displayName}
+            </label>
+          ))}
         </div>
 
         <FormField label="엑셀 파일" className="mb-4">

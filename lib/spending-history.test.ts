@@ -12,6 +12,7 @@ describe("getActiveTransactions", () => {
     const db = drizzle();
     setDbForTesting(db);
     const householdId = "00000000-0000-4000-8000-0000000000a1";
+    await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
     await db.execute(sql`
       CREATE TABLE uploads (
         id uuid PRIMARY KEY, household_id uuid NOT NULL, person_id text NOT NULL, source_filename text NOT NULL,

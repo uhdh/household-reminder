@@ -44,7 +44,7 @@ describe("summarizeMonthlyTransactions", () => {
       makeTxn({ personId: "wife", txnType: "지출", stdCategory: "식비", amount: "-500000" }),
     ];
 
-    const summary = summarizeMonthlyTransactions(tx, kindOf);
+    const summary = summarizeMonthlyTransactions(tx, kindOf, ["husband", "wife"]);
 
     expect(summary.totalIncome).toBe(5000000);
     expect(summary.totalIncomeByPerson).toEqual({ husband: 3000000, wife: 2000000 });
@@ -66,7 +66,7 @@ describe("summarizeMonthlyTransactions", () => {
       makeTxn({ personId: "wife", txnType: "지출", stdCategory: "식비", amount: "-100000" }),
     ];
 
-    const summary = summarizeMonthlyTransactions(tx, kindOf);
+    const summary = summarizeMonthlyTransactions(tx, kindOf, ["husband", "wife"]);
 
     expect(summary.savingsRateByPerson.husband).toBeCloseTo(75, 5);
     expect(summary.savingsRateByPerson.wife).toBe(0);
@@ -79,7 +79,7 @@ describe("summarizeMonthlyTransactions", () => {
       makeTxn({ personId: "wife", beneficiary: "wife", txnType: "지출", stdCategory: "식비", amount: "-20000" }),
     ];
 
-    const summary = summarizeMonthlyTransactions(tx, kindOf);
+    const summary = summarizeMonthlyTransactions(tx, kindOf, ["husband", "wife"]);
 
     expect(summary.categoryTotals.get("식비")).toBe(50000);
     expect(summary.categoryByPerson.get("식비")).toEqual({ husband: 30000, wife: 20000 });
@@ -89,7 +89,7 @@ describe("summarizeMonthlyTransactions", () => {
   test("falls back to 미분류 for transactions without a std category", () => {
     const tx = [makeTxn({ txnType: "지출", stdCategory: null, amount: "-10000" })];
 
-    const summary = summarizeMonthlyTransactions(tx, kindOf);
+    const summary = summarizeMonthlyTransactions(tx, kindOf, ["husband", "wife"]);
 
     expect(summary.categoryTotals.get("미분류")).toBe(10000);
   });
@@ -126,7 +126,7 @@ describe("unmappedTransferExclusion", () => {
 
 describe("compareMonthlySummaries", () => {
   test("returns null when there is no previous month data", () => {
-    const current = summarizeMonthlyTransactions([makeTxn({ txnType: "지출", stdCategory: "식비", amount: "-10000" })], kindOf);
+    const current = summarizeMonthlyTransactions([makeTxn({ txnType: "지출", stdCategory: "식비", amount: "-10000" })], kindOf, ["husband", "wife"]);
     expect(compareMonthlySummaries(current, null)).toBeNull();
   });
 
@@ -136,7 +136,8 @@ describe("compareMonthlySummaries", () => {
         makeTxn({ txnType: "수입", stdCategory: "월급", amount: "3000000" }),
         makeTxn({ txnType: "지출", stdCategory: "식비", amount: "-100000" }),
       ],
-      kindOf
+      kindOf,
+      ["husband", "wife"]
     );
     const current = summarizeMonthlyTransactions(
       [
@@ -144,7 +145,8 @@ describe("compareMonthlySummaries", () => {
         makeTxn({ txnType: "지출", stdCategory: "식비", amount: "-180000" }),
         makeTxn({ txnType: "지출", stdCategory: "월세", amount: "-1000000" }),
       ],
-      kindOf
+      kindOf,
+      ["husband", "wife"]
     );
 
     const comparison = compareMonthlySummaries(current, previous);

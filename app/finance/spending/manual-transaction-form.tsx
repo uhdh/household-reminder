@@ -1,14 +1,16 @@
-import { PERSON_IDS, PERSON_LABELS, type PersonId } from "@/lib/spending-queries";
+import type { PersonId } from "@/lib/spending-queries";
 import { addManualTransactionAction } from "./actions";
 
 export function ManualTransactionForm({
   month,
   defaultPerson,
+  people,
   categories,
   returnTo,
 }: {
   month: string;
   defaultPerson: PersonId;
+  people: { id: string; displayName: string }[];
   categories: { name: string; kind: string }[];
   returnTo: string;
 }) {
@@ -29,14 +31,13 @@ export function ManualTransactionForm({
         <label className="text-[12px] font-medium text-ink-muted">
           결제한 사람
           <select name="personId" defaultValue={defaultPerson} className="seed-input mt-1.5 text-[14px]">
-            {PERSON_IDS.map((person) => <option key={person} value={person}>{PERSON_LABELS[person]}</option>)}
+            {people.map((person) => <option key={person.id} value={person.id}>{person.displayName}</option>)}
           </select>
         </label>
         <label className="text-[12px] font-medium text-ink-muted">
           사용 대상
           <select name="beneficiary" defaultValue={defaultPerson} className="seed-input mt-1.5 text-[14px]">
-            <option value="husband">남편</option>
-            <option value="wife">아내</option>
+            {people.map((person) => <option key={person.id} value={person.id}>{person.displayName}</option>)}
             <option value="joint">우리</option>
           </select>
         </label>

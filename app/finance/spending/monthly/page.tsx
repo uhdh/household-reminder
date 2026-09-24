@@ -2,7 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
-import { requireHousehold } from "@/lib/require-household";
+import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import {
   compareMonthlySummaries,
   countsInTotals,
@@ -78,15 +78,17 @@ export default async function MonthlyPage({
   searchParams: Promise<{ month?: string; person?: string }>;
 }) {
   const { month: monthParam, person } = await searchParams;
-  const personFilter: "all" | PersonId = isPersonId(person) ? person : "all";
 
   if (await isFinanceDemoMode()) {
     const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : "2026-07";
+    const personFilter: "all" | PersonId = person === "husband" || person === "wife" ? person : "all";
     return <DemoMonthlySpending personFilter={personFilter} month={month} />;
   }
 
-  const { householdId } = await requireHousehold();
+  const { householdId } = await requireHouseholdOrOnboard();
   const { transactions: allTx, displayNameByPerson } = await getActiveTransactions(householdId);
+  const personIds = Array.from(displayNameByPerson.keys());
+  const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
   const includedTx = allTx.filter(countsInTotals);
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(includedTx);
   const periodTxAll = allTx.filter((t) => monthKeyOf(t.txnDate) === month && (personFilter === "all" || t.personId === personFilter));
@@ -104,12 +106,12 @@ export default async function MonthlyPage({
     return flow === "입금" ? "변동수입" : "변동비";
   }
 
-  const summary = summarizeMonthlyTransactions(monthTx, kindOf);
+  const summary = summarizeMonthlyTransactions(monthTx, kindOf, personIds);
   const { categoryTotals } = summary;
 
   const prevMonth = shiftMonth(month, -1);
   const prevMonthTx = includedTx.filter((t) => monthKeyOf(t.txnDate) === prevMonth && (personFilter === "all" || t.personId === personFilter));
-  const prevSummary = prevMonthTx.length > 0 ? summarizeMonthlyTransactions(prevMonthTx, kindOf) : null;
+  const prevSummary = prevMonthTx.length > 0 ? summarizeMonthlyTransactions(prevMonthTx, kindOf, personIds) : null;
   const comparison = compareMonthlySummaries(summary, prevSummary);
 
   // 카테고리별 성격은 budgetCategories 기준으로만 판정한다(집계 때 kindOf가 쓰는
