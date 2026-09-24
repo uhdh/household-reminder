@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getDb } from "./db";
 import { householdMembers, users } from "./finance-db";
+import { DEMO_HOUSEHOLD_ID } from "./demo-household";
+import { isFinanceDemoMode } from "./finance-viewer-server";
 
 // proxy.ts + requireFinanceUser(허용 명단)는 그대로 두고(P4 전환 전까지), 여기서는
 // "이 사용자가 어느 가구 소속인가"만 추가로 판정한다. 소속 가구가 없으면 거부(fail-closed).
@@ -60,4 +62,21 @@ export async function requireHouseholdOrOnboard(): Promise<HouseholdContext> {
     if (error instanceof NoHouseholdError) redirect("/onboarding");
     throw error;
   }
+}
+
+export interface FinanceViewer {
+  householdId: string;
+  /** true면 샘플 가구(데모)를 보는 중 - 화면은 그대로 쓰되 모든 수정 컨트롤을 숨겨야 한다. */
+  readOnly: boolean;
+}
+
+/**
+ * /finance, /finance/spending(+monthly/yearly) 등 실화면이 공통으로 쓰는 진입점. 로그인 없이 보는
+ * 데모 모드는 DEMO_HOUSEHOLD_ID(샘플 가구)를 읽기 전용으로 보여주고, 그 외에는 평소대로 로그인한
+ * 사용자의 가구를 반환한다(가구가 없으면 기존과 동일하게 /onboarding으로 보낸다).
+ */
+export async function resolveFinanceViewer(): Promise<FinanceViewer> {
+  if (await isFinanceDemoMode()) return { householdId: DEMO_HOUSEHOLD_ID, readOnly: true };
+  const { householdId } = await requireHouseholdOrOnboard();
+  return { householdId, readOnly: false };
 }

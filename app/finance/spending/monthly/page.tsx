@@ -2,7 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
-import { requireHouseholdOrOnboard } from "@/lib/require-household";
+import { resolveFinanceViewer } from "@/lib/require-household";
 import {
   classifySpendingEmptyStateScoped,
   compareMonthlySummaries,
@@ -25,10 +25,9 @@ import { buildCategoryColorMap, formatCompactKRW, formatKRW, topNWithOther } fro
 import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { CategoryPie } from "./chart";
 import { PersonFilter } from "../person-filter";
-import { CategoryRow, UsageAmount } from "./category-row";
-import { DemoMonthlySpending } from "@/app/finance/_components/demo-pages";
+import { BudgetSectionHeader, CategoryRow } from "./category-row";
+import { DemoBanner } from "@/app/finance/_components/demo-banner";
 import { FinanceEmptyState, PeriodEmptyNote } from "@/app/finance/_components/empty-state";
-import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 import { MonthlyNavigator } from "./monthly-navigator";
 
 export const dynamic = "force-dynamic";
@@ -82,13 +81,7 @@ export default async function MonthlyPage({
 }) {
   const { month: monthParam, person } = await searchParams;
 
-  if (await isFinanceDemoMode()) {
-    const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : "2026-07";
-    const personFilter: "all" | PersonId = person === "husband" || person === "wife" ? person : "all";
-    return <DemoMonthlySpending personFilter={personFilter} month={month} />;
-  }
-
-  const { householdId } = await requireHouseholdOrOnboard();
+  const { householdId, readOnly } = await resolveFinanceViewer();
 
   // 월 파라미터가 없을 때만 가구 전체에서 최근 월을 조회한다(집계에 잡히는 거래 기준, latestMonth와 동치).
   const monthNeedsLookup = !(monthParam && MONTH_RE.test(monthParam));
@@ -161,15 +154,9 @@ export default async function MonthlyPage({
     .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)))
     .map((transaction) => ({ id: transaction.id, description: transaction.description, amount: Math.abs(toNum(transaction.amount)) }));
 
-  // 이번 달 가장 심한 초과율에 맞춰 초과 구간 게이지 스케일을 자동으로 잡는다 (최소 200%).
-  const usagePercents = [...fixedRows, ...variableRows]
-    .map((b) => (b.monthlyBudget !== null && toNum(b.monthlyBudget) > 0 ? ((categoryTotals.get(b.name) ?? 0) / toNum(b.monthlyBudget)) * 100 : null))
-    .filter((pct): pct is number => pct !== null);
-  const maxUsagePercent = usagePercents.length > 0 ? Math.max(...usagePercents) : 100;
-  const scaleMax = Math.max(200, Math.ceil(maxUsagePercent / 50) * 50);
-
   return (
     <div>
+      {readOnly && <DemoBanner />}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">월별 지출</h1>
@@ -179,7 +166,16 @@ export default async function MonthlyPage({
       </div>
 
       {emptyState === "onboarding" ? (
-        <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />
+        readOnly ? (
+          <FinanceEmptyState
+            title="샘플 데이터를 준비 중이에요"
+            description="잠시 후 다시 확인하거나 로그인해서 내 가계부를 만들어보세요."
+            primaryHref="/login"
+            primaryLabel="로그인하러 가기"
+          />
+        ) : (
+          <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />
+        )
       ) : emptyState === "period" ? (
         <PeriodEmptyNote label="이 달" />
       ) : (
@@ -246,12 +242,12 @@ export default async function MonthlyPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="seed-card overflow-hidden shadow-none">
           <ul className="text-[13px]">
-            <li className="border-b border-stroke-neutral-muted px-4 py-4 sm:px-6">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[17px] font-extrabold text-ink">고정비</span>
-                <UsageAmount actual={summary.fixedExpense} budget={fixedBudgetTotal} />
-              </div>
-            </li>
+            <BudgetSectionHeader
+              title="고정비"
+              actual={summary.fixedExpense}
+              budget={fixedBudgetTotal}
+              rows={fixedRows.map((b) => ({ actual: categoryTotals.get(b.name) ?? 0, budget: b.monthlyBudget !== null ? toNum(b.monthlyBudget) : null }))}
+            />
             {fixedRows.map((b) => (
               <CategoryRow
                 key={b.name}
@@ -259,19 +255,18 @@ export default async function MonthlyPage({
                 budget={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : null}
                 actual={categoryTotals.get(b.name) ?? 0}
                 transactions={transactionsFor(b.name)}
-                scaleMax={scaleMax}
               />
             ))}
           </ul>
         </div>
         <div className="seed-card overflow-hidden shadow-none">
           <ul className="text-[13px]">
-            <li className="border-b border-stroke-neutral-muted px-4 py-4 sm:px-6">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[17px] font-extrabold text-ink">변동비</span>
-                <UsageAmount actual={summary.variableExpense} budget={variableBudgetTotal} />
-              </div>
-            </li>
+            <BudgetSectionHeader
+              title="변동비"
+              actual={summary.variableExpense}
+              budget={variableBudgetTotal}
+              rows={variableRows.map((b) => ({ actual: categoryTotals.get(b.name) ?? 0, budget: b.monthlyBudget !== null ? toNum(b.monthlyBudget) : null }))}
+            />
             {variableRows.map((b) => (
               <CategoryRow
                 key={b.name}
@@ -279,7 +274,6 @@ export default async function MonthlyPage({
                 budget={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : null}
                 actual={categoryTotals.get(b.name) ?? 0}
                 transactions={transactionsFor(b.name)}
-                scaleMax={scaleMax}
               />
             ))}
             {unmappedTotal > 0 && (
@@ -288,7 +282,6 @@ export default async function MonthlyPage({
                 budget={null}
                 actual={unmappedTotal}
                 transactions={transactionsFor(UNMAPPED)}
-                scaleMax={scaleMax}
               />
             )}
           </ul>

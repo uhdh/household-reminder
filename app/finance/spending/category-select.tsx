@@ -39,6 +39,7 @@ export function CategorySelect({
   frequentCategories,
   sameMerchantCount = 0,
   autoOpen = false,
+  readOnly = false,
 }: {
   txnId: string;
   value: string | null;
@@ -51,6 +52,8 @@ export function CategorySelect({
   /** 같은 가맹점(설명 정규화)+같은 txnType의 다른 거래 건수(자기 자신 제외). 병합 토스트 노출 여부 판단용. */
   sameMerchantCount?: number;
   autoOpen?: boolean;
+  /** true면 샘플(데모) 데이터 - 값만 보여주고 변경 UI는 렌더하지 않는다. */
+  readOnly?: boolean;
 }) {
   const shared = useContext(CategoryOptionsContext);
   const resolvedOptions = options ?? shared?.options ?? [];
@@ -84,6 +87,10 @@ export function CategorySelect({
         ? "border-transparent bg-bg-neutral-weak text-ink"
         : "border-dashed border-stroke-brand-weak bg-bg-brand-weak/40 text-fg-brand"
   }`;
+
+  if (readOnly) {
+    return <span className={`${chipClassName} cursor-default hover:bg-transparent`}>{displayCategoryLabel(value)}</span>;
+  }
 
   return (
     <form ref={formRef} action={updateTransactionCategoryAction} className="inline-block">

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
-import { requireHouseholdOrOnboard } from "@/lib/require-household";
+import { resolveFinanceViewer } from "@/lib/require-household";
 import { suggestKeywordFromDescription } from "@/lib/spending-derive";
 import {
   MONTH_RE,
@@ -38,9 +38,8 @@ import { MonthlyNavigator } from "./monthly/monthly-navigator";
 import { ManualTransactionForm } from "./manual-transaction-form";
 import { TransactionDeleteButton } from "./transaction-delete-button";
 import { SelectAllTransactions, TransactionBulkDeleteForm, TransactionCheckbox } from "./transaction-bulk-delete";
-import { DemoTransactionList } from "@/app/finance/_components/demo-pages";
+import { DemoBanner } from "@/app/finance/_components/demo-banner";
 import { FinanceEmptyState } from "@/app/finance/_components/empty-state";
-import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 
 export const dynamic = "force-dynamic";
 
@@ -80,12 +79,7 @@ export default async function SpendingPage({
   } = await searchParams;
   const reviewMode = review === "1";
 
-  if (await isFinanceDemoMode()) {
-    const personFilter: "all" | PersonId = person === "husband" || person === "wife" ? person : "all";
-    return <DemoTransactionList personFilter={personFilter} />;
-  }
-
-  const { householdId } = await requireHouseholdOrOnboard();
+  const { householdId, readOnly } = await resolveFinanceViewer();
   const db = getDb();
 
   // 월 파라미터가 없으면(기본값) 가구 전체에서 가장 최근 월을 찾아야 하므로 그때만 조회한다.
@@ -180,8 +174,107 @@ export default async function SpendingPage({
   const exportParams = new URLSearchParams({ month, ...(personFilter !== "all" ? { person: personFilter } : {}), ...activeFilterParams });
   const exportHref = `/api/finance/spending/export?${exportParams.toString()}`;
 
+  const transactionsTable = (
+    <>
+      {!readOnly && (
+        <div className="mb-2 flex items-center gap-2 px-1 text-[13px] text-ink-muted md:hidden">
+          <SelectAllTransactions />
+          <span>전체 선택</span>
+        </div>
+      )}
+      <div className="seed-card relative overflow-x-auto shadow-none">
+        <table className="block w-full text-[14px] md:table md:min-w-[760px]">
+          <thead className="hidden md:table-header-group">
+            <tr className="border-b border-stroke-neutral-muted text-left text-ink-muted">
+              <th className="w-9 px-2 py-2 text-center">{!readOnly && <SelectAllTransactions />}</th>
+              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">날짜</th>
+              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">카테고리</th>
+              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">결제 · 사용</th>
+              <th className="px-3 py-2 text-[11px] font-semibold">메모</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">금액</th>
+              <th className="w-12 px-2 py-2 text-right text-[11px] font-semibold sm:px-3"><span className="sr-only">관리</span></th>
+            </tr>
+          </thead>
+          <tbody className="block md:table-row-group">
+            {filtered.length === 0 && (
+              <tr className="block md:table-row">
+                <td colSpan={7} className="block px-3 py-8 text-center text-ink-muted md:table-cell">
+                  해당 월에 표시할 거래가 없습니다.
+                </td>
+              </tr>
+            )}
+            {filtered.map((t) => {
+              const flow = flowLabel(t);
+              const rawCategory = t.category ?? "미분류";
+              const displayedCategory = t.stdCategory ?? "미분류";
+              const payerLabel = beneficiaryLabel(t.personId, displayNameByPerson);
+              const amount = toNum(t.amount);
+              // 이 행 전용 값만 클라이언트로 내려보낸다: 추천 카테고리(최대 3개)와 같은 가맹점
+              // 건수(숫자 1개). categoryOptions/frequentCategories 같은 가구 공통 데이터는
+              // CategoryOptionsProvider가 한 번만 직렬화해 내려주므로 행마다 반복하지 않는다.
+              const merchantKey = suggestKeywordFromDescription(t.description);
+              const sameMerchantCount = merchantKey ? (merchantCounts[merchantCountKey(merchantKey, t.txnType)] ?? 0) - 1 : 0;
+              return (
+                <tr
+                  key={t.id}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 border-b border-stroke-neutral-muted/60 p-4 last:border-0 md:table-row md:p-0 md:[&>td]:py-3"
+                >
+                  <td className="col-start-1 row-start-1 md:table-cell md:px-2 md:text-center">{!readOnly && <TransactionCheckbox transactionId={t.id} />}</td>
+                  <td className="col-start-2 row-start-1 text-[13px] text-ink-muted md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px]">{t.txnDate.slice(5)}</td>
+                  <td className="col-span-2 col-start-2 row-start-2 md:table-cell md:whitespace-nowrap md:px-3">
+                    <div className="flex flex-col gap-0.5">
+                      <CategorySelect
+                        txnId={t.id}
+                        value={t.stdCategory}
+                        returnTo={returnTo}
+                        description={t.description}
+                        txnType={t.txnType}
+                        recommendations={recommendCategoriesForTransaction(t, merchantIndex, rawIndex)}
+                        sameMerchantCount={sameMerchantCount}
+                        autoOpen={reviewMode && t.id === autoOpenTxnId}
+                        readOnly={readOnly}
+                      />
+                      {rawCategory !== displayedCategory && <span className="text-[10px] text-ink-muted/70">원본: {rawCategory}</span>}
+                    </div>
+                  </td>
+                  <td className="col-span-2 col-start-2 row-start-3 md:table-cell md:whitespace-nowrap md:px-3">
+                    <div className="flex items-center gap-1 text-[12px]">
+                      {t.personId !== t.beneficiary && (
+                        <span className="text-ink-muted">
+                          {payerLabel}
+                          <span className="mx-1 text-ink-muted/60">→</span>
+                        </span>
+                      )}
+                      <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} people={personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }))} readOnly={readOnly} />
+                    </div>
+                  </td>
+                  <td className="col-span-2 col-start-2 row-start-4 md:table-cell md:px-3">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-ink-muted">{t.description ?? "-"}</span>
+                      {t.paymentMethod && <span className="text-[10px] text-ink-muted/70">{t.paymentMethod}</span>}
+                    </div>
+                  </td>
+                  <td className="col-start-3 row-start-1 text-right text-[17px] font-extrabold tabular-nums md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px] md:font-semibold">
+                    <span className={flow === "입금" ? "text-fg-positive" : "text-ink"}>
+                      {flow === "입금" ? "+" : "-"}
+                      {formatKRW(Math.abs(amount))}
+                    </span>
+                  </td>
+                  <td className="col-span-2 col-start-2 row-start-5 justify-self-end md:table-cell md:whitespace-nowrap md:px-3 md:text-right">
+                    {!readOnly && <TransactionDeleteButton txnId={t.id} returnTo={returnTo} />}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+
   return (
     <div>
+      {readOnly && <DemoBanner />}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">세부 내역</h1>
@@ -191,7 +284,18 @@ export default async function SpendingPage({
         <PersonFilter pathname="/finance/spending" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} extraParams={activeFilterParams} />
       </div>
 
-      {isHouseholdEmpty && <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />}
+      {isHouseholdEmpty && (
+        readOnly ? (
+          <FinanceEmptyState
+            title="샘플 데이터를 준비 중이에요"
+            description="잠시 후 다시 확인하거나 로그인해서 내 가계부를 만들어보세요."
+            primaryHref="/login"
+            primaryLabel="로그인하러 가기"
+          />
+        ) : (
+          <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />
+        )
+      )}
 
       {!isHouseholdEmpty && (
       <>
@@ -251,24 +355,26 @@ export default async function SpendingPage({
           <span>
             분류 안 된 거래 {unclassifiedCount}건 · {formatKRW(unclassifiedAmount)}
           </span>
-          <div className="flex items-center gap-3">
-            {reviewMode ? (
-              <Link href={hrefFor(month, personFilter, false)} className="text-[12px] font-semibold text-ink-muted hover:text-ink">
-                분류 모드 종료
+          {!readOnly && (
+            <div className="flex items-center gap-3">
+              {reviewMode ? (
+                <Link href={hrefFor(month, personFilter, false)} className="text-[12px] font-semibold text-ink-muted hover:text-ink">
+                  분류 모드 종료
+                </Link>
+              ) : (
+                <Link href={reviewHref} className="seed-button seed-button-primary px-4 py-1.5 text-[13px]">
+                  분류 시작
+                </Link>
+              )}
+              <Link href="/finance/spending/settings" className="text-[12px] font-semibold text-fg-brand">
+                설정에서 매핑하기
               </Link>
-            ) : (
-              <Link href={reviewHref} className="seed-button seed-button-primary px-4 py-1.5 text-[13px]">
-                분류 시작
-              </Link>
-            )}
-            <Link href="/finance/spending/settings" className="text-[12px] font-semibold text-fg-brand">
-              설정에서 매핑하기
-            </Link>
-          </div>
+            </div>
+          )}
         </div>
       )}
 
-      {toastMerchant && toastCategory && toastTxnIds.length > 0 && (
+      {!readOnly && toastMerchant && toastCategory && toastTxnIds.length > 0 && (
         <CategoryMergeToast
           merchantKey={toastMerchant}
           category={toastCategory}
@@ -282,114 +388,31 @@ export default async function SpendingPage({
       </>
       )}
 
-      <ManualTransactionForm
-        month={month}
-        defaultPerson={personFilter === "all" ? personIds[0] : personFilter}
-        people={personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }))}
-        categories={categoryOptions}
-        returnTo={returnTo}
-        open={manual === "1"}
-      />
+      {!readOnly && (
+        <ManualTransactionForm
+          month={month}
+          defaultPerson={personFilter === "all" ? personIds[0] : personFilter}
+          people={personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }))}
+          categories={categoryOptions}
+          returnTo={returnTo}
+          open={manual === "1"}
+        />
+      )}
 
       {!isHouseholdEmpty && (
       <CategoryOptionsProvider options={categoryOptions} frequentCategories={frequentCategories}>
-      <TransactionBulkDeleteForm
-        transactionIds={filtered.map((transaction) => transaction.id)}
-        returnTo={returnTo}
-        categoryOptions={categoryOptions}
-        frequentCategories={frequentCategories}
-      >
-      <div className="mb-2 flex items-center gap-2 px-1 text-[13px] text-ink-muted md:hidden">
-        <SelectAllTransactions />
-        <span>전체 선택</span>
-      </div>
-      <div className="seed-card relative overflow-x-auto shadow-none">
-        <table className="block w-full text-[14px] md:table md:min-w-[760px]">
-          <thead className="hidden md:table-header-group">
-            <tr className="border-b border-stroke-neutral-muted text-left text-ink-muted">
-              <th className="w-9 px-2 py-2 text-center"><SelectAllTransactions /></th>
-              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">날짜</th>
-              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">카테고리</th>
-              <th className="whitespace-nowrap px-2 py-2 text-[11px] font-semibold sm:px-3">결제 · 사용</th>
-              <th className="px-3 py-2 text-[11px] font-semibold">메모</th>
-              <th className="whitespace-nowrap px-2 py-2 text-right text-[11px] font-semibold sm:px-3">금액</th>
-              <th className="w-12 px-2 py-2 text-right text-[11px] font-semibold sm:px-3"><span className="sr-only">관리</span></th>
-            </tr>
-          </thead>
-          <tbody className="block md:table-row-group">
-            {filtered.length === 0 && (
-              <tr className="block md:table-row">
-                <td colSpan={7} className="block px-3 py-8 text-center text-ink-muted md:table-cell">
-                  해당 월에 표시할 거래가 없습니다.
-                </td>
-              </tr>
-            )}
-            {filtered.map((t) => {
-              const flow = flowLabel(t);
-              const rawCategory = t.category ?? "미분류";
-              const displayedCategory = t.stdCategory ?? "미분류";
-              const payerLabel = beneficiaryLabel(t.personId, displayNameByPerson);
-              const amount = toNum(t.amount);
-              // 이 행 전용 값만 클라이언트로 내려보낸다: 추천 카테고리(최대 3개)와 같은 가맹점
-              // 건수(숫자 1개). categoryOptions/frequentCategories 같은 가구 공통 데이터는
-              // CategoryOptionsProvider가 한 번만 직렬화해 내려주므로 행마다 반복하지 않는다.
-              const merchantKey = suggestKeywordFromDescription(t.description);
-              const sameMerchantCount = merchantKey ? (merchantCounts[merchantCountKey(merchantKey, t.txnType)] ?? 0) - 1 : 0;
-              return (
-                <tr
-                  key={t.id}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 border-b border-stroke-neutral-muted/60 p-4 last:border-0 md:table-row md:p-0 md:[&>td]:py-3"
-                >
-                  <td className="col-start-1 row-start-1 md:table-cell md:px-2 md:text-center"><TransactionCheckbox transactionId={t.id} /></td>
-                  <td className="col-start-2 row-start-1 text-[13px] text-ink-muted md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px]">{t.txnDate.slice(5)}</td>
-                  <td className="col-span-2 col-start-2 row-start-2 md:table-cell md:whitespace-nowrap md:px-3">
-                    <div className="flex flex-col gap-0.5">
-                      <CategorySelect
-                        txnId={t.id}
-                        value={t.stdCategory}
-                        returnTo={returnTo}
-                        description={t.description}
-                        txnType={t.txnType}
-                        recommendations={recommendCategoriesForTransaction(t, merchantIndex, rawIndex)}
-                        sameMerchantCount={sameMerchantCount}
-                        autoOpen={reviewMode && t.id === autoOpenTxnId}
-                      />
-                      {rawCategory !== displayedCategory && <span className="text-[10px] text-ink-muted/70">원본: {rawCategory}</span>}
-                    </div>
-                  </td>
-                  <td className="col-span-2 col-start-2 row-start-3 md:table-cell md:whitespace-nowrap md:px-3">
-                    <div className="flex items-center gap-1 text-[12px]">
-                      {t.personId !== t.beneficiary && (
-                        <span className="text-ink-muted">
-                          {payerLabel}
-                          <span className="mx-1 text-ink-muted/60">→</span>
-                        </span>
-                      )}
-                      <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} people={personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }))} />
-                    </div>
-                  </td>
-                  <td className="col-span-2 col-start-2 row-start-4 md:table-cell md:px-3">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-ink-muted">{t.description ?? "-"}</span>
-                      {t.paymentMethod && <span className="text-[10px] text-ink-muted/70">{t.paymentMethod}</span>}
-                    </div>
-                  </td>
-                  <td className="col-start-3 row-start-1 text-right text-[17px] font-extrabold tabular-nums md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px] md:font-semibold">
-                    <span className={flow === "입금" ? "text-fg-positive" : "text-ink"}>
-                      {flow === "입금" ? "+" : "-"}
-                      {formatKRW(Math.abs(amount))}
-                    </span>
-                  </td>
-                  <td className="col-span-2 col-start-2 row-start-5 justify-self-end md:table-cell md:whitespace-nowrap md:px-3 md:text-right">
-                    <TransactionDeleteButton txnId={t.id} returnTo={returnTo} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      </TransactionBulkDeleteForm>
+        {readOnly ? (
+          transactionsTable
+        ) : (
+          <TransactionBulkDeleteForm
+            transactionIds={filtered.map((transaction) => transaction.id)}
+            returnTo={returnTo}
+            categoryOptions={categoryOptions}
+            frequentCategories={frequentCategories}
+          >
+            {transactionsTable}
+          </TransactionBulkDeleteForm>
+        )}
       </CategoryOptionsProvider>
       )}
     </div>

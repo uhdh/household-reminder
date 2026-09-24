@@ -12,10 +12,12 @@ function AllocationTargetRow({
   row,
   totalAsset,
   showRebalance,
+  readOnly,
 }: {
   row: AllocationRow;
   totalAsset: number;
   showRebalance: boolean;
+  readOnly: boolean;
 }) {
   const deltaPct = row.currentPct - row.targetPct;
   const rebalanceAmount = (totalAsset * (row.targetPct - row.currentPct)) / 100;
@@ -31,15 +33,19 @@ function AllocationTargetRow({
         </span>
         <span className="flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-ink-muted">
           {row.currentPct.toFixed(0)}%<span>/</span>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            max="100"
-            name={`target:${row.category}`}
-            defaultValue={row.targetPct.toFixed(1)}
-            className="w-14 border border-hairline2 bg-canvas px-1 py-0.5 text-right text-ink outline-none focus:border-legend1"
-          />
+          {readOnly ? (
+            <span className="text-ink">{row.targetPct.toFixed(1)}</span>
+          ) : (
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              name={`target:${row.category}`}
+              defaultValue={row.targetPct.toFixed(1)}
+              className="w-14 border border-hairline2 bg-canvas px-1 py-0.5 text-right text-ink outline-none focus:border-legend1"
+            />
+          )}
           <span>%</span>
         </span>
       </div>
@@ -64,15 +70,25 @@ export function TargetAllocationCard({
   rows,
   totalAsset,
   personFilter,
+  readOnly = false,
 }: {
   rows: AllocationRow[];
   totalAsset: number;
   personFilter: string;
+  readOnly?: boolean;
 }) {
   if (rows.length === 0) return null;
 
   const targetSum = sumTargetPct(rows.map((row) => row.targetPct));
   const isValid = isAllocationTargetSumValid(targetSum);
+
+  const rowsEl = (
+    <div>
+      {rows.map((row) => (
+        <AllocationTargetRow key={row.category} row={row} totalAsset={totalAsset} showRebalance={isValid} readOnly={readOnly} />
+      ))}
+    </div>
+  );
 
   return (
     <div className="seed-card p-5 shadow-none sm:p-7">
@@ -81,27 +97,27 @@ export function TargetAllocationCard({
         <span className="text-[12px] text-ink-muted">현재% / 목표%</span>
       </div>
       <p className="mb-1 text-[13px] text-ink-muted">
-        막대 = 현재 비중, 눈금 = 목표 비중. 목표 %를 수정하고 저장하면 리밸런싱에 필요한 금액이 계산됩니다.
+        막대 = 현재 비중, 눈금 = 목표 비중. {readOnly ? "샘플 데이터의 목표 비중이에요." : "목표 %를 수정하고 저장하면 리밸런싱에 필요한 금액이 계산됩니다."}
       </p>
       <p className={`mb-4 text-[12px] font-semibold ${isValid ? "text-ink-muted" : "text-fg-critical"}`}>
         목표 합계 {targetSum.toFixed(1)}%
         {!isValid && " · 100%가 되도록 맞춰야 저장할 수 있어요"}
       </p>
-      <form action={updateAllocationTargetsAction}>
-        <input type="hidden" name="person" value={personFilter} />
-        <div>
-          {rows.map((row) => (
-            <AllocationTargetRow key={row.category} row={row} totalAsset={totalAsset} showRebalance={isValid} />
-          ))}
-        </div>
-        <button
-          type="submit"
-          disabled={!isValid}
-          className="seed-button seed-button-primary mt-5 w-full sm:w-auto"
-        >
-          목표 저장
-        </button>
-      </form>
+      {readOnly ? (
+        rowsEl
+      ) : (
+        <form action={updateAllocationTargetsAction}>
+          <input type="hidden" name="person" value={personFilter} />
+          {rowsEl}
+          <button
+            type="submit"
+            disabled={!isValid}
+            className="seed-button seed-button-primary mt-5 w-full sm:w-auto"
+          >
+            목표 저장
+          </button>
+        </form>
+      )}
     </div>
   );
 }

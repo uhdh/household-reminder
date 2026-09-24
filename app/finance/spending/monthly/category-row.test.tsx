@@ -12,7 +12,6 @@ describe("CategoryRow", () => {
           name="생필품"
           budget={100_000}
           actual={102_220}
-          scaleMax={200}
           transactions={[
             { id: "tx-1", description: "세탁세제", amount: 52_900 },
             { id: "tx-2", description: null, amount: 49_320 },

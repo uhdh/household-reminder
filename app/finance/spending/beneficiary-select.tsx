@@ -9,16 +9,23 @@ export function BeneficiarySelect({
   value,
   returnTo,
   people,
+  readOnly = false,
 }: {
   txnId: string;
   value: string;
   returnTo: string;
   people: { id: string; displayName: string }[];
+  /** true면 샘플(데모) 데이터 - 값만 보여주고 변경 UI는 렌더하지 않는다. */
+  readOnly?: boolean;
 }) {
   const options = [...people.map((p) => ({ value: p.id, label: p.displayName })), { value: "joint", label: "우리" }];
   const formRef = useRef<HTMLFormElement>(null);
   const [editing, setEditing] = useState(false);
   const label = options.find((o) => o.value === value)?.label ?? value;
+
+  if (readOnly) {
+    return <span className="min-h-9 px-1 py-1 text-[14px] font-medium text-ink">{label}</span>;
+  }
 
   if (!editing) {
     return (

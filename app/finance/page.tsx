@@ -12,9 +12,8 @@ import { TargetAllocationCard } from "./_components/target-allocation";
 import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
 import { AppShell } from "@/components/ui";
 import { FinanceEmptyState } from "./_components/empty-state";
-import { DemoFinanceDashboard } from "./_components/demo-pages";
-import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
-import { requireHouseholdOrOnboard } from "@/lib/require-household";
+import { DemoBanner } from "./_components/demo-banner";
+import { resolveFinanceViewer } from "@/lib/require-household";
 import { getHouseholdPeople, isPersonId, type PersonId } from "@/lib/spending-queries";
 
 export const dynamic = "force-dynamic";
@@ -54,12 +53,7 @@ export default async function DashboardPage({
 }) {
   const { person } = await searchParams;
 
-  if (await isFinanceDemoMode()) {
-    const personFilter: "all" | PersonId = person === "husband" || person === "wife" ? person : "all";
-    return <DemoFinanceDashboard personFilter={personFilter} />;
-  }
-
-  const { householdId } = await requireHouseholdOrOnboard();
+  const { householdId, readOnly } = await resolveFinanceViewer();
   const db = getDb();
 
   const [activeUploads, allocationTargetRows, householdPeople] = await Promise.all([
@@ -71,6 +65,20 @@ export default async function DashboardPage({
   const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
 
   if (activeUploads.length === 0) {
+    // 데모 모드는 샘플 가구 시드가 아직 안 돌았을 때를 위한 안전장치 - 업로드 화면 대신 빈 상태만 보여준다.
+    if (readOnly) {
+      return (
+        <AppShell size="wide" className="font-office text-ink">
+          <DemoBanner />
+          <FinanceEmptyState
+            title="샘플 데이터를 준비 중이에요"
+            description="잠시 후 다시 확인하거나 로그인해서 내 가계부를 만들어보세요."
+            primaryHref="/login"
+            primaryLabel="로그인하러 가기"
+          />
+        </AppShell>
+      );
+    }
     redirect("/finance/upload");
   }
 
@@ -266,6 +274,7 @@ export default async function DashboardPage({
 
   return (
     <AppShell size="wide" className="font-office text-ink">
+        {readOnly && <DemoBanner />}
         {hasAnyData && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <PersonFilterTabs current={personFilter} people={householdPeople.map((p) => ({ id: p.id, label: displayNameByPerson.get(p.id) ?? p.displayName }))} />
@@ -292,7 +301,7 @@ export default async function DashboardPage({
             />
 
             <div className="mt-4">
-              <TargetAllocationCard rows={allocationRows} totalAsset={totalAsset} personFilter={personFilter} />
+              <TargetAllocationCard rows={allocationRows} totalAsset={totalAsset} personFilter={personFilter} readOnly={readOnly} />
             </div>
 
             {investmentItems.length > 0 && (

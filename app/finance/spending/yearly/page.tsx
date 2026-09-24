@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
-import { requireHouseholdOrOnboard } from "@/lib/require-household";
+import { resolveFinanceViewer } from "@/lib/require-household";
 import {
   classifySpendingEmptyStateScoped,
   countsInTotals,
@@ -20,9 +20,8 @@ import {
 } from "@/lib/spending-queries";
 import { PersonFilter } from "../person-filter";
 import { YearlyView } from "./yearly-view";
-import { DemoYearlySpending } from "@/app/finance/_components/demo-pages";
+import { DemoBanner } from "@/app/finance/_components/demo-banner";
 import { FinanceEmptyState, PeriodEmptyNote } from "@/app/finance/_components/empty-state";
-import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 
 export const dynamic = "force-dynamic";
 
@@ -87,12 +86,7 @@ export default async function YearlyPage({
 }) {
   const { year: yearParam, person } = await searchParams;
 
-  if (await isFinanceDemoMode()) {
-    const personFilter: "all" | PersonId = person === "husband" || person === "wife" ? person : "all";
-    return <DemoYearlySpending personFilter={personFilter} />;
-  }
-
-  const { householdId } = await requireHouseholdOrOnboard();
+  const { householdId, readOnly } = await resolveFinanceViewer();
   // maxYear(다음 해 이동 가능 여부)는 연도 파라미터 유무와 무관하게 항상 필요하므로 매번 조회한다.
   const [householdHasAny, latestPeriod] = await Promise.all([hasAnyTransaction(householdId), getLatestActivePeriod(householdId)]);
   const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : latestPeriod.year;
@@ -194,6 +188,7 @@ export default async function YearlyPage({
 
   return (
     <div>
+      {readOnly && <DemoBanner />}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
         <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">연간 내역</h1>
@@ -218,7 +213,16 @@ export default async function YearlyPage({
       </div>
 
       {emptyState === "onboarding" ? (
-        <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />
+        readOnly ? (
+          <FinanceEmptyState
+            title="샘플 데이터를 준비 중이에요"
+            description="잠시 후 다시 확인하거나 로그인해서 내 가계부를 만들어보세요."
+            primaryHref="/login"
+            primaryLabel="로그인하러 가기"
+          />
+        ) : (
+          <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />
+        )
       ) : emptyState === "period" ? (
         <PeriodEmptyNote label="이 해" />
       ) : (
