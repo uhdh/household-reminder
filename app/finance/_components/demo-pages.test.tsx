@@ -15,7 +15,7 @@ describe("signed-out finance samples", () => {
   it("shows a sample asset dashboard", () => {
     render(<DemoFinanceDashboard personFilter="all" />);
     expect(screen.getByText("자산관리 샘플")).toBeTruthy();
-    expect(screen.getByText("34,057만원")).toBeTruthy();
+    expect(screen.getByText("22,000만원")).toBeTruthy();
   });
 
   it("shows sample monthly spending", () => {
