@@ -20,7 +20,7 @@ export default auth((request) => {
     return new NextResponse(null, { status: 401 });
   }
 
-  const signInUrl = new URL("/api/auth/signin", request.url);
+  const signInUrl = new URL("/login", request.url);
   signInUrl.searchParams.set("callbackUrl", pathname);
   return NextResponse.redirect(signInUrl);
 });
