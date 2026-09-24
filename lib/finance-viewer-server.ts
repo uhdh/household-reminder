@@ -1,6 +1,6 @@
 import "server-only";
 import { auth } from "@/auth";
-import { isEmailAllowed } from "@/lib/auth-allowlist";
+import { isFinanceAccessAllowed } from "@/lib/auth-allowlist";
 import { shouldUseFinanceDemo } from "@/lib/finance-viewer";
 
 export async function isFinanceDemoMode(): Promise<boolean> {
@@ -12,6 +12,11 @@ export async function isFinanceDemoMode(): Promise<boolean> {
   }
   const session = await auth();
   const email = session?.user?.email ?? null;
-  const allowed = isEmailAllowed(email, process.env.ALLOWED_EMAILS);
+  // proxy.ts와 같은 판정(가입 공개 시 로그인만, 아니면 허용 명단)을 써야 신규 가입자가 샘플이 아닌 온보딩으로 간다.
+  const allowed = isFinanceAccessAllowed({
+    email,
+    allowedEmailsRaw: process.env.ALLOWED_EMAILS,
+    openSignupRaw: process.env.AUTH_OPEN_SIGNUP,
+  });
   return shouldUseFinanceDemo({ authEnabled: authConfigured, userId: allowed ? email : null });
 }
