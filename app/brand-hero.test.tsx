@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+
+vi.mock("@/auth", () => ({ signIn: vi.fn() }));
 import { BrandHero } from "./brand-hero";
 
 describe("BrandHero", () => {
@@ -7,9 +9,9 @@ describe("BrandHero", () => {
     render(<BrandHero />);
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("가계부는 부탁만 하세요.");
-    expect(screen.getByRole("link", { name: "Google로 무료 시작하기" }).getAttribute("href")).toBe("/login");
+    expect(screen.getByRole("button", { name: "Google로 무료 시작하기" })).toBeDefined();
     expect(screen.getByRole("link", { name: "로그인 없이 둘러보기" }).getAttribute("href")).toBe("/finance");
-    expect(screen.getByRole("link", { name: "로그인" }).getAttribute("href")).toBe("/login");
+    expect(screen.getByRole("button", { name: "로그인" })).toBeDefined();
     expect(screen.getByText("예시 화면")).toBeDefined();
   });
 });

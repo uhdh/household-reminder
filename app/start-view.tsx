@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BrandHero } from "@/app/brand-hero";
+import { GoogleStartButton } from "@/app/google-start-button";
 
 // 비로그인 방문자용 소개 페이지. 실데이터를 절대 쿼리하지 않는다.
 
@@ -209,12 +210,11 @@ export function StartView() {
             <br />
             가계부탁에 부탁하세요.
           </h2>
-          <Link
-            href="/login"
-            className="mt-8 inline-flex min-h-12 items-center rounded-full bg-[#141414] px-6 text-[15px] font-bold text-white hover:bg-black dark:bg-white dark:text-[#141414]"
-          >
-            Google로 무료 시작하기
-          </Link>
+          <div className="mt-8 flex justify-center">
+            <GoogleStartButton className="inline-flex min-h-12 items-center rounded-full bg-[#141414] px-6 text-[15px] font-bold text-white hover:bg-black dark:bg-white dark:text-[#141414]">
+              Google로 무료 시작하기
+            </GoogleStartButton>
+          </div>
         </section>
       </div>
 
@@ -228,7 +228,7 @@ export function StartView() {
             <div className="space-y-2">
               <p className="font-semibold">서비스</p>
               <Link href="/finance" className="block text-fg-neutral-muted hover:text-fg-neutral">둘러보기</Link>
-              <Link href="/login" className="block text-fg-neutral-muted hover:text-fg-neutral">시작하기</Link>
+              <GoogleStartButton className="block text-fg-neutral-muted hover:text-fg-neutral">시작하기</GoogleStartButton>
             </div>
             <div className="space-y-2">
               <p className="font-semibold">정책</p>
