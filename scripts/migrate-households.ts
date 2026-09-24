@@ -43,15 +43,17 @@ async function findUniqueConstraintOnColumns(db: AppDb, table: string, columns: 
   const sortedTarget = [...columns].sort();
   const result = await db.execute(sql`
     SELECT tc.constraint_name AS name,
-           array_agg(kcu.column_name ORDER BY kcu.column_name) AS cols
+           string_agg(kcu.column_name::text, ',' ORDER BY kcu.column_name) AS cols
     FROM information_schema.table_constraints tc
     JOIN information_schema.key_column_usage kcu
       ON kcu.constraint_name = tc.constraint_name AND kcu.table_name = tc.table_name
     WHERE tc.table_name = ${table} AND tc.constraint_type = 'UNIQUE'
     GROUP BY tc.constraint_name
   `);
-  const rows = (result as unknown as { rows: { name: string; cols: string[] }[] }).rows ?? [];
-  return rows.filter((row) => JSON.stringify([...row.cols].sort()) === JSON.stringify(sortedTarget)).map((row) => row.name);
+  // array_agg는 드라이버마다 배열/문자열("{a,b}")로 다르게 돌아와(neon-http는 문자열) 비교가 항상 실패했다.
+  // 쉼표로 이은 문자열로 받아 어느 드라이버에서도 같게 비교한다.
+  const rows = (result as unknown as { rows: { name: string; cols: string }[] }).rows ?? [];
+  return rows.filter((row) => row.cols.split(",").sort().join(",") === sortedTarget.join(",")).map((row) => row.name);
 }
 
 async function swapUniqueConstraint(db: AppDb, table: string, oldColumns: string[]) {
