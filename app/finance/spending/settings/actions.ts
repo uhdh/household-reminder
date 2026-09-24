@@ -5,9 +5,33 @@ import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, transactions } from "@/lib/finance-db";
 import { requireHousehold } from "@/lib/require-household";
+import { escapeIlikePattern, rederiveTransactions } from "@/lib/rederive-transactions";
 
 const VALID_TXN_TYPES = new Set(["수입", "지출", "이체"]);
 const VALID_KINDS = new Set(["고정비", "변동비", "고정수입", "변동수입"]);
+
+// 원본 대분류/소분류 조합으로 매핑 규칙의 영향을 받는 거래를 골라내는 조건(매핑 자체의
+// std_category와 무관하게, 이 raw 값 조합을 가진 거래 전부가 후보다).
+function mappingCandidateFilter(txnType: string, rawCategory: string, rawSubcategory: string) {
+  return and(
+    eq(transactions.txnType, txnType),
+    rawCategory === "미분류"
+      ? or(isNull(transactions.category), eq(transactions.category, rawCategory))
+      : eq(transactions.category, rawCategory),
+    rawSubcategory === "미분류"
+      ? or(isNull(transactions.subcategory), eq(transactions.subcategory, rawSubcategory))
+      : eq(transactions.subcategory, rawSubcategory)
+  );
+}
+
+function ruleCandidateFilter(txnType: string, paymentMethod: string) {
+  return and(eq(transactions.txnType, txnType), eq(transactions.paymentMethod, paymentMethod));
+}
+
+function keywordCandidateFilter(txnType: string, keyword: string) {
+  const typeFilter = txnType !== "전체" ? eq(transactions.txnType, txnType) : undefined;
+  return and(typeFilter, ilike(transactions.description, `%${escapeIlikePattern(keyword)}%`));
+}
 
 export async function upsertCategoryMappingAction(formData: FormData) {
   const { householdId } = await requireHousehold();
@@ -26,21 +50,7 @@ export async function upsertCategoryMappingAction(formData: FormData) {
         set: { stdCategory },
       });
 
-    await db
-      .update(transactions)
-      .set({ stdCategory })
-      .where(
-        and(
-          eq(transactions.householdId, householdId),
-          eq(transactions.txnType, txnType),
-          rawCategory === "미분류"
-            ? or(isNull(transactions.category), eq(transactions.category, rawCategory))
-            : eq(transactions.category, rawCategory),
-          rawSubcategory === "미분류"
-            ? or(isNull(transactions.subcategory), eq(transactions.subcategory, rawSubcategory))
-            : eq(transactions.subcategory, rawSubcategory)
-        )
-      );
+    await rederiveTransactions(db, householdId, mappingCandidateFilter(txnType, rawCategory, rawSubcategory));
   }
 
   redirect("/finance/spending/settings");
@@ -51,7 +61,14 @@ export async function deleteCategoryMappingAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (id) {
     const db = getDb();
+    const [mapping] = await db
+      .select({ txnType: categoryMappings.txnType, rawCategory: categoryMappings.rawCategory, rawSubcategory: categoryMappings.rawSubcategory })
+      .from(categoryMappings)
+      .where(and(eq(categoryMappings.id, id), eq(categoryMappings.householdId, householdId)))
+      .limit(1);
     await db.delete(categoryMappings).where(and(eq(categoryMappings.id, id), eq(categoryMappings.householdId, householdId)));
+    // 삭제된 매핑이 적용되던 거래도, 남은 규칙 우선순위대로 다시 계산한다(전에는 그대로 남아있었음).
+    if (mapping) await rederiveTransactions(db, householdId, mappingCandidateFilter(mapping.txnType, mapping.rawCategory, mapping.rawSubcategory));
   }
   redirect("/finance/spending/settings");
 }
@@ -71,10 +88,7 @@ export async function upsertCategoryRuleAction(formData: FormData) {
         target: [categoryRules.householdId, categoryRules.txnType, categoryRules.paymentMethod],
         set: { stdCategory },
       });
-    await db
-      .update(transactions)
-      .set({ stdCategory })
-      .where(and(eq(transactions.householdId, householdId), eq(transactions.txnType, txnType), eq(transactions.paymentMethod, paymentMethod)));
+    await rederiveTransactions(db, householdId, ruleCandidateFilter(txnType, paymentMethod));
   }
 
   redirect("/finance/spending/settings?tab=rules");
@@ -83,7 +97,16 @@ export async function upsertCategoryRuleAction(formData: FormData) {
 export async function deleteCategoryRuleAction(formData: FormData) {
   const { householdId } = await requireHousehold();
   const id = String(formData.get("id") ?? "");
-  if (id) await getDb().delete(categoryRules).where(and(eq(categoryRules.id, id), eq(categoryRules.householdId, householdId)));
+  if (id) {
+    const db = getDb();
+    const [rule] = await db
+      .select({ txnType: categoryRules.txnType, paymentMethod: categoryRules.paymentMethod })
+      .from(categoryRules)
+      .where(and(eq(categoryRules.id, id), eq(categoryRules.householdId, householdId)))
+      .limit(1);
+    await db.delete(categoryRules).where(and(eq(categoryRules.id, id), eq(categoryRules.householdId, householdId)));
+    if (rule) await rederiveTransactions(db, householdId, ruleCandidateFilter(rule.txnType, rule.paymentMethod));
+  }
   redirect("/finance/spending/settings?tab=rules");
 }
 
@@ -96,31 +119,17 @@ export async function upsertCategoryKeywordRuleAction(formData: FormData) {
 
   if (keyword && stdCategory) {
     const db = getDb();
+    const normalizedTxnType = txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체";
     await db
       .insert(categoryKeywordRules)
-      .values({
-        householdId,
-        txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
-        keyword,
-        stdCategory,
-      })
+      .values({ householdId, txnType: normalizedTxnType, keyword, stdCategory })
       .onConflictDoUpdate({
         target: [categoryKeywordRules.householdId, categoryKeywordRules.keyword],
-        set: {
-          stdCategory,
-          txnType: txnType === "수입" || txnType === "지출" || txnType === "이체" ? txnType : "전체",
-        },
+        set: { stdCategory, txnType: normalizedTxnType },
       });
 
     if (applyToExisting) {
-      const typeFilter = txnType !== "전체" ? eq(transactions.txnType, txnType) : undefined;
-      const descFilter = ilike(transactions.description, `%${keyword}%`);
-      const whereCondition = and(eq(transactions.householdId, householdId), typeFilter, descFilter);
-      if (stdCategory === "자산수정") {
-        await db.update(transactions).set({ stdCategory, included: false }).where(whereCondition);
-      } else {
-        await db.update(transactions).set({ stdCategory }).where(whereCondition);
-      }
+      await rederiveTransactions(db, householdId, keywordCandidateFilter(normalizedTxnType, keyword));
     }
   }
 
@@ -130,7 +139,16 @@ export async function upsertCategoryKeywordRuleAction(formData: FormData) {
 export async function deleteCategoryKeywordRuleAction(formData: FormData) {
   const { householdId } = await requireHousehold();
   const id = String(formData.get("id") ?? "");
-  if (id) await getDb().delete(categoryKeywordRules).where(and(eq(categoryKeywordRules.id, id), eq(categoryKeywordRules.householdId, householdId)));
+  if (id) {
+    const db = getDb();
+    const [rule] = await db
+      .select({ txnType: categoryKeywordRules.txnType, keyword: categoryKeywordRules.keyword })
+      .from(categoryKeywordRules)
+      .where(and(eq(categoryKeywordRules.id, id), eq(categoryKeywordRules.householdId, householdId)))
+      .limit(1);
+    await db.delete(categoryKeywordRules).where(and(eq(categoryKeywordRules.id, id), eq(categoryKeywordRules.householdId, householdId)));
+    if (rule) await rederiveTransactions(db, householdId, keywordCandidateFilter(rule.txnType, rule.keyword));
+  }
   redirect("/finance/spending/settings?tab=rules");
 }
 

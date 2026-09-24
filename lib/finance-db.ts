@@ -113,6 +113,10 @@ export const transactions = pgTable("transactions", {
   included: boolean("included").notNull().default(true), // 자기계좌이체 등을 제외한, 수입/지출 집계에 포함할지 여부
   isInternalTransfer: boolean("is_internal_transfer").notNull().default(false), // 짝이 맞는 자기계좌이체로 판정됐는지(참고용)
   beneficiary: text("beneficiary").notNull(), // 'husband' | 'wife' | 'joint' - 누구를 위해 쓴 지출인지, 기본값은 업로드한 사람이며 건별로 수정 가능
+  // 사용자가 세부 내역에서 직접 카테고리를 바꾼 거래는 true. true인 동안은 rederiveTransactions(매핑/규칙
+  // 변경·삭제에 따른 일괄 재계산)가 절대 건드리지 않는다. "미분류로 되돌리기"를 하면 다시 false가 되어
+  // 자동 분류(rederiveTransactions)로 복귀한다.
+  categoryLocked: boolean("category_locked").notNull().default(false),
 });
 
 // 뱅크샐러드 원본 (타입, 대분류, 소분류) 조합을 표준카테고리로 정규화하는 매핑 테이블. 수기로 관리한다.

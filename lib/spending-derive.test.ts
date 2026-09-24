@@ -96,6 +96,15 @@ describe("mapStdCategory", () => {
     expect(mapStdCategory(row, mappings, new Map(), keywordRules)).toBe("렌트카");
   });
 
+  test("가구별 특수 규칙(옛 보험사명 등)은 코드에 하드코딩돼 있지 않다 - keywordRules로만 분류된다", () => {
+    const row = transaction({ txnType: "지출", category: "미분류", subcategory: "미분류", description: "11삼생보험료" });
+
+    expect(mapStdCategory(row, new Map())).toBeNull(); // 규칙이 없으면 더 이상 자동으로 "보험"이 되지 않음
+
+    const keywordRules = [{ txnType: "전체", keyword: "11삼생", stdCategory: "보험" }];
+    expect(mapStdCategory(row, new Map(), new Map(), keywordRules)).toBe("보험"); // 가구별 키워드 규칙으로는 여전히 가능
+  });
+
   test("suggestKeywordFromDescription이 불필요한 사업자 접두/접미사를 깔끔하게 제거한다", async () => {
     const { suggestKeywordFromDescription } = await import("@/lib/spending-derive");
     expect(suggestKeywordFromDescription("(주)이니시스(빌링_일반)")).toBe("이니시스(빌링_일반)");

@@ -146,7 +146,7 @@ describe("leaveHouseholdAction / deleteHouseholdAction (위험 구역)", () => {
         upload_id uuid NOT NULL REFERENCES uploads(id) ON DELETE CASCADE, person_id text NOT NULL REFERENCES people(id),
         txn_date date NOT NULL, txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
         amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL DEFAULT true,
-        is_internal_transfer boolean NOT NULL DEFAULT false, beneficiary text NOT NULL
+        is_internal_transfer boolean NOT NULL DEFAULT false, beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
       )
     `);
     await db.execute(sql`

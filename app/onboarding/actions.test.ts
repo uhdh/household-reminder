@@ -67,7 +67,7 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
       txn_time time, txn_type text NOT NULL, category text, subcategory text, description text, amount numeric NOT NULL,
       payment_method text, std_category text, included boolean NOT NULL DEFAULT true, is_internal_transfer boolean NOT NULL DEFAULT false,
-      beneficiary text NOT NULL
+      beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
     )
   `);
 }

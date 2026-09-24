@@ -23,6 +23,7 @@ describe("exportTransactionsToExcel", () => {
         included: true,
         isInternalTransfer: false,
         beneficiary: "husband",
+        categoryLocked: false,
       },
       {
         id: "tx-2",
@@ -41,6 +42,7 @@ describe("exportTransactionsToExcel", () => {
         included: true,
         isInternalTransfer: false,
         beneficiary: "wife",
+        categoryLocked: false,
       },
     ];
 

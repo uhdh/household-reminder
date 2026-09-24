@@ -33,21 +33,19 @@ export function suggestKeywordFromDescription(desc: string | null | undefined): 
   return clean.trim() || desc.trim();
 }
 
-// 원본 엑셀 M열 수식에서, 매핑표와 무관하게 특정 키워드가 포함된 거래는 항상 "보험"으로 분류한다.
-const INSURANCE_KEYWORDS = ["11삼생", "DB생", "삼성생보험금"];
+// 특정 가구에만 해당하는 규칙(보험 가입사명, 특정 급여 이체처 등)은 하드코딩하지 않고
+// category_keyword_rules(가구별 키워드 규칙)로 관리한다. 여기 남기는 것은 모든 가구에 공통되는 것만.
 const SALARY_KEYWORDS = ["급여", "월급"];
 
 // 원본 엑셀 P열: 대분류가 아래 중 하나면 자기계좌이체 후보로 본다.
 const TRANSFER_CATEGORY_KEYWORDS = new Set(["카드대금", "저축", "투자", "현금", "내계좌이체"]);
 // 이체 후보라도 저축/투자/현금으로 분류된 건은, 매칭되는 반대쪽 거래가 없으면 그대로 수입/지출로 집계한다.
 const SAVINGS_LIKE_CATEGORIES = new Set(["저축", "투자", "현금"]);
-// 원본 엑셀 P열에서 대분류와 무관하게 자기계좌이체 후보로 취급하던 설명 키워드/패턴
+// 원본 엑셀 P열에서 대분류와 무관하게 자기계좌이체 후보로 취급하던 설명 키워드/패턴(모든 가구 공통분만)
 const TRANSFER_DESCRIPTION_PATTERNS: RegExp[] = [
-  /문.*롬/,
   /세금환급/,
   /예적금신규/,
   /통장\s*개설/,
-  /서울우유급여/,
 ];
 
 function mapKey(txnType: string, rawCategory: string, rawSubcategory: string) {
@@ -90,8 +88,7 @@ export function mapStdCategory(
   const ruleCategory = ruleIndex.get(ruleKey(txn.txnType, txn.paymentMethod ?? ""));
   if (ruleCategory) return ruleCategory;
 
-  // 3. 내장 키워드 규칙
-  if (INSURANCE_KEYWORDS.some((kw) => description.includes(kw))) return "보험";
+  // 3. 내장 키워드 규칙(모든 가구 공통분만; 가구별 규칙은 keywordRules로 관리)
   if (txn.txnType === "수입" && SALARY_KEYWORDS.some((kw) => description.includes(kw))) return "월급";
 
   // 4. 원본 엑셀 대분류/소분류 매핑

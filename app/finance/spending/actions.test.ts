@@ -32,7 +32,7 @@ async function createUploadSchema(db: ReturnType<typeof drizzle>) {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
       txn_time time, txn_type text NOT NULL, category text, subcategory text, description text, amount numeric NOT NULL,
       payment_method text, std_category text, included boolean NOT NULL DEFAULT true, is_internal_transfer boolean NOT NULL DEFAULT false,
-      beneficiary text NOT NULL
+      beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
     )
   `);
 }
@@ -173,7 +173,7 @@ describe("deleteTransactionsAction", () => {
         id uuid PRIMARY KEY, household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
         txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
         amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL,
-        is_internal_transfer boolean NOT NULL, beneficiary text NOT NULL
+        is_internal_transfer boolean NOT NULL, beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
       )
     `);
     const rows = ["00000000-0000-4000-8000-000000000011", "00000000-0000-4000-8000-000000000012"].map((id) => ({
@@ -217,7 +217,7 @@ describe("deleteTransactionsAction", () => {
         id uuid PRIMARY KEY, household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
         txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
         amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL,
-        is_internal_transfer boolean NOT NULL, beneficiary text NOT NULL
+        is_internal_transfer boolean NOT NULL, beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
       )
     `);
 
@@ -325,5 +325,122 @@ describe("deleteTransactionsAction", () => {
     expect(costco2?.stdCategory).toBe("식재료");
     expect(other?.stdCategory).toBe("식비");
     expect(unrelatedCostcoMention?.stdCategory).toBe("주차");
+
+    // 토스트의 "앞으로도 자동" - 기존 거래 적용은 직접 고친 분류로 보고 잠근다(설정 탭 일괄
+    // 재계산이 나중에 덮어쓰지 않도록).
+    expect(costco1?.categoryLocked).toBe(true);
+    expect(costco2?.categoryLocked).toBe(true);
+    expect(other?.categoryLocked).toBe(false);
+  });
+});
+
+// category_locked 동작: 사용자가 직접 카테고리를 바꾸면 잠그고, "미분류로 되돌리기"(stdCategory=null)를
+// 하면 잠금을 풀고 규칙 우선순위대로 다시 계산한다(자동 분류로 복귀).
+describe("category_locked", () => {
+  afterEach(() => setDbForTesting(null));
+
+  async function createSchemaWithRules(db: ReturnType<typeof drizzle>) {
+    await db.execute(sql`
+      CREATE TABLE transactions (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL,
+        txn_date date NOT NULL, txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
+        amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL DEFAULT true,
+        is_internal_transfer boolean NOT NULL DEFAULT false, beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE category_mappings (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, txn_type text NOT NULL, raw_category text NOT NULL,
+        raw_subcategory text NOT NULL, std_category text NOT NULL,
+        UNIQUE (household_id, txn_type, raw_category, raw_subcategory)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE category_rules (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, txn_type text NOT NULL, payment_method text NOT NULL,
+        std_category text NOT NULL,
+        UNIQUE (household_id, txn_type, payment_method)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE category_keyword_rules (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, txn_type text NOT NULL, keyword text NOT NULL,
+        std_category text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (household_id, keyword)
+      )
+    `);
+  }
+
+  function txnRow(overrides: Partial<typeof transactions.$inferInsert>) {
+    return {
+      householdId: HOUSEHOLD_ID,
+      uploadId: "00000000-0000-0000-0000-000000000001",
+      personId: "husband",
+      txnDate: "2026-08-10",
+      txnType: "지출",
+      category: "식비",
+      subcategory: "한식",
+      description: "순대국밥",
+      amount: "-10000",
+      stdCategory: null,
+      included: true,
+      isInternalTransfer: false,
+      beneficiary: "husband",
+      categoryLocked: false,
+      ...overrides,
+    };
+  }
+
+  test("단건 카테고리 변경은 category_locked=true로 저장된다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchemaWithRules(db);
+    const [row] = await db.insert(transactions).values(txnRow({ stdCategory: null })).returning();
+
+    const { updateTransactionCategoryAction } = await import("./actions");
+    const form = new FormData();
+    form.set("txnId", row.id);
+    form.set("stdCategory", "여행");
+    await updateTransactionCategoryAction(form);
+
+    const [after] = await db.select().from(transactions).where(sql`id = ${row.id}`);
+    expect(after.stdCategory).toBe("여행");
+    expect(after.categoryLocked).toBe(true);
+  });
+
+  test("일괄 카테고리 변경도 category_locked=true로 저장된다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchemaWithRules(db);
+    const [row] = await db.insert(transactions).values(txnRow({ stdCategory: null })).returning();
+
+    const { updateTransactionsCategoryAction } = await import("./actions");
+    const form = new FormData();
+    form.append("txnId", row.id);
+    form.set("stdCategory", "여행");
+    await updateTransactionsCategoryAction(form);
+
+    const [after] = await db.select().from(transactions).where(sql`id = ${row.id}`);
+    expect(after.categoryLocked).toBe(true);
+  });
+
+  test("'미분류로 되돌리기'는 잠금을 풀고 규칙 우선순위대로 다시 계산한다(자동 분류로 복귀)", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchemaWithRules(db);
+    const { categoryMappings } = await import("@/lib/finance-db");
+    await db.insert(categoryMappings).values({ householdId: HOUSEHOLD_ID, txnType: "지출", rawCategory: "식비", rawSubcategory: "한식", stdCategory: "식비" });
+    // 사용자가 직접 "여행"으로 고쳐서 잠긴 상태(원본 매핑은 "식비"를 가리킴).
+    const [row] = await db.insert(transactions).values(txnRow({ stdCategory: "여행", categoryLocked: true })).returning();
+
+    const { updateTransactionCategoryAction } = await import("./actions");
+    const form = new FormData();
+    form.set("txnId", row.id);
+    form.set("stdCategory", "__미분류__");
+    await updateTransactionCategoryAction(form);
+
+    const [after] = await db.select().from(transactions).where(sql`id = ${row.id}`);
+    expect(after.categoryLocked).toBe(false);
+    expect(after.stdCategory).toBe("식비"); // 잠금 해제 후 매핑대로 자동 재계산됨
   });
 });

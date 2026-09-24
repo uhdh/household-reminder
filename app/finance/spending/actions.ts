@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { categoryKeywordRules, transactions, uploads } from "@/lib/finance-db";
 import { getHouseholdPeople, isBeneficiary, isPersonId } from "@/lib/spending-queries";
 import { requireHousehold } from "@/lib/require-household";
+import { rederiveTransactions } from "@/lib/rederive-transactions";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -131,7 +132,22 @@ const UNMAPPED_VALUE = "__미분류__";
 // 자기계좌이체 등을 제외한 집계 포함 여부(included)를 카테고리 변경에 맞춰 재계산하며 저장한다.
 // 단건/규칙 일괄적용/다건 일괄변경이 모두 이 로직을 공유한다. householdId 조건으로 다른 가구의
 // 거래 id가 섞여 들어와도(악의적 요청 포함) 절대 바뀌지 않는다.
+//
+// stdCategory가 null이면 "미분류로 되돌리기"다: 사용자가 직접 고친 분류를 지우고 자동 분류로
+// 되돌리는 것이므로, category_locked를 풀고 rederiveTransactions로 우선순위 규칙에 따라 다시
+// 계산한다(값이 그대로 null로 남을 수도, 매핑/규칙에 걸려 자동으로 채워질 수도 있다).
+// stdCategory가 있으면 사용자가 직접 고른 것이므로 category_locked=true로 저장해, 이후 설정 탭의
+// 일괄 재계산(rederiveTransactions)이 이 거래를 건드리지 않도록 보호한다.
 async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, householdId: string, txnId: string, stdCategory: string | null) {
+  if (stdCategory === null) {
+    await db
+      .update(transactions)
+      .set({ categoryLocked: false })
+      .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
+    await rederiveTransactions(db, householdId, eq(transactions.id, txnId));
+    return;
+  }
+
   const [transaction] = await db
     .select({
       stdCategory: transactions.stdCategory,
@@ -152,7 +168,7 @@ async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, house
         : transaction.included;
   await db
     .update(transactions)
-    .set({ stdCategory, included })
+    .set({ stdCategory, included, categoryLocked: true })
     .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
 }
 
