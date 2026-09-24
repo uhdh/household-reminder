@@ -11,15 +11,16 @@ export type CategoryTransaction = {
 
 type UsageStatus = "good" | "warn" | "over";
 
+// 빨강은 "예산 초과"에만 쓰고, 그 전까지는 차분한 색으로 보여준다(막대가 전부 빨갛게 보이지 않도록).
 const USAGE_COLORS: Record<UsageStatus, { fill: string; text: string }> = {
-  good: { fill: "bg-bg-positive-solid", text: "text-fg-positive" },
-  warn: { fill: "bg-bg-warning-solid", text: "text-fg-warning" },
-  over: { fill: "bg-bg-critical-solid", text: "text-fg-critical" },
+  good: { fill: "bg-bg-informative-solid/70", text: "text-ink-muted" },
+  warn: { fill: "bg-bg-warning-solid", text: "text-ink-muted" },
+  over: { fill: "bg-bg-critical-solid/45", text: "text-fg-critical" },
 };
 
 function usageStatus(pct: number): UsageStatus {
   if (pct > 100) return "over";
-  if (pct >= 70) return "warn";
+  if (pct >= 90) return "warn";
   return "good";
 }
 
@@ -32,32 +33,26 @@ export function UsageAmount({ actual, budget }: { actual: number; budget: number
   return (
     <span className="whitespace-nowrap text-[14px] font-bold tabular-nums text-ink">
       {formatKRW(actual)}
-      {budget !== null && budget > 0 && <span className="text-ink-muted"> / {formatKRW(budget)}</span>}
-      {usagePct !== null && <span className={USAGE_COLORS[usageStatus(usagePct)].text}>({usagePct.toFixed(0)}%)</span>}
+      {budget !== null && budget > 0 && <span className="font-medium text-ink-muted"> / {formatKRW(budget)}</span>}
+      {usagePct !== null && <span className={`ml-1.5 text-[13px] font-semibold ${USAGE_COLORS[usageStatus(usagePct)].text}`}>{usagePct.toFixed(0)}%</span>}
     </span>
   );
 }
 
-/** 막대 앞 GAUGE_SPLIT%는 0~100% 사용률 구간, 뒤 나머지는 100%를 넘긴 초과분을 scaleMax 기준으로 다시 늘려 보여주는 구간. */
-const GAUGE_SPLIT = 60;
-
-function gaugeWidth(pct: number, scaleMax: number): number {
-  if (pct <= 100) return (pct / 100) * GAUGE_SPLIT;
-  const overRange = Math.max(scaleMax - 100, 1);
-  const over = Math.min(pct - 100, overRange);
-  return GAUGE_SPLIT + (over / overRange) * (100 - GAUGE_SPLIT);
-}
-
-export function UsageBar({ actual, budget, scaleMax }: { actual: number; budget: number | null; scaleMax: number }) {
+/** 막대 전체 길이 = 예산. 초과하면 가득 찬 막대를 부드러운 빨강으로 바꾸고 초과 금액을 글자로 알려준다. */
+export function UsageBar({ actual, budget }: { actual: number; budget: number | null; scaleMax?: number }) {
   const usagePct = usagePctOf(actual, budget);
-  if (usagePct === null) return null;
+  if (usagePct === null || budget === null) return null;
+  const status = usageStatus(usagePct);
+  const diff = budget - actual;
   return (
-    <div className="relative mt-2.5 h-2 overflow-hidden rounded-full bg-bg-neutral-weak">
-      <div
-        className={`h-full rounded-full ${USAGE_COLORS[usageStatus(usagePct)].fill}`}
-        style={{ width: `${gaugeWidth(usagePct, scaleMax)}%` }}
-      />
-      <div className="absolute inset-y-0 w-0.5 bg-ink/50" style={{ left: `${GAUGE_SPLIT}%` }} />
+    <div className="mt-2.5 flex items-center gap-3">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg-neutral-weak">
+        <div className={`h-full rounded-full ${USAGE_COLORS[status].fill}`} style={{ width: `${Math.min(usagePct, 100)}%` }} />
+      </div>
+      <span className={`shrink-0 text-[12px] font-medium tabular-nums ${status === "over" ? "text-fg-critical" : "text-ink-muted"}`}>
+        {diff >= 0 ? `${formatKRW(diff)} 남음` : `${formatKRW(-diff)} 초과`}
+      </span>
     </div>
   );
 }
