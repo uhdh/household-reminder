@@ -221,3 +221,17 @@ body {
     .seed-button, .seed-primary-button, .seed-icon-button { transition: none; }
   }
 }
+
+/* 소개 페이지 히어로/마무리 배경: 브랜드 주황을 살린 복숭아빛 하늘 */
+.landing-sky {
+  background:
+    radial-gradient(90% 60% at 15% 0%, #fff3e6 0%, transparent 60%),
+    radial-gradient(70% 50% at 90% 5%, #ffd7b5 0%, transparent 60%),
+    linear-gradient(180deg, #ffc99c 0%, #ffe3cc 38%, #fff4ea 70%, #fffaf5 100%);
+}
+.dark .landing-sky {
+  background:
+    radial-gradient(90% 60% at 15% 0%, #4a2a17 0%, transparent 60%),
+    radial-gradient(70% 50% at 90% 5%, #5a3219 0%, transparent 60%),
+    linear-gradient(180deg, #3a2213 0%, #24170f 50%, #17110d 100%);
+}

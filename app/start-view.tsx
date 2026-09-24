@@ -1,120 +1,179 @@
+import Image from "next/image";
 import Link from "next/link";
-import { IconArrowUpBracketDownLine, IconLinechartUpXaxisLine, IconPerson2Line } from "@karrotmarket/react-monochrome-icon";
-import { AppShell, Card } from "@/components/ui";
-import { SummaryCard } from "@/app/finance/_components/summary-card";
-import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 import { BrandHero } from "@/app/brand-hero";
 
-// 비로그인 방문자용 소개 페이지. 실데이터를 절대 쿼리하지 않는다 - 아래 숫자는 모두 가상의 예시다.
+// 비로그인 방문자용 소개 페이지. 실데이터를 절대 쿼리하지 않는다.
 
-const benefits = [
-  { Icon: IconArrowUpBracketDownLine, title: "한 번만 올리면", description: "카테고리 분류·집계는 자동" },
-  { Icon: IconPerson2Line, title: "각자 올리면", description: "가족 데이터를 한 화면에 합쳐서" },
-  { Icon: IconLinechartUpXaxisLine, title: "소비부터 투자까지", description: "월별·연간 흐름을 한눈에" },
+const features = [
+  {
+    title: "자동 분류",
+    description: "뱅크샐러드 분류를 우리집 카테고리로 바꾸고, 한 번 고친 가맹점은 다음부터 알아서 분류해요.",
+    art: "from-[#ffd6b0] via-[#ffc4d6] to-[#e6d4ff]",
+  },
+  {
+    title: "가족 합산",
+    description: "각자 올린 파일이 한 가계부로 합쳐지고, 가족끼리 보낸 돈은 지출에서 빠져요.",
+    art: "from-[#bfe7ff] via-[#c9f0e4] to-[#fff1c2]",
+  },
+  {
+    title: "자산·연간 흐름",
+    description: "순자산, 투자 비중, 월별 추이와 예산 대비 지출을 한 화면에서 확인해요.",
+    art: "from-[#d7f5c8] via-[#c8ecf5] to-[#d9d6ff]",
+  },
 ];
 
 const steps = [
   { title: "Google로 가입", description: "가구 이름과 표시 이름만 정하면 끝이에요." },
-  { title: "뱅크샐러드 엑셀 올리기", description: "앱에서 내려받은 파일을 그대로 올리면 자동으로 분류돼요." },
+  { title: "뱅크샐러드 엑셀 올리기", description: "앱에서 내려받은 파일을 그대로 올리면 자동으로 정리돼요." },
   { title: "가족 초대(선택)", description: "초대 링크를 보내면 각자 올린 내역이 한 가계부로 합쳐져요." },
 ];
 
 const privacyPoints = [
-  "업로드한 엑셀 원본은 저장하지 않고, 필요한 거래·자산 항목만 저장해요.",
-  "가구별로 데이터가 분리되어 우리 가족만 볼 수 있어요.",
-  "모든 통신은 HTTPS로 암호화되고, 언제든 탈퇴·가구 삭제가 가능해요.",
+  { title: "원본 미저장", description: "엑셀 원본은 저장하지 않고, 필요한 거래·자산 항목만 남겨요." },
+  { title: "가구별 분리", description: "데이터는 가구 단위로 분리되어 우리 가족만 볼 수 있어요." },
+  { title: "암호화 전송", description: "모든 통신은 HTTPS로 암호화되고, 초대 링크는 해시로만 저장해요." },
+  { title: "언제든 삭제", description: "설정에서 가구를 삭제하면 가계부 데이터가 모두 지워져요." },
 ];
 
-const sampleVariable = [
-  { name: "식비", value: 820_000, fill: "#2E7DD7" },
-  { name: "생필품", value: 460_000, fill: "#F36B2A" },
-  { name: "교통", value: 180_000, fill: "#17A875" },
-  { name: "문화", value: 140_000, fill: "#F2A900" },
-  { name: "기타", value: 210_000, fill: "#DD6B9A" },
-];
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-[14px] font-semibold text-fg-brand">{children}</p>;
+}
 
 export function StartView() {
   return (
-    <AppShell size="wide" className="font-sans">
-      <BrandHero />
+    <div className="flex-1 bg-bg-layer-default font-sans text-fg-neutral">
+      <div className="p-2 sm:p-4">
+        <BrandHero />
+      </div>
 
-      <section className="py-6 sm:py-8" aria-label="가계부탁의 주요 기능">
-        <div className="grid gap-3 sm:grid-cols-3">
-          {benefits.map((benefit) => (
-            <Card key={benefit.title} className="p-7 shadow-none">
-              <span className="flex size-14 items-center justify-center rounded-r3 bg-bg-brand-weak text-fg-brand" aria-hidden="true">
-                <benefit.Icon size={28} />
-              </span>
-              <h3 className="mt-5 text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">{benefit.title}</h3>
-              <p className="mt-1 text-base text-fg-neutral-muted">{benefit.description}</p>
-            </Card>
-          ))}
+      <section className="mx-auto grid max-w-5xl gap-6 px-5 py-20 sm:grid-cols-[1fr_2fr] sm:py-28" aria-labelledby="intro-heading">
+        <SectionLabel>
+          <span id="intro-heading">가계부탁 소개</span>
+        </SectionLabel>
+        <div className="space-y-5 text-[19px] leading-8 text-fg-neutral-muted sm:text-[21px] sm:leading-9">
+          <p>
+            <b className="font-semibold text-fg-neutral">가계부, 같이 쓰기는 어려웠어요.</b> 은행과 카드는 제각각이고, 서로 보낸 돈은 두 번 잡히고, 결국 엑셀로 다시
+            정리하게 되죠.
+          </p>
+          <p>
+            <b className="font-semibold text-fg-neutral">가계부탁은 각자 올린 뱅크샐러드 파일을 하나의 가계부로 합쳐요.</b> 분류, 이체 정리, 집계는 알아서 합니다. 혼자 써도 좋아요.
+          </p>
         </div>
       </section>
 
-      <section className="border-t border-stroke-neutral-muted py-10" aria-labelledby="preview-heading">
-        <p className="text-sm font-bold text-fg-brand">가계부탁이 만든 결과</p>
-        <h2 id="preview-heading" className="mt-2 text-3xl font-extrabold tracking-[-0.03em] text-fg-neutral">입력은 한 번, 이후에는 확인만 하세요</h2>
-        <Card className="mt-6 overflow-hidden p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-[22px] font-extrabold tracking-[-0.02em] text-fg-neutral">이번 달 가계부</h3>
-            <span className="rounded-r2 bg-bg-neutral-weak px-3 py-1.5 text-[13px] font-medium text-fg-neutral-muted">예시 화면 · 가상의 숫자</span>
+      <section className="mx-2 rounded-[28px] bg-bg-layer-basement px-5 py-20 sm:mx-4 sm:py-28" aria-labelledby="features-heading">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center">
+            <SectionLabel>자동 정리</SectionLabel>
+            <h2 id="features-heading" className="mx-auto mt-3 max-w-2xl text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">
+              파일 하나 올리면,
+              <br />
+              가계부는 끝났어요.
+            </h2>
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-            <SummaryCard label="총수입" value={6_200_000} format="compactKrw" />
-            <SummaryCard label="총지출" value={3_610_000} format="compactKrw" />
-            <SummaryCard label="당월 저축" value={2_590_000} format="compactKrw" />
-            <SummaryCard label="저축률" value={41.8} format="signedPct" />
+          <div className="mt-14 grid gap-5 sm:grid-cols-3">
+            {features.map((feature) => (
+              <div key={feature.title}>
+                <div className={`aspect-[4/3] rounded-[20px] bg-gradient-to-br ${feature.art}`} aria-hidden="true" />
+                <p className="mt-4 text-[15px] leading-6 text-fg-neutral-muted">
+                  <b className="font-semibold text-fg-neutral">{feature.title}</b> {feature.description}
+                </p>
+              </div>
+            ))}
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <CategoryPie title="변동비" data={sampleVariable} />
-            <div className="flex flex-col justify-center gap-3 rounded-r3 bg-bg-neutral-weak p-5 text-sm leading-6 text-fg-neutral-muted">
-              <p><b className="text-fg-neutral">자동 분류</b> — 뱅크샐러드 분류를 우리집 카테고리로 바꾸고, 가족 간 이체는 지출에서 빼요.</p>
-              <p><b className="text-fg-neutral">한 번 고치면 기억</b> — 분류를 고칠 때 같은 가맹점 거래도 한 번에 바꿀 수 있어요.</p>
-              <p><b className="text-fg-neutral">예산·연간 흐름</b> — 카테고리별 예산과 월별 추이를 한 화면에서 봐요.</p>
-            </div>
+          <div className="mt-10 text-center">
+            <Link href="/finance" className="text-[15px] font-semibold text-fg-brand hover:underline">
+              샘플 가계부 둘러보기 →
+            </Link>
           </div>
-        </Card>
-        <Link href="/finance" className="mt-4 inline-block text-sm font-bold text-fg-brand hover:underline">
-          샘플 가계부 전체 둘러보기 →
-        </Link>
+        </div>
       </section>
 
-      <section className="border-t border-stroke-neutral-muted py-10" aria-labelledby="steps-heading">
-        <h2 id="steps-heading" className="text-3xl font-extrabold tracking-[-0.03em] text-fg-neutral">3분이면 시작해요</h2>
-        <ol className="mt-6 grid gap-3 sm:grid-cols-3">
+      <section className="mx-auto max-w-5xl px-5 py-20 sm:py-28" aria-labelledby="steps-heading">
+        <div className="text-center">
+          <SectionLabel>시작하기</SectionLabel>
+          <h2 id="steps-heading" className="mt-3 text-[32px] font-semibold tracking-[-0.035em] sm:text-5xl">
+            3분이면 시작해요.
+          </h2>
+        </div>
+        <ol className="mt-14 grid gap-8 sm:grid-cols-3">
           {steps.map((step, index) => (
-            <li key={step.title} className="seed-card p-6 shadow-none">
-              <span className="flex size-9 items-center justify-center rounded-full bg-bg-brand-solid text-sm font-black text-fg-neutral-inverted">{index + 1}</span>
-              <h3 className="mt-4 text-lg font-extrabold text-fg-neutral">{step.title}</h3>
-              <p className="mt-1 text-sm leading-6 text-fg-neutral-muted">{step.description}</p>
+            <li key={step.title} className="border-t border-stroke-neutral-muted pt-6">
+              <span className="text-[14px] font-semibold tabular-nums text-fg-brand">0{index + 1}</span>
+              <h3 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{step.title}</h3>
+              <p className="mt-2 text-[15px] leading-6 text-fg-neutral-muted">{step.description}</p>
             </li>
           ))}
         </ol>
       </section>
 
-      <section className="border-t border-stroke-neutral-muted py-10" aria-labelledby="privacy-heading">
-        <h2 id="privacy-heading" className="text-3xl font-extrabold tracking-[-0.03em] text-fg-neutral">돈 이야기라 더 조심해요</h2>
-        <ul className="mt-6 space-y-3">
-          {privacyPoints.map((point) => (
-            <li key={point} className="flex gap-3 text-base text-fg-neutral">
-              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-bg-positive-solid" aria-hidden="true" />
-              {point}
-            </li>
-          ))}
-        </ul>
-        <Link href="/privacy" className="mt-4 inline-block text-sm font-bold text-fg-neutral-muted hover:text-fg-neutral hover:underline">
-          개인정보처리방침 보기
-        </Link>
+      <section className="mx-2 rounded-[28px] bg-bg-layer-basement px-5 py-20 sm:mx-4 sm:py-28" aria-labelledby="privacy-heading">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center">
+            <SectionLabel>개인정보 보호</SectionLabel>
+            <h2 id="privacy-heading" className="mt-3 text-[32px] font-semibold tracking-[-0.035em] sm:text-5xl">
+              <span className="font-mono tracking-normal text-fg-neutral-muted" aria-hidden="true">******</span> 원본은
+              <br className="sm:hidden" /> 저장하지 않아요.
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-[16px] leading-7 text-fg-neutral-muted">돈 이야기라 더 조심해요. 필요한 만큼만 저장하고, 우리 가족만 볼 수 있어요.</p>
+          </div>
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {privacyPoints.map((point) => (
+              <div key={point.title} className="rounded-[20px] bg-bg-layer-default p-6">
+                <h3 className="text-[16px] font-semibold">{point.title}</h3>
+                <p className="mt-2 text-[14px] leading-6 text-fg-neutral-muted">{point.description}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 text-center">
+            <Link href="/privacy" className="text-[15px] font-semibold text-fg-neutral-muted hover:text-fg-neutral hover:underline">
+              개인정보처리방침 보기
+            </Link>
+          </div>
+        </div>
       </section>
 
-      <section className="rounded-r5 bg-bg-brand-weak px-6 py-10 text-center">
-        <h2 className="text-2xl font-extrabold tracking-[-0.03em] text-fg-neutral sm:text-3xl">이번 달 가계부, 가계부탁에 맡겨 보세요</h2>
-        <p className="mt-2 text-fg-neutral-muted">무료로 시작하고, 필요 없으면 언제든 탈퇴할 수 있어요.</p>
-        <Link href="/login" className="seed-button seed-button-primary mt-6 min-h-14 rounded-r3 px-8 text-base">
-          Google로 무료 시작하기
-        </Link>
-      </section>
-    </AppShell>
+      <div className="p-2 pt-16 sm:p-4 sm:pt-24">
+        <section className="landing-sky relative overflow-hidden rounded-[28px] px-5 py-24 text-center sm:py-32">
+          <h2 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">
+            가계부는 이제,
+            <br />
+            가계부탁에 부탁하세요.
+          </h2>
+          <Link
+            href="/login"
+            className="mt-8 inline-flex min-h-12 items-center rounded-full bg-[#141414] px-6 text-[15px] font-bold text-white hover:bg-black dark:bg-white dark:text-[#141414]"
+          >
+            Google로 무료 시작하기
+          </Link>
+        </section>
+      </div>
+
+      <footer className="mx-auto max-w-5xl px-5 py-14">
+        <div className="flex flex-wrap justify-between gap-10">
+          <Link href="/" className="flex items-center gap-2 text-lg font-extrabold tracking-[-0.02em]">
+            <Image src="/icon.svg" alt="" width={28} height={28} />
+            가계부탁
+          </Link>
+          <div className="grid grid-cols-2 gap-x-16 gap-y-2 text-[14px] sm:grid-cols-3">
+            <div className="space-y-2">
+              <p className="font-semibold">서비스</p>
+              <Link href="/finance" className="block text-fg-neutral-muted hover:text-fg-neutral">둘러보기</Link>
+              <Link href="/login" className="block text-fg-neutral-muted hover:text-fg-neutral">시작하기</Link>
+            </div>
+            <div className="space-y-2">
+              <p className="font-semibold">정책</p>
+              <Link href="/privacy" className="block text-fg-neutral-muted hover:text-fg-neutral">개인정보처리방침</Link>
+              <Link href="/account-deletion" className="block text-fg-neutral-muted hover:text-fg-neutral">계정 삭제 안내</Link>
+            </div>
+            <div className="space-y-2">
+              <p className="font-semibold">문의</p>
+              <a href="mailto:maktubhd@gmail.com" className="block text-fg-neutral-muted hover:text-fg-neutral">maktubhd@gmail.com</a>
+            </div>
+          </div>
+        </div>
+        <p className="mt-12 text-[13px] text-fg-neutral-muted">© 2026 가계부탁</p>
+      </footer>
+    </div>
   );
 }

@@ -1,83 +1,109 @@
 import Image from "next/image";
 import Link from "next/link";
-import { IconArrowDownLine, IconDocumentLine } from "@karrotmarket/react-monochrome-icon";
+import { SummaryCard } from "@/app/finance/_components/summary-card";
+import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 
-function SourceChip({ label, tone }: { label: string; tone: "husband" | "wife" }) {
-  const toneClass = tone === "husband" ? "bg-husband/15 text-husband" : "bg-wife/15 text-wife";
+// 히어로 안의 앱 화면 미리보기. 모두 가상의 숫자다.
+const sampleFixed = [
+  { name: "주거", value: 900_000, fill: "#2E7DD7" },
+  { name: "보험", value: 250_000, fill: "#F36B2A" },
+  { name: "통신", value: 150_000, fill: "#17A875" },
+  { name: "교통", value: 120_000, fill: "#F2A900" },
+];
+const sampleVariable = [
+  { name: "식비", value: 820_000, fill: "#2E7DD7" },
+  { name: "생필품", value: 460_000, fill: "#F36B2A" },
+  { name: "문화", value: 140_000, fill: "#17A875" },
+  { name: "기타", value: 210_000, fill: "#DD6B9A" },
+];
 
+export function LandingNav() {
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-r3 bg-bg-neutral-weak px-4 py-3.5">
-      <span className={`flex size-9 shrink-0 items-center justify-center rounded-r2 ${toneClass}`} aria-hidden="true">
-        <IconDocumentLine size={20} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-sm font-bold text-fg-neutral">{label}</p>
-        <p className="mt-0.5 text-xs text-fg-neutral-muted">뱅크샐러드 엑셀</p>
+    <nav aria-label="가계부탁" className="relative z-10 mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+      <Link href="/" className="flex items-center gap-2 text-lg font-extrabold tracking-[-0.02em] text-fg-neutral">
+        <Image src="/icon.svg" alt="" width={30} height={30} priority />
+        가계부탁
+      </Link>
+      <div className="flex items-center gap-5">
+        <Link href="/finance" className="hidden text-[15px] font-medium text-fg-neutral hover:opacity-70 sm:inline">
+          둘러보기
+        </Link>
+        <Link href="/privacy" className="hidden text-[15px] font-medium text-fg-neutral hover:opacity-70 sm:inline">
+          개인정보 보호
+        </Link>
+        <Link href="/login" className="rounded-full bg-[#141414] px-4 py-2 text-[14px] font-bold text-white hover:bg-black dark:bg-white dark:text-[#141414]">
+          로그인
+        </Link>
+      </div>
+    </nav>
+  );
+}
+
+function SkyBlobs() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      <span className="absolute -left-16 top-24 size-72 rounded-full bg-white/70 blur-3xl dark:bg-white/5" />
+      <span className="absolute right-0 top-10 size-96 rounded-full bg-white/60 blur-3xl dark:bg-white/5" />
+      <span className="absolute left-1/3 top-64 size-80 rounded-full bg-white/50 blur-3xl dark:bg-white/5" />
+    </div>
+  );
+}
+
+function AppPreview() {
+  return (
+    <div className="mx-auto mt-14 max-w-5xl overflow-hidden rounded-t-[18px] border border-b-0 border-black/10 bg-bg-layer-basement text-left shadow-[0_30px_80px_-20px_rgba(120,60,20,0.35)] sm:mt-16">
+      <div className="flex items-center gap-3 border-b border-stroke-neutral-muted bg-bg-layer-default px-4 py-2.5">
+        <span className="flex gap-1.5" aria-hidden="true">
+          <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+          <span className="size-2.5 rounded-full bg-[#febc2e]" />
+          <span className="size-2.5 rounded-full bg-[#28c840]" />
+        </span>
+        <span className="truncate text-[13px] text-fg-neutral-muted">가계부탁 · 월별지출 · 2026년 7월</span>
+        <span className="ml-auto shrink-0 rounded-full bg-bg-neutral-weak px-2.5 py-1 text-[11px] font-medium text-fg-neutral-muted">예시 화면</span>
+      </div>
+      <div className="max-h-[420px] overflow-hidden p-4 sm:max-h-[520px] sm:p-6">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SummaryCard label="총수입" value={6_200_000} format="compactKrw" />
+          <SummaryCard label="총지출" value={3_050_000} format="compactKrw" />
+          <SummaryCard label="당월 저축" value={3_150_000} format="compactKrw" />
+          <SummaryCard label="저축률" value={50.8} format="signedPct" />
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <CategoryPie title="고정비" data={sampleFixed} />
+          <CategoryPie title="변동비" data={sampleVariable} />
+        </div>
       </div>
     </div>
   );
 }
 
-const results = ["소비 내역", "자산 현황", "투자 내역"];
-
 export function BrandHero() {
   return (
-    <section className="overflow-hidden rounded-r5 border border-stroke-neutral-muted bg-bg-layer-default px-5 py-8 sm:px-8 sm:py-10 lg:px-14 lg:py-14">
-      <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-12">
-        <div>
-          <p className="text-sm font-bold text-fg-brand">귀찮은 돈 관리, 가계부탁에 부탁하세요</p>
-          <h1 className="mt-5 text-5xl font-black leading-[1.12] tracking-[-0.045em] text-fg-neutral sm:text-6xl lg:text-[4.5rem]">
-            가계부는 <br />부탁만 하세요.
-          </h1>
-          <p className="mt-6 text-xl font-bold tracking-[-0.025em] text-fg-neutral sm:text-[22px]">
-            각자 올리면, 알아서 합쳐져요.
-          </p>
-          <p className="mt-3 max-w-md text-sm leading-6 text-fg-neutral-muted sm:text-base sm:leading-7">
-            뱅크샐러드에서 내려받은 엑셀 파일만 올리면 소비·자산·투자가 한 화면에 정리돼요. 혼자 써도, 가족을 초대해 함께 써도 좋아요.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/login" className="seed-button seed-button-primary min-h-14 min-w-48 rounded-r3 px-8 text-base">
-              Google로 무료 시작하기
-            </Link>
-            <Link href="/finance" className="seed-button seed-button-secondary min-h-14 rounded-r3 px-6 text-base">
-              로그인 없이 둘러보기
-            </Link>
-          </div>
+    <section className="landing-sky relative overflow-hidden rounded-[28px]">
+      <SkyBlobs />
+      <LandingNav />
+      <div className="relative px-5 pt-14 text-center sm:pt-20">
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white/60 px-3 py-1 text-[13px] font-medium text-fg-neutral backdrop-blur dark:border-white/15 dark:bg-white/10"
+        >
+          뱅크샐러드 엑셀 파일로 바로 시작 <span aria-hidden="true">›</span>
+        </Link>
+        <h1 className="mx-auto mt-6 max-w-3xl text-[40px] font-semibold leading-[1.15] tracking-[-0.04em] text-fg-neutral sm:text-6xl">
+          가계부는 <br className="sm:hidden" />부탁만 하세요.
+        </h1>
+        <p className="mx-auto mt-5 max-w-xl text-[17px] leading-7 text-fg-neutral-muted sm:text-lg">
+          각자 올리면, 알아서 합쳐져요. 소비·자산·투자가 한 화면에 정리돼요.
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Link href="/login" className="inline-flex min-h-12 items-center rounded-full bg-[#141414] px-6 text-[15px] font-bold text-white hover:bg-black dark:bg-white dark:text-[#141414]">
+            Google로 무료 시작하기
+          </Link>
+          <Link href="/finance" className="inline-flex min-h-12 items-center rounded-full border border-black/10 bg-white/70 px-6 text-[15px] font-bold text-fg-neutral backdrop-blur hover:bg-white dark:border-white/15 dark:bg-white/10">
+            로그인 없이 둘러보기
+          </Link>
         </div>
-
-        <div role="group" aria-label="가족 데이터 통합 과정" className="flex flex-col gap-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SourceChip label="내 파일" tone="husband" />
-            <SourceChip label="가족 파일" tone="wife" />
-          </div>
-
-          <div className="flex justify-center text-fg-brand" aria-hidden="true">
-            <IconArrowDownLine size={24} />
-          </div>
-
-          <div className="rounded-r4 border border-stroke-brand-weak bg-bg-brand-weak p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <Image src="/icon.svg" alt="" width={36} height={36} className="size-9 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-black tracking-[-0.02em] text-fg-neutral">가계부탁 자동 정리</p>
-                  <p className="mt-0.5 truncate text-xs text-fg-neutral-muted">우리 가계 · 자산 · 투자</p>
-                </div>
-              </div>
-              <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold text-fg-positive">
-                <span className="size-1.5 rounded-full bg-bg-positive-solid" aria-hidden="true" />
-                정리 완료
-              </span>
-            </div>
-            <ul className="mt-4 flex flex-wrap gap-2">
-              {results.map((label) => (
-                <li key={label} className="rounded-r2 bg-bg-layer-default px-3 py-1.5 text-[13px] font-bold text-fg-neutral">
-                  {label}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        <AppPreview />
       </div>
     </section>
   );
