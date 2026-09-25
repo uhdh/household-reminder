@@ -62,17 +62,19 @@ function AppPreview() {
         <span className="truncate text-[13px] text-fg-neutral-muted">가계부탁 · 월별지출 · 2026년 7월</span>
         <span className="ml-auto shrink-0 rounded-full bg-bg-neutral-weak px-2.5 py-1 text-[11px] font-medium text-fg-neutral-muted">예시 화면</span>
       </div>
-      <div className="max-h-[420px] overflow-hidden p-4 sm:max-h-[520px] sm:p-6">
+      <div className="relative p-4 sm:max-h-[520px] sm:overflow-hidden sm:p-6">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <SummaryCard label="총수입" value={6_200_000} format="compactKrw" />
           <SummaryCard label="총지출" value={3_050_000} format="compactKrw" />
           <SummaryCard label="당월 저축" value={3_150_000} format="compactKrw" />
           <SummaryCard label="저축률" value={50.8} format="signedPct" />
         </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* 모바일은 요약 카드까지만 보여주고, 넓은 화면에서만 차트를 걸쳐 보이게 한 뒤 아래를 흐리게 끊는다. */}
+        <div className="mt-3 hidden grid-cols-2 gap-3 sm:grid">
           <CategoryPie title="고정비" data={sampleFixed} />
           <CategoryPie title="변동비" data={sampleVariable} />
         </div>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-32 bg-gradient-to-t from-bg-layer-basement to-transparent sm:block" />
       </div>
     </div>
   );
