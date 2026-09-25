@@ -25,7 +25,7 @@ export function MaskedWord({ word }: { word: string }) {
   const [index, setIndex] = useState(frames.length - 2);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const id = window.setInterval(() => setIndex((i) => (i + 1) % frames.length), 130);
     return () => window.clearInterval(id);
   }, [frames]);

@@ -235,3 +235,32 @@ body {
     radial-gradient(70% 50% at 90% 5%, #5a3219 0%, transparent 60%),
     linear-gradient(180deg, #3a2213 0%, #24170f 50%, #17110d 100%);
 }
+
+/* 소개 페이지 애니메이션: 등장(떠오르며 선명해짐), 구름 흐름, 스크롤에 따라 앱 화면 확대 */
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes landing-drift {
+  from { transform: translate3d(-24px, 0, 0) scale(1); }
+  to { transform: translate3d(36px, -12px, 0) scale(1.08); }
+}
+@keyframes landing-grow {
+  from { transform: scale(0.92); }
+  to { transform: scale(1); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .landing-enter { animation: landing-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .landing-drift { animation: landing-drift 18s ease-in-out infinite alternate; }
+  @supports (animation-timeline: view()) {
+    .landing-scale {
+      transform-origin: 50% 0;
+      animation: landing-grow linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 35%;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-enter, .landing-drift, .landing-scale { animation: none !important; }
+}

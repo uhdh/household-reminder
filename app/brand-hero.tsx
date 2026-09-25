@@ -1,22 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { GoogleStartButton } from "@/app/google-start-button";
-import { SummaryCard } from "@/app/finance/_components/summary-card";
-import { CategoryPie } from "@/app/finance/spending/monthly/chart";
-
-// 히어로 안의 앱 화면 미리보기. 모두 가상의 숫자다.
-const sampleFixed = [
-  { name: "주거", value: 900_000, fill: "#2E7DD7" },
-  { name: "보험", value: 250_000, fill: "#F36B2A" },
-  { name: "통신", value: 150_000, fill: "#17A875" },
-  { name: "교통", value: 120_000, fill: "#F2A900" },
-];
-const sampleVariable = [
-  { name: "식비", value: 820_000, fill: "#2E7DD7" },
-  { name: "생필품", value: 460_000, fill: "#F36B2A" },
-  { name: "문화", value: 140_000, fill: "#17A875" },
-  { name: "기타", value: 210_000, fill: "#DD6B9A" },
-];
+import { HeroDemo } from "@/app/hero-demo";
 
 export function LandingNav() {
   return (
@@ -43,39 +28,9 @@ export function LandingNav() {
 function SkyBlobs() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-      <span className="absolute -left-16 top-24 size-72 rounded-full bg-white/70 blur-3xl dark:bg-white/5" />
-      <span className="absolute right-0 top-10 size-96 rounded-full bg-white/60 blur-3xl dark:bg-white/5" />
-      <span className="absolute left-1/3 top-64 size-80 rounded-full bg-white/50 blur-3xl dark:bg-white/5" />
-    </div>
-  );
-}
-
-function AppPreview() {
-  return (
-    <div className="mx-auto mt-14 max-w-5xl overflow-hidden rounded-t-[18px] border border-b-0 border-black/10 bg-bg-layer-basement text-left shadow-[0_30px_80px_-20px_rgba(120,60,20,0.35)] sm:mt-16">
-      <div className="flex items-center gap-3 border-b border-stroke-neutral-muted bg-bg-layer-default px-4 py-2.5">
-        <span className="flex gap-1.5" aria-hidden="true">
-          <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-          <span className="size-2.5 rounded-full bg-[#febc2e]" />
-          <span className="size-2.5 rounded-full bg-[#28c840]" />
-        </span>
-        <span className="truncate text-[13px] text-fg-neutral-muted">가계부탁 · 월별지출 · 2026년 7월</span>
-        <span className="ml-auto shrink-0 rounded-full bg-bg-neutral-weak px-2.5 py-1 text-[11px] font-medium text-fg-neutral-muted">예시 화면</span>
-      </div>
-      <div className="relative p-4 sm:max-h-[520px] sm:overflow-hidden sm:p-6">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryCard label="총수입" value={6_200_000} format="compactKrw" />
-          <SummaryCard label="총지출" value={3_050_000} format="compactKrw" />
-          <SummaryCard label="당월 저축" value={3_150_000} format="compactKrw" />
-          <SummaryCard label="저축률" value={50.8} format="signedPct" />
-        </div>
-        {/* 모바일은 요약 카드까지만 보여주고, 넓은 화면에서만 차트를 걸쳐 보이게 한 뒤 아래를 흐리게 끊는다. */}
-        <div className="mt-3 hidden grid-cols-2 gap-3 sm:grid">
-          <CategoryPie title="고정비" data={sampleFixed} />
-          <CategoryPie title="변동비" data={sampleVariable} />
-        </div>
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-32 bg-gradient-to-t from-bg-layer-basement to-transparent sm:block" />
-      </div>
+      <span className="landing-drift absolute -left-16 top-24 size-72 rounded-full bg-white/70 blur-3xl dark:bg-white/5" />
+      <span className="landing-drift absolute right-0 top-10 size-96 rounded-full bg-white/60 blur-3xl [animation-delay:-6s] dark:bg-white/5" />
+      <span className="landing-drift absolute left-1/3 top-64 size-80 rounded-full bg-white/50 blur-3xl [animation-delay:-12s] dark:bg-white/5" />
     </div>
   );
 }
@@ -86,16 +41,16 @@ export function BrandHero() {
       <SkyBlobs />
       <LandingNav />
       <div className="relative px-5 pt-14 text-center sm:pt-20">
-        <span className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white/60 px-3 py-1 text-[13px] font-medium text-fg-neutral backdrop-blur dark:border-white/15 dark:bg-white/10">
+        <span className="landing-enter inline-flex items-center gap-1 rounded-full border border-black/10 bg-white/60 px-3 py-1 text-[13px] font-medium text-fg-neutral backdrop-blur dark:border-white/15 dark:bg-white/10">
           뱅크샐러드 엑셀 파일로 바로 시작
         </span>
-        <h1 className="mx-auto mt-6 max-w-3xl text-[40px] font-semibold leading-[1.15] tracking-[-0.04em] text-fg-neutral sm:text-6xl">
+        <h1 className="landing-enter [animation-delay:80ms] mx-auto mt-6 max-w-3xl text-[40px] font-semibold leading-[1.15] tracking-[-0.04em] text-fg-neutral sm:text-6xl">
           가계부는 <br className="sm:hidden" />부탁만 하세요.
         </h1>
-        <p className="mx-auto mt-5 max-w-xl text-[17px] leading-7 text-fg-neutral-muted sm:text-lg">
+        <p className="landing-enter [animation-delay:160ms] mx-auto mt-5 max-w-xl text-[17px] leading-7 text-fg-neutral-muted sm:text-lg">
           각자 올리면, 알아서 합쳐져요. 소비·자산·투자가 한 화면에 정리돼요.
         </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <div className="landing-enter [animation-delay:240ms] mt-8 flex flex-wrap justify-center gap-3">
           <GoogleStartButton className="inline-flex min-h-12 items-center rounded-full bg-[#141414] px-6 text-[15px] font-bold text-white hover:bg-black dark:bg-white dark:text-[#141414]">
             Google로 무료 시작하기
           </GoogleStartButton>
@@ -103,7 +58,7 @@ export function BrandHero() {
             로그인 없이 둘러보기
           </Link>
         </div>
-        <AppPreview />
+        <HeroDemo />
       </div>
     </section>
   );
