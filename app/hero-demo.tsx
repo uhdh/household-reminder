@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { IconDocumentLine } from "@karrotmarket/react-monochrome-icon";
 import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
@@ -129,9 +129,8 @@ function ProcessStage({ t }: { t: number }) {
   );
 }
 
-function ResultStage({ t }: { t: number }) {
-  // 결과 카드가 나타난 직후 0 → 실제 값으로 바꿔 AnimatedNumber가 숫자를 올리도록 한다.
-  const counted = t > RESULT_AT + 250;
+// t 대신 boolean만 받아 memo로 감싼다 — 100ms마다 차트(recharts)가 다시 그려지지 않도록.
+const ResultStage = memo(function ResultStage({ counted }: { counted: boolean }) {
   return (
     <div className="animate-[landing-rise_0.4s_ease-out_both]">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -146,7 +145,7 @@ function ResultStage({ t }: { t: number }) {
       </div>
     </div>
   );
-}
+});
 
 export function HeroDemo() {
   const t = useLoopTime();
@@ -167,7 +166,8 @@ export function HeroDemo() {
       <div className="relative h-[330px] overflow-hidden p-4 sm:h-[480px] sm:p-6" aria-hidden="true">
         {stage === "upload" && <UploadStage t={t} />}
         {stage === "process" && <ProcessStage t={t} />}
-        {stage === "result" && <ResultStage t={t} />}
+        {/* 결과 카드가 나타난 직후 0 → 실제 값으로 바꿔 AnimatedNumber가 숫자를 올리도록 한다. */}
+        {stage === "result" && <ResultStage counted={t > RESULT_AT + 250} />}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-28 bg-gradient-to-t from-bg-layer-basement to-transparent sm:block" />
       </div>
     </div>
