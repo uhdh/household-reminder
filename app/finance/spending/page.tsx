@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories } from "@/lib/finance-db";
 import { resolveFinanceViewer } from "@/lib/require-household";
+import { isVoucherPurchaseRecord } from "@/lib/voucher-exclusion";
 import { suggestKeywordFromDescription } from "@/lib/spending-derive";
 import {
   MONTH_RE,
@@ -111,8 +112,9 @@ export default async function SpendingPage({
   const categoryFilter = category === "미분류" ? "미분류" : categoryOptions.some((option) => option.name === category) ? category! : "all";
   const query = q?.trim().slice(0, 50) ?? "";
   // 자산수정은 집계에서는 제외하지만, 사용자가 다른 카테고리로 변경할 수 있도록
-  // 세부 내역 화면에는 계속 노출한다.
-  const monthTx = monthRowsAll.filter((t) => t.included || t.stdCategory === "자산수정");
+  // 세부 내역 화면에는 계속 노출한다. 다만 서울페이 상품권 구매 장부용 행은 집계 제외를 위한
+  // 내부 기록일 뿐이라 예외적으로 숨긴다.
+  const monthTx = monthRowsAll.filter((t) => (t.included || t.stdCategory === "자산수정") && !isVoucherPurchaseRecord(t));
   // 가구 전체에 거래가 하나도 없을 때만 온보딩형 빈 상태를 보여준다. 필터·월 선택으로 인한
   // "이 조건엔 없음"은 아래 목록의 기존 안내 문구로 충분하다.
   const isHouseholdEmpty = classifySpendingEmptyStateScoped(householdHasAny, monthTx) === "onboarding";

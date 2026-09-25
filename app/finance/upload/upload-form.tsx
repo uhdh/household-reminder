@@ -17,7 +17,8 @@ export function UploadForm({
           뱅크샐러드에서 내보낸 엑셀 파일(&apos;뱅샐현황&apos;, &apos;가계부
           내역&apos; 시트 포함)을 업로드하면 자산 현황과 거래 내역이
           저장됩니다. 같은 보유자로 다시 업로드하면 이전 데이터는
-          비활성화되고 새 데이터가 최신 기준으로 반영됩니다.
+          비활성화되고 새 데이터가 최신 기준으로 반영됩니다. 서울페이
+          이용내역 엑셀도 이 화면에서 함께 올릴 수 있어요.
         </p>
 
         <p className="mb-2 text-sm font-medium text-fg-neutral">보유자</p>
@@ -42,6 +43,13 @@ export function UploadForm({
             className="file:mr-3 file:rounded-full file:border-0 file:bg-bg-neutral-weak file:px-3 file:py-1.5 file:text-sm file:text-fg-neutral"
           />
         </FormField>
+
+        <FormField label="파일 비밀번호" className="mb-1">
+          <TextInput type="password" name="filePassword" autoComplete="off" />
+        </FormField>
+        <p className="mb-4 text-xs text-ink-muted">
+          서울페이 파일처럼 비밀번호가 걸린 파일만 입력하세요(보통 생년월일 6자리). 비밀번호는 저장하지 않아요.
+        </p>
 
         {error && <FeedbackMessage tone="critical" className="mb-3">{error}</FeedbackMessage>}
         {success && <FeedbackMessage tone="positive" className="mb-3">{success}</FeedbackMessage>}

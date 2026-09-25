@@ -11,6 +11,7 @@ import {
 } from "@/lib/spending-queries";
 import { exportTransactionsToExcel } from "@/lib/spending-export";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
+import { isVoucherPurchaseRecord } from "@/lib/voucher-exclusion";
 import { NoHouseholdError, requireHousehold } from "@/lib/require-household";
 import { DEMO_HOUSEHOLD_ID } from "@/lib/demo-household";
 
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
   const personFilter: "all" | PersonId = isPersonId(person ?? undefined, personIds) ? (person as PersonId) : "all";
   const beneficiaryFilter = isBeneficiary(beneficiary, personIds) ? beneficiary! : "all";
 
-  const visibleTx = allTx.filter((t) => t.included || t.stdCategory === "자산수정");
+  const visibleTx = allTx.filter((t) => (t.included || t.stdCategory === "자산수정") && !isVoucherPurchaseRecord(t));
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(visibleTx);
 
   const monthTx = visibleTx.filter((t) => monthKeyOf(t.txnDate) === month);

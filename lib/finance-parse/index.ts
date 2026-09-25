@@ -3,9 +3,13 @@ import { parseAssetItems, parseCustomerName, parseInvestmentInputDetails } from 
 import { classifyInvestmentSector } from "./investment-sector";
 import { parseTransactions } from "./ledger";
 import { normalizeInvestmentProductName } from "./investment-utils";
+import { decryptWorkbookBuffer } from "./crypto";
+import { isSeoulPayWorkbook } from "./seoulpay";
 import type { ParsedUpload } from "./types";
 
 export * from "./types";
+export * from "./crypto";
+export * from "./seoulpay";
 
 const FILENAME_PERIOD_RE = /(\d{4}-\d{2}-\d{2})~(\d{4}-\d{2}-\d{2})/;
 
@@ -80,4 +84,26 @@ export async function parseUploadFile(
     assetItems,
     transactions,
   };
+}
+
+/**
+ * 업로드된 파일이 서울페이 이용내역인지 뱅크샐러드 내보내기인지 판별한다. (선택) 비밀번호로
+ * 먼저 복호화한 뒤(암호화 안 된 파일은 그대로 통과) 워크북을 열어 확인하며, 비밀번호 오류는
+ * 그대로 던진다. 워크북 자체를 못 열 만큼 손상/형식이 다른 파일이면 판별을 포기하고 기존
+ * 뱅크샐러드 경로(parseUploadFile)로 넘겨 그쪽의 에러 메시지를 그대로 쓰게 한다 - 여기서 실패를
+ * 삼키는 이유는 비밀번호 오류만은 꼭 이 단계에서 사용자에게 보여야 하기 때문이다.
+ */
+export async function detectUploadFileKind(
+  buffer: ArrayBuffer,
+  password?: string
+): Promise<{ kind: "seoulpay" | "banksalad"; buffer: ArrayBuffer }> {
+  const decrypted = await decryptWorkbookBuffer(buffer, password);
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(decrypted);
+    if (isSeoulPayWorkbook(workbook)) return { kind: "seoulpay", buffer: decrypted };
+  } catch {
+    // 판별 단계에서의 로드 실패는 무시하고 뱅크샐러드 경로로 넘긴다(위 설명 참고).
+  }
+  return { kind: "banksalad", buffer: decrypted };
 }

@@ -16,8 +16,12 @@ const mockParseUploadFile = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/require-household", () => ({ requireHousehold: vi.fn().mockResolvedValue({ userId: "test-user", householdId: HOUSEHOLD_ID, role: "owner", email: "test@example.com" }) }));
 // 업로드 재연결 테스트에서는 실제 뱅크샐러드 엑셀 형식을 구성할 필요 없이, 파싱 결과만 흉내 낸다
-// (검증 대상은 파서가 아니라 app/finance/upload/actions.ts의 업로드/재연결 로직이다).
-vi.mock("@/lib/finance-parse", () => ({ parseUploadFile: (...args: unknown[]) => mockParseUploadFile(...args) }));
+// (검증 대상은 파서가 아니라 app/finance/upload/actions.ts의 업로드/재연결 로직이다). detectUploadFileKind는
+// 실제 구현 그대로 둬야, 가짜 파일("dummy" 바이트)이 자동으로 뱅크샐러드 경로로 판별된다.
+vi.mock("@/lib/finance-parse", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/finance-parse")>()),
+  parseUploadFile: (...args: unknown[]) => mockParseUploadFile(...args),
+}));
 
 async function createUploadSchema(db: ReturnType<typeof drizzle>) {
   await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
