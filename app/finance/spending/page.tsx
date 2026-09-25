@@ -218,12 +218,16 @@ export default async function SpendingPage({
               return (
                 <tr
                   key={t.id}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2 border-b border-stroke-neutral-muted/60 p-4 last:border-0 md:table-row md:p-0 md:[&>td]:py-3"
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5 border-b border-stroke-neutral-muted/60 px-4 py-3 last:border-0 md:table-row md:p-0 md:[&>td]:py-3"
                 >
-                  <td className="col-start-1 row-start-1 md:table-cell md:px-2 md:text-center">{!readOnly && <TransactionCheckbox transactionId={t.id} />}</td>
-                  <td className="col-start-2 row-start-1 text-[13px] text-ink-muted md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px]">{t.txnDate.slice(5)}</td>
-                  <td className="col-span-2 col-start-2 row-start-2 md:table-cell md:whitespace-nowrap md:px-3">
-                    <div className="flex flex-col gap-0.5">
+                  <td className="col-start-1 row-span-3 row-start-1 self-start md:table-cell md:px-2 md:text-center">{!readOnly && <TransactionCheckbox transactionId={t.id} />}</td>
+                  <td className="col-start-2 row-start-2 truncate text-[12px] text-ink-muted md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px]">
+                    {t.txnDate.slice(5)}
+                    {/* 모바일 카드에서는 결제수단을 날짜 줄에 붙인다(표에서는 메모 칸 아래에 표시). */}
+                    {t.paymentMethod && <span className="md:hidden"> · {t.paymentMethod}</span>}
+                  </td>
+                  <td className="col-start-2 row-start-3 min-w-0 md:table-cell md:whitespace-nowrap md:px-3">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 md:flex-col md:flex-nowrap md:items-start">
                       <CategorySelect
                         txnId={t.id}
                         value={t.stdCategory}
@@ -238,7 +242,7 @@ export default async function SpendingPage({
                       {rawCategory !== displayedCategory && <span className="text-[10px] text-ink-muted/70">원본: {rawCategory}</span>}
                     </div>
                   </td>
-                  <td className="col-span-2 col-start-2 row-start-3 md:table-cell md:whitespace-nowrap md:px-3">
+                  <td className="col-start-3 row-start-2 justify-self-end md:table-cell md:whitespace-nowrap md:px-3">
                     <div className="flex items-center gap-1 text-[12px]">
                       {t.personId !== t.beneficiary && (
                         <span className="text-ink-muted">
@@ -249,19 +253,19 @@ export default async function SpendingPage({
                       <BeneficiarySelect txnId={t.id} value={t.beneficiary} returnTo={returnTo} people={personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }))} readOnly={readOnly} />
                     </div>
                   </td>
-                  <td className="col-span-2 col-start-2 row-start-4 md:table-cell md:px-3">
+                  <td className="col-start-2 row-start-1 min-w-0 md:table-cell md:px-3">
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-ink-muted">{t.description ?? "-"}</span>
-                      {t.paymentMethod && <span className="text-[10px] text-ink-muted/70">{t.paymentMethod}</span>}
+                      <span className="truncate font-semibold text-ink md:font-normal md:text-ink-muted">{t.description ?? "-"}</span>
+                      {t.paymentMethod && <span className="hidden text-[10px] text-ink-muted/70 md:inline">{t.paymentMethod}</span>}
                     </div>
                   </td>
-                  <td className="col-start-3 row-start-1 text-right text-[17px] font-extrabold tabular-nums md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px] md:font-semibold">
+                  <td className="col-start-3 row-start-1 text-right text-[16px] font-extrabold tabular-nums md:table-cell md:whitespace-nowrap md:px-3 md:text-[14px] md:font-semibold">
                     <span className={flow === "입금" ? "text-fg-positive" : "text-ink"}>
                       {flow === "입금" ? "+" : "-"}
                       {formatKRW(Math.abs(amount))}
                     </span>
                   </td>
-                  <td className="col-span-2 col-start-2 row-start-5 justify-self-end md:table-cell md:whitespace-nowrap md:px-3 md:text-right">
+                  <td className="col-start-3 row-start-3 justify-self-end md:table-cell md:whitespace-nowrap md:px-3 md:text-right">
                     {!readOnly && <TransactionDeleteButton txnId={t.id} returnTo={returnTo} />}
                   </td>
                 </tr>
