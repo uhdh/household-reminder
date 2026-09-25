@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { BrandHero } from "@/app/brand-hero";
 import { GoogleStartButton } from "@/app/google-start-button";
+import { MaskedWord } from "@/app/masked-word";
 
 // 비로그인 방문자용 소개 페이지. 실데이터를 절대 쿼리하지 않는다.
 
@@ -182,7 +183,7 @@ export function StartView() {
           <div className="text-center">
             <SectionLabel>개인정보 보호</SectionLabel>
             <h2 id="privacy-heading" className="mt-3 text-[32px] font-semibold tracking-[-0.035em] sm:text-5xl">
-              <span className="font-mono tracking-normal text-fg-neutral-muted" aria-hidden="true">******</span> 원본은
+              <MaskedWord word="엑셀 원본" />은
               <br className="sm:hidden" /> 저장하지 않아요.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-[16px] leading-7 text-fg-neutral-muted">돈 이야기라 더 조심해요. 필요한 만큼만 저장하고, 우리 가족만 볼 수 있어요.</p>
