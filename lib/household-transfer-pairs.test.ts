@@ -1,6 +1,6 @@
 // 가구 단위 내 계좌 이동 짝짓기 검증: 배우자 간 계좌이체(cross-person)와 같은 사람의
-// 이체↔수입 오분류를 짝지어 집계에서 빼는지, 짝 조건(부호 반대·금액 동일·±1일·이체 or
-// 타인)을 정확히 지키는지, 잠긴 행은 건드리지 않는지, 그리디 최소시간차 선택과 멱등성,
+// 이체↔이체를 짝지어 집계에서 빼는지, 짝 조건(부호 반대·금액 동일·±1일·같은 사람은 양쪽
+// 이체, 다른 사람은 한쪽 이체)을 정확히 지키는지, 잠긴 행은 건드리지 않는지, 그리디 최소시간차 선택과 멱등성,
 // dryRun이 아무 것도 쓰지 않는지를 확인한다.
 import { drizzle } from "drizzle-orm/pglite";
 import { eq, sql } from "drizzle-orm";
@@ -71,7 +71,7 @@ describe("applyHouseholdTransferPairs", () => {
     const [a, b] = await db
       .insert(transactions)
       .values([
-        row({ personId: "husband", uploadId: UPLOAD_H, beneficiary: "husband", txnType: "지출", amount: "-200000", txnDate: "2026-09-10" }),
+        row({ personId: "husband", uploadId: UPLOAD_H, beneficiary: "husband", txnType: "이체", amount: "-200000", txnDate: "2026-09-10" }),
         row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "200000", txnDate: "2026-09-11", description: "다른 설명" }),
       ])
       .returning();
@@ -87,7 +87,7 @@ describe("applyHouseholdTransferPairs", () => {
     expect(afterB.included).toBe(false);
   });
 
-  test("같은 사람의 이체↔수입은 설명이 달라도 짝짓는다", async () => {
+  test("같은 사람은 양쪽 모두 이체일 때만 짝짓는다(설명이 달라도)", async () => {
     const db = drizzle();
     setDbForTesting(db);
     await createSchema(db);
@@ -95,7 +95,7 @@ describe("applyHouseholdTransferPairs", () => {
       .insert(transactions)
       .values([
         row({ txnType: "이체", amount: "-50000", description: "계좌이체", txnDate: "2026-09-10" }),
-        row({ txnType: "수입", amount: "50000", description: "입금", txnDate: "2026-09-10" }),
+        row({ txnType: "이체", amount: "50000", description: "입금", txnDate: "2026-09-10" }),
       ])
       .returning();
 
@@ -104,6 +104,32 @@ describe("applyHouseholdTransferPairs", () => {
     const rows = await db.select().from(transactions);
     expect(rows.find((r) => r.id === a.id)!.isInternalTransfer).toBe(true);
     expect(rows.find((r) => r.id === b.id)!.isInternalTransfer).toBe(true);
+  });
+
+  test("같은 사람의 이체↔수입·지출은 짝짓지 않는다(급여·정산 같은 실제 거래를 지키기 위해)", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(transactions).values([
+      row({ txnType: "수입", amount: "3000000", description: "급여", txnDate: "2026-09-10" }),
+      row({ txnType: "이체", amount: "-3000000", description: "다른 계좌로", txnDate: "2026-09-10" }),
+      row({ txnType: "지출", amount: "-45000", description: "공연 예매", txnDate: "2026-09-11" }),
+      row({ txnType: "이체", amount: "45000", description: "정산 받음", txnDate: "2026-09-11" }),
+    ]);
+
+    expect(await applyHouseholdTransferPairs(db, HOUSEHOLD_ID)).toEqual({ pairs: 0, rows: 0 });
+  });
+
+  test("다른 사람끼리라도 둘 다 이체가 아니면 짝짓지 않는다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(transactions).values([
+      row({ personId: "husband", txnType: "지출", amount: "-25000", txnDate: "2026-09-10" }),
+      row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "25000", txnDate: "2026-09-10" }),
+    ]);
+
+    expect(await applyHouseholdTransferPairs(db, HOUSEHOLD_ID)).toEqual({ pairs: 0, rows: 0 });
   });
 
   test("같은 사람의 지출↔수입(둘 다 이체가 아님)은 짝짓지 않는다", async () => {
@@ -128,7 +154,7 @@ describe("applyHouseholdTransferPairs", () => {
     const [locked, other] = await db
       .insert(transactions)
       .values([
-        row({ personId: "husband", txnType: "지출", amount: "-70000", txnDate: "2026-09-10", categoryLocked: true }),
+        row({ personId: "husband", txnType: "이체", amount: "-70000", txnDate: "2026-09-10", categoryLocked: true }),
         row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "70000", txnDate: "2026-09-10" }),
       ])
       .returning();
@@ -145,7 +171,7 @@ describe("applyHouseholdTransferPairs", () => {
     setDbForTesting(db);
     await createSchema(db);
     await db.insert(transactions).values([
-      row({ personId: "husband", txnType: "지출", amount: "-40000", txnDate: "2026-09-10" }),
+      row({ personId: "husband", txnType: "이체", amount: "-40000", txnDate: "2026-09-10" }),
       row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "40000", txnDate: "2026-09-11" }), // 정확히 1일
     ]);
     const within = await applyHouseholdTransferPairs(db, HOUSEHOLD_ID);
@@ -153,7 +179,7 @@ describe("applyHouseholdTransferPairs", () => {
 
     await db.execute(sql`DELETE FROM transactions`);
     await db.insert(transactions).values([
-      row({ personId: "husband", txnType: "지출", amount: "-40000", txnDate: "2026-09-10" }),
+      row({ personId: "husband", txnType: "이체", amount: "-40000", txnDate: "2026-09-10" }),
       row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "40000", txnDate: "2026-09-12" }), // 2일
     ]);
     const beyond = await applyHouseholdTransferPairs(db, HOUSEHOLD_ID);
@@ -167,7 +193,7 @@ describe("applyHouseholdTransferPairs", () => {
     const [a, near, far] = await db
       .insert(transactions)
       .values([
-        row({ personId: "husband", txnType: "지출", amount: "-20000", txnDate: "2026-09-10", txnTime: "09:00:00" }),
+        row({ personId: "husband", txnType: "이체", amount: "-20000", txnDate: "2026-09-10", txnTime: "09:00:00" }),
         row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "20000", txnDate: "2026-09-10", txnTime: "09:05:00", description: "가까운쪽" }),
         row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "20000", txnDate: "2026-09-10", txnTime: "09:30:00", description: "먼쪽" }),
       ])
@@ -187,7 +213,7 @@ describe("applyHouseholdTransferPairs", () => {
     setDbForTesting(db);
     await createSchema(db);
     await db.insert(transactions).values([
-      row({ personId: "husband", txnType: "지출", amount: "-90000", txnDate: "2026-09-10" }),
+      row({ personId: "husband", txnType: "이체", amount: "-90000", txnDate: "2026-09-10" }),
       row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "90000", txnDate: "2026-09-10" }),
     ]);
 
@@ -204,7 +230,7 @@ describe("applyHouseholdTransferPairs", () => {
     const [a] = await db
       .insert(transactions)
       .values([
-        row({ personId: "husband", txnType: "지출", amount: "-60000", txnDate: "2026-09-10" }),
+        row({ personId: "husband", txnType: "이체", amount: "-60000", txnDate: "2026-09-10" }),
         row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", amount: "60000", txnDate: "2026-09-10" }),
       ])
       .returning();

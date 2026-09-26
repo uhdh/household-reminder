@@ -26,7 +26,11 @@ function canPair(a: Txn, b: Txn): boolean {
   if (Math.sign(amountA) === Math.sign(amountB)) return false;
   if (Math.abs(amountA) !== Math.abs(amountB)) return false;
   if (daysBetween(a.txnDate, b.txnDate) > MAX_DAY_DIFF) return false;
-  return a.txnType === "이체" || b.txnType === "이체" || a.personId !== b.personId;
+  // 실데이터 검증(적용 전 미리보기) 결과: 같은 사람의 이체↔지출/수입 짝은 대부분 정산·환급 같은
+  // 실제 거래였고(지출:문화 39건 등), 둘 다 이체가 아닌 짝은 우연히 금액만 같은 경우였다.
+  // 그래서 같은 사람은 양쪽 모두 이체일 때만, 다른 사람(부부 간 송금)은 한쪽이라도 이체일 때만 짝으로 본다.
+  if (a.personId === b.personId) return a.txnType === "이체" && b.txnType === "이체";
+  return a.txnType === "이체" || b.txnType === "이체";
 }
 
 function sortKey(t: Txn): string {
@@ -41,8 +45,8 @@ function sortKey(t: Txn): string {
  *
  * 후보 = category_locked=false(사용자가 직접 고치지 않음) AND is_internal_transfer=false(아직
  * 안 잡힘) AND 원본 category≠'서울페이'(결제·구매 장부 제외) AND |금액| > 100.
- * 짝 조건 = 부호 반대 AND |금액| 같음 AND 날짜 차이 ≤ 1일 AND (둘 중 하나라도 거래유형='이체'
- * 이거나 서로 다른 사람). 매칭되면 std_category는 그대로 두고 is_internal_transfer=true,
+ * 짝 조건 = 부호 반대 AND |금액| 같음 AND 날짜 차이 ≤ 1일 AND (같은 사람이면 양쪽 모두 '이체',
+ * 다른 사람이면 한쪽이라도 '이체'). 매칭되면 std_category는 그대로 두고 is_internal_transfer=true,
  * included=false로만 표시한다.
  *
  * 그리디·결정적: (날짜, 시간, id) 순으로 훑으며 각 후보마다 아직 안 짝지어진 것 중 시간 차이가
@@ -54,12 +58,8 @@ function sortKey(t: Txn): string {
  *
  * 같은 |금액|끼리만 비교하므로 실사용 규모(가구당 수천 건)에서 스캔 비용은 작다.
  */
-export async function applyHouseholdTransferPairs(
-  db: AppDb,
-  householdId: string,
-  options: { dryRun?: boolean } = {}
-): Promise<{ pairs: number; rows: number }> {
-  const { transactions: activeTx } = await getActiveTransactions(householdId);
+/** 순수 함수: 활성 거래 목록에서 가구 단위 내 계좌 이동 짝을 찾아 [a, b] 쌍 목록을 돌려준다(DB 쓰기 없음). */
+export function findHouseholdTransferPairs(activeTx: Txn[]): [Txn, Txn][] {
   const candidates = activeTx.filter(isEligibleCandidate).sort((a, b) => (sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0));
 
   // 짝은 |금액|이 같아야 하므로 금액별로 묶어 그 안에서만 비교한다(후보 전체 제곱 스캔 방지).
@@ -72,7 +72,7 @@ export async function applyHouseholdTransferPairs(
   }
 
   const paired = new Set<string>();
-  const matchedIds: string[] = [];
+  const pairs: [Txn, Txn][] = [];
 
   for (const candidate of candidates) {
     if (paired.has(candidate.id)) continue;
@@ -90,9 +90,20 @@ export async function applyHouseholdTransferPairs(
     if (best) {
       paired.add(candidate.id);
       paired.add(best.id);
-      matchedIds.push(candidate.id, best.id);
+      pairs.push([candidate, best]);
     }
   }
+
+  return pairs;
+}
+
+export async function applyHouseholdTransferPairs(
+  db: AppDb,
+  householdId: string,
+  options: { dryRun?: boolean } = {}
+): Promise<{ pairs: number; rows: number }> {
+  const { transactions: activeTx } = await getActiveTransactions(householdId);
+  const matchedIds = findHouseholdTransferPairs(activeTx).flatMap(([a, b]) => [a.id, b.id]);
 
   if (matchedIds.length > 0 && !options.dryRun) {
     await db

@@ -103,7 +103,7 @@ describe("rederive + household 계좌이동 짝짓기 안정성", () => {
       // 매핑으로 분류될 미분류 거래(rederive 대상)
       row({ description: "순대국밥집", stdCategory: null }),
       // 배우자 간 계좌이동 후보(household pairing 대상)
-      row({ personId: "husband", uploadId: UPLOAD_H, beneficiary: "husband", txnType: "지출", category: "이체", subcategory: "계좌", amount: "-150000", txnDate: "2026-09-12", description: "생활비 송금" }),
+      row({ personId: "husband", uploadId: UPLOAD_H, beneficiary: "husband", txnType: "이체", category: "이체", subcategory: "계좌", amount: "-150000", txnDate: "2026-09-12", description: "생활비 송금" }),
       row({ personId: "wife", uploadId: UPLOAD_W, beneficiary: "wife", txnType: "수입", category: "이체", subcategory: "계좌", amount: "150000", txnDate: "2026-09-12", description: "생활비 수령" }),
     ]);
 

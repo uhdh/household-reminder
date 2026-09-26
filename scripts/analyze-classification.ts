@@ -22,6 +22,7 @@ import { getDb } from "../lib/db";
 import { categoryKeywordRules, categoryMappings, categoryRules } from "../lib/finance-db";
 import { buildMappingIndex, buildRuleIndex, mapStdCategory, suggestKeywordFromDescription } from "../lib/spending-derive";
 import { getActiveTransactions, type Txn } from "../lib/spending-queries";
+import { findHouseholdTransferPairs } from "../lib/household-transfer-pairs";
 
 const HOUSEHOLD_ID = process.env.HOUSEHOLD_ID ?? "a1f94fe6-44b6-4a58-ab1a-6433606e3d86";
 const pct = (a: number, b: number) => (b === 0 ? "-" : `${((a / b) * 100).toFixed(1)}%`);
@@ -193,6 +194,32 @@ async function main() {
     (t) => t.txnType !== "이체" && counted(t) && (/(이체|송금|계좌)/.test(t.category ?? "") || /(이체|송금)/.test(t.subcategory ?? ""))
   );
   console.log(`[B4] 수입·지출로 들어왔지만 원본 분류가 이체·송금류이고 집계에 잡힌 거래: ${typedTransferLike.length}건`);
+
+  // ── C. 새 가구 단위 이체 짝(적용 시 실제로 묶일 짝) 중 지금 집계에 잡혀 있는 쪽의 내역 ──
+  const pairs = findHouseholdTransferPairs(all);
+  const affecting = pairs.filter(([a, b]) => counted(a) || counted(b));
+  console.log(`
+[C] 새로 묶일 내 계좌 이동 짝 ${pairs.length}쌍 중 집계에 잡힌 거래가 포함된 짝: ${affecting.length}쌍`);
+  const combo = new Map<string, number>();
+  const countedCats = new Map<string, number>();
+  const sizes = new Map<string, number>();
+  for (const [a, b] of affecting) {
+    const who = a.personId === b.personId ? "같은 사람" : "다른 사람";
+    const k = `${who} ${[a.txnType, b.txnType].sort().join("↔")}`;
+    combo.set(k, (combo.get(k) ?? 0) + 1);
+    for (const t of [a, b]) {
+      if (!counted(t)) continue;
+      const cat = `${t.txnType}:${t.stdCategory ?? "미분류"}`;
+      countedCats.set(cat, (countedCats.get(cat) ?? 0) + 1);
+    }
+    const abs = Math.abs(num(a));
+    const size = abs >= 1_000_000 ? "100만원 이상" : abs >= 100_000 ? "10만~100만원" : "10만원 미만";
+    sizes.set(size, (sizes.get(size) ?? 0) + 1);
+  }
+  const fmt = (m: Map<string, number>) => [...m].sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(", ") || "-";
+  console.log(`  유형: ${fmt(combo)}`);
+  console.log(`  집계에서 빠지게 될 쪽의 (타입:카테고리): ${fmt(countedCats)}`);
+  console.log(`  금액대: ${fmt(sizes)}`);
 }
 
 main()
