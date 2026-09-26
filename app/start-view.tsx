@@ -130,6 +130,42 @@ export function StartView() {
         </div>
       </section>
 
+      <section className="mx-auto grid max-w-5xl items-center gap-10 px-5 pb-20 sm:grid-cols-2 sm:pb-28" aria-labelledby="transfer-heading">
+        <div>
+          <SectionLabel>내 계좌 이동 자동 제외</SectionLabel>
+          <h2 id="transfer-heading" className="mt-3 text-[30px] font-semibold leading-tight tracking-[-0.035em] sm:text-[40px]">
+            내 돈 옮긴 건
+            <br />
+            수입도 지출도 아니에요.
+          </h2>
+          <p className="mt-5 text-[17px] leading-8 text-fg-neutral-muted">
+            일반 가계부 앱에서는 월급 통장에서 적금 통장으로 옮긴 돈, 부부끼리 보낸 생활비가 <b className="font-semibold text-fg-neutral">지출과 수입으로 한 번씩 더 잡혀</b> 합계가
+            부풀려지곤 해요.
+          </p>
+          <p className="mt-3 text-[17px] leading-8 text-fg-neutral-muted">
+            가계부탁은 금액·날짜가 맞는 <b className="font-semibold text-fg-neutral">나간 돈과 들어온 돈을 자동으로 짝지어</b> 집계에서 빼요. 부부가 각자 올린 파일 사이의 송금도 찾아내요.
+          </p>
+        </div>
+        <div className="grid gap-3" aria-hidden="true">
+          <div className="rounded-[20px] border border-stroke-neutral-muted p-5">
+            <p className="text-[13px] font-semibold text-fg-neutral-muted">일반 가계부</p>
+            <ul className="mt-3 space-y-2 text-[14px]">
+              <li className="flex justify-between gap-3"><span>월급 통장 → 적금 통장</span><span className="shrink-0 font-semibold tabular-nums text-fg-critical">지출 -50만원</span></li>
+              <li className="flex justify-between gap-3"><span>적금 통장 ← 월급 통장</span><span className="shrink-0 font-semibold tabular-nums text-fg-positive">수입 +50만원</span></li>
+            </ul>
+            <p className="mt-3 border-t border-stroke-neutral-muted pt-3 text-[13px] text-fg-neutral-muted">수입·지출이 둘 다 50만원씩 부풀려짐</p>
+          </div>
+          <div className="rounded-[20px] border border-stroke-brand-weak bg-bg-brand-weak p-5">
+            <p className="text-[13px] font-semibold text-fg-brand">가계부탁</p>
+            <ul className="mt-3 space-y-2 text-[14px]">
+              <li className="flex justify-between gap-3"><span>월급 통장 → 적금 통장</span><span className="shrink-0 rounded-full bg-bg-layer-default px-2 py-0.5 text-[12px] font-semibold text-fg-neutral-muted">내 계좌 이동</span></li>
+              <li className="flex justify-between gap-3"><span>지훈 → 수아 생활비</span><span className="shrink-0 rounded-full bg-bg-layer-default px-2 py-0.5 text-[12px] font-semibold text-fg-neutral-muted">내 계좌 이동</span></li>
+            </ul>
+            <p className="mt-3 border-t border-stroke-brand-weak pt-3 text-[13px] text-fg-neutral">짝을 찾아 자동으로 집계에서 제외 ✓</p>
+          </div>
+        </div>
+      </section>
+
       <section className="mx-2 rounded-[28px] bg-bg-layer-basement px-5 py-20 sm:mx-4 sm:py-28" aria-labelledby="features-heading">
         <div className="mx-auto max-w-5xl">
           <div className="text-center">
