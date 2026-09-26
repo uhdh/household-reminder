@@ -3,7 +3,7 @@
 // 부수효과(활성 업로드/asset_items 무변경, 수동입력/서울페이 보존)를 검증한다.
 import ExcelJS from "exceljs";
 import { drizzle } from "drizzle-orm/pglite";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { setDbForTesting } from "@/lib/db";
 import { people, transactions, uploads } from "@/lib/finance-db";
@@ -298,5 +298,40 @@ describe("uploadAction - 가맹점 기억(merchant memory)", () => {
     const newRow = (await db.select().from(transactions)).find((t) => t.txnDate === "2026-09-06")!;
     expect(newRow.stdCategory).toBe("식비"); // 매핑 테이블엔 없지만 가맹점 기억으로 분류됨
     expect(newRow.categoryLocked).toBe(false); // 자동 분류일 뿐 잠기지는 않음
+  });
+
+  test("같은 기간 파일을 다시 올려도 직접 고친 분류·사용 대상은 그대로 유지된다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(people).values([
+      { id: "husband", householdId: HOUSEHOLD_ID, displayName: "지훈" },
+      { id: "wife", householdId: HOUSEHOLD_ID, displayName: "수아" },
+    ]);
+    const { uploadAction } = await import("./actions");
+    const txns = [
+      { txnDate: "2026-09-06", txnTime: "12:30:00", txnType: "지출", category: "식비", subcategory: "한식", description: "동네 김밥", amount: -8000, paymentMethod: "체크카드" },
+      { txnDate: "2026-09-07", txnTime: "09:00:00", txnType: "지출", category: "식비", subcategory: "한식", description: "동네 김밥", amount: -8000, paymentMethod: "체크카드" },
+    ];
+    const upload = async () => {
+      mockParseUploadFile.mockResolvedValue({ customerName: null, periodStart: "2026-09-01", periodEnd: "2026-09-30", assetItems: [], transactions: txns });
+      return decodeURIComponent((await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "가계부.xlsx"))))).split("success=")[1]);
+    };
+
+    await upload();
+    // 사용자가 첫 거래만 "선물"로 고치고 사용 대상을 배우자로 바꿈(잠금)
+    const first = (await db.select().from(transactions)).find((t) => t.txnDate === "2026-09-06")!;
+    await db.update(transactions).set({ stdCategory: "선물", categoryLocked: true, beneficiary: "wife" }).where(eq(transactions.id, first.id));
+
+    const message = await upload();
+    expect(message).toContain("직접 고친 분류 1건 유지");
+    const rows = await db.select().from(transactions);
+    expect(rows).toHaveLength(2); // 중복 없이 교체
+    const restored = rows.find((t) => t.txnDate === "2026-09-06")!;
+    expect(restored.stdCategory).toBe("선물");
+    expect(restored.categoryLocked).toBe(true);
+    expect(restored.beneficiary).toBe("wife");
+    // 고치지 않은 같은 가맹점 거래는 자동 분류 그대로(잠금 안 됨)
+    expect(rows.find((t) => t.txnDate === "2026-09-07")!.categoryLocked).toBe(false);
   });
 });

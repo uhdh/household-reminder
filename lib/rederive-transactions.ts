@@ -4,15 +4,13 @@ import { categoryKeywordRules, categoryMappings, categoryRules, transactions } f
 import type { ParsedTransaction } from "@/lib/finance-parse/types";
 import {
   buildMappingIndex,
-  buildMerchantMemory,
-  buildRawCategoryFallback,
+  buildHistoryIndex,
   buildRuleIndex,
   computeIncluded,
   isTransferCandidate,
   mapStdCategory,
   type CategoryKeywordRule,
-  type MerchantMemoryIndex,
-  type RawCategoryFallbackIndex,
+  type HistoryIndex,
 } from "@/lib/spending-derive";
 
 /** ILIKE 패턴에 쓸 문자열에서 %, _, \(와일드카드/이스케이프 특수문자)를 리터럴로 이스케이프한다. */
@@ -48,33 +46,27 @@ export interface CategoryDerivationContext {
   mappingIndex: Map<string, string>;
   ruleIndex: Map<string, string>;
   keywordRules: CategoryKeywordRule[];
-  merchantMemory: MerchantMemoryIndex;
-  rawFallback: RawCategoryFallbackIndex;
+  history: HistoryIndex;
 }
 
 /**
- * 매핑/결제수단 규칙/키워드 규칙과, mapStdCategory의 새 우선순위 단계인 가맹점 기억·원본 조합
- * 다수결 폴백까지 이 가구 데이터로 한 번에 읽어 mapStdCategory에 그대로 넘길 수 있게 묶는다.
- * 업로드(뱅크샐러드/서울페이 저장 로직)와 rederiveTransactions가 공통으로 쓴다.
+ * 매핑/결제수단 규칙/키워드 규칙과 분류 이력(buildHistoryIndex)을 이 가구 데이터로 한 번에 읽어
+ * mapStdCategory에 그대로 넘길 수 있게 묶는다. 업로드와 rederiveTransactions가 공통으로 쓴다.
  *
- * excludeFromFallback: rederiveTransactions가 지금 막 재계산하려는 후보 행(category_locked=false AND
- * candidateFilter)들을 그대로 넘겨준다. 이 후보들은 아직 재계산 전이라 std_category가 "곧 바뀔 예정인
- * 옛 값"을 들고 있는데, 원본 조합 폴백 집계에 자기 자신의 옛 값이 섞이면 매핑을 지워도 스스로를
- * 근거로 옛 분류를 재확인해버려(자기참조) 절대 미분류로 못 돌아가는 문제가 생긴다. 그래서 이
- * 조건에 해당하는 행은 폴백 집계에서 제외한다 - locked 행(가맹점 기억과 동일한 안정된 근거)이나
- * 이번에 안 건드리는 다른 행은 계속 신뢰할 수 있는 근거로 남는다. 업로드 경로는 아직 DB에 없는
- * 새 행을 분류하는 것이라 자기참조가 애초에 불가능하므로 생략(undefined)해도 된다.
+ * excludeFromHistory: rederiveTransactions가 지금 재계산하려는 후보 행 조건. 이 행들의 "곧 바뀔 옛 값"이
+ * 이력에 섞이면 매핑을 지워도 스스로를 근거로 옛 분류를 재확인하는 자기참조가 생기므로 뺀다.
+ * 업로드는 반드시 기존 기간 거래를 지우기 "전에" 호출해야 한다 - 그래야 다시 올리는 기간의 이력도 쓴다.
  */
 export async function loadCategoryDerivationContext(
   db: AppDb,
   householdId: string,
-  options: { excludeFromFallback?: SQL } = {}
+  options: { excludeFromHistory?: SQL } = {}
 ): Promise<CategoryDerivationContext> {
-  const fallbackWhere = options.excludeFromFallback
-    ? and(eq(transactions.householdId, householdId), isNotNull(transactions.stdCategory), not(options.excludeFromFallback))
+  const historyWhere = options.excludeFromHistory
+    ? and(eq(transactions.householdId, householdId), isNotNull(transactions.stdCategory), not(options.excludeFromHistory))
     : and(eq(transactions.householdId, householdId), isNotNull(transactions.stdCategory));
 
-  const [mappingRows, ruleRows, keywordRuleRows, memorySourceRows, fallbackSourceRows] = await Promise.all([
+  const [mappingRows, ruleRows, keywordRuleRows, historyRows] = await Promise.all([
     db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
     db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
     db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
@@ -82,35 +74,24 @@ export async function loadCategoryDerivationContext(
       .select({
         description: transactions.description,
         txnType: transactions.txnType,
-        stdCategory: transactions.stdCategory,
-        categoryLocked: transactions.categoryLocked,
-        category: transactions.category,
-        subcategory: transactions.subcategory,
-      })
-      .from(transactions)
-      .where(and(eq(transactions.householdId, householdId), eq(transactions.categoryLocked, true))),
-    db
-      .select({
-        txnType: transactions.txnType,
         category: transactions.category,
         subcategory: transactions.subcategory,
         stdCategory: transactions.stdCategory,
       })
       .from(transactions)
-      .where(fallbackWhere),
+      .where(historyWhere),
   ]);
 
   return {
     mappingIndex: buildMappingIndex(mappingRows),
     ruleIndex: buildRuleIndex(ruleRows),
     keywordRules: keywordRuleRows,
-    merchantMemory: buildMerchantMemory(memorySourceRows),
-    rawFallback: buildRawCategoryFallback(fallbackSourceRows),
+    history: buildHistoryIndex(historyRows),
   };
 }
 
 /**
- * 가구의 매핑/결제수단 규칙/키워드 규칙(+가맹점 기억/원본 조합 폴백)을 다시 읽어, candidateFilter에
+ * 가구의 매핑/결제수단 규칙/키워드 규칙(+분류 이력)을 다시 읽어, candidateFilter에
  * 걸리는 거래 중 사용자가 직접 고치지 않은(category_locked=false) 것만 mapStdCategory 우선순위대로
  * 재계산한다. 매핑·규칙의 추가/수정/삭제 후 영향받는 거래를 일괄 갱신하는 공용 함수 - 값이 실제로
  * 바뀐 행만 UPDATE하며, household_id로 항상 스코프를 건다. options.dryRun이면 변경 내역만 계산하고
@@ -132,8 +113,8 @@ export async function rederiveTransactions(
   // "이 행이 이번에 재계산될 후보인가"를 한 번만 정의해 후보 조회와 폴백 집계 제외(자기참조
   // 방지) 양쪽에 그대로 재사용한다.
   const isCandidateCondition = and(eq(transactions.categoryLocked, false), candidateFilter);
-  const { mappingIndex, ruleIndex, keywordRules, merchantMemory, rawFallback } = await loadCategoryDerivationContext(db, householdId, {
-    excludeFromFallback: isCandidateCondition,
+  const { mappingIndex, ruleIndex, keywordRules, history } = await loadCategoryDerivationContext(db, householdId, {
+    excludeFromHistory: isCandidateCondition,
   });
 
   const candidates = await db
@@ -171,7 +152,7 @@ export async function rederiveTransactions(
       amount: Number(row.amount),
       paymentMethod: row.paymentMethod,
     };
-    const stdCategory = mapStdCategory(pseudo, mappingIndex, ruleIndex, keywordRules, { merchantMemory, rawFallback });
+    const stdCategory = mapStdCategory(pseudo, mappingIndex, ruleIndex, keywordRules, { history, historyFirst: false });
     const included = stdCategory !== "자산수정" && computeIncluded(pseudo, isTransferCandidate(pseudo), row.isInternalTransfer);
 
     if (stdCategory !== row.stdCategory || included !== row.included) {

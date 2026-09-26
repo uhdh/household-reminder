@@ -1,14 +1,13 @@
 import { describe, expect, test } from "vitest";
 import type { ParsedTransaction } from "@/lib/finance-parse/types";
 import {
-  buildMerchantMemory,
-  buildRawCategoryFallback,
+  buildHistoryIndex,
   buildRuleIndex,
   deriveTransactionFields,
   mapStdCategory,
   matchSelfTransferPairs,
-  type MerchantMemorySourceRow,
-  type RawCategoryFallbackSourceRow,
+  predictFromHistory,
+  type HistorySourceRow,
 } from "@/lib/spending-derive";
 
 function transaction(overrides: Partial<ParsedTransaction>): ParsedTransaction {
@@ -122,101 +121,66 @@ describe("mapStdCategory", () => {
     expect(suggestKeywordFromDescription("SK텔레콤(자동납부)")).toBe("SK텔레콤");
   });
 
-  test("우선순위: 가맹점 기억은 매핑·급여 규칙이 비었을 때만 채우고, 원본 조합 폴백보다는 위", () => {
+  test("우선순위(새로 올리는 거래): 키워드·결제수단 규칙 → 분류 이력 → 급여 → 매핑", () => {
+    const history = buildHistoryIndex([
+      historyRow({ description: "스타벅스", category: "카페", subcategory: "미분류", stdCategory: "간식" }),
+    ]);
     const mappings = new Map([["지출|카페|미분류", "카페"]]);
-    const memory = new Map([["스타벅스|지출", "식비"]]);
-
-    // 매핑이 있으면 매핑이 이긴다(잠긴 예외에서 배운 값이 멀쩡한 자동 분류를 덮어쓰지 않도록)
     const spendRow = transaction({ txnType: "지출", category: "카페", subcategory: "미분류", description: "스타벅스", paymentMethod: "체크카드" });
-    expect(mapStdCategory(spendRow, mappings, new Map(), [], { merchantMemory: memory })).toBe("카페");
 
-    // 내장 급여 규칙도 가맹점 기억보다 우선
-    const salaryMemory = new Map([["OO상사급여|수입", "기타수입"]]);
-    const salaryRow = transaction({ txnType: "수입", description: "OO상사급여", category: "금융수입", subcategory: "미분류" });
-    expect(mapStdCategory(salaryRow, new Map(), new Map(), [], { merchantMemory: salaryMemory })).toBe("월급");
+    // 새 거래: 이력이 매핑보다 먼저
+    expect(mapStdCategory(spendRow, mappings, new Map(), [], { history, historyFirst: true })).toBe("간식");
+    // 기존 거래 다시 분류: 매핑이 이기고, 이력은 비었을 때만
+    expect(mapStdCategory(spendRow, mappings, new Map(), [], { history, historyFirst: false })).toBe("카페");
+    expect(mapStdCategory(spendRow, new Map(), new Map(), [], { history, historyFirst: false })).toBe("간식");
 
-    // 매핑이 없는 조합이면 가맹점 기억이 채우고, 원본 조합 폴백보다 우선한다
-    const unmappedRow = transaction({ txnType: "지출", category: "기타소비", subcategory: "미분류", description: "스타벅스" });
-    const fallback = new Map([["지출|기타소비|미분류", "기타"]]);
-    expect(mapStdCategory(unmappedRow, new Map(), new Map(), [], { merchantMemory: memory, rawFallback: fallback })).toBe("식비");
-
-    // 결제수단·키워드 규칙은 여전히 최우선
+    // 사용자 규칙(결제수단·키워드)은 항상 최우선
     const rules = buildRuleIndex([{ txnType: "지출", paymentMethod: "체크카드", stdCategory: "결제수단우선" }]);
-    expect(mapStdCategory(spendRow, mappings, rules, [], { merchantMemory: memory })).toBe("결제수단우선");
+    expect(mapStdCategory(spendRow, mappings, rules, [], { history, historyFirst: true })).toBe("결제수단우선");
     const keywordRules = [{ txnType: "지출", keyword: "스타벅스", stdCategory: "키워드우선" }];
-    expect(mapStdCategory(spendRow, mappings, new Map(), keywordRules, { merchantMemory: memory })).toBe("키워드우선");
+    expect(mapStdCategory(spendRow, mappings, new Map(), keywordRules, { history, historyFirst: true })).toBe("키워드우선");
   });
 
-  test("우선순위: 원본 조합 다수결 폴백은 매핑에도 없을 때만, null보다는 위에서 적용된다", () => {
-    const row = transaction({ txnType: "지출", category: "기타소비", subcategory: "미분류", description: "알수없는가맹점" });
-    expect(mapStdCategory(row, new Map())).toBeNull(); // 폴백 없으면 그대로 null
-
-    const fallback = new Map([["지출|기타소비|미분류", "생활용품"]]);
-    expect(mapStdCategory(row, new Map(), new Map(), [], { rawFallback: fallback })).toBe("생활용품");
-
-    // 매핑이 있으면 폴백보다 매핑이 이긴다
-    const mappings = new Map([["지출|기타소비|미분류", "매핑값"]]);
-    expect(mapStdCategory(row, mappings, new Map(), [], { rawFallback: fallback })).toBe("매핑값");
+  test("이력은 이체에는 쓰지 않는다(저축 이체 → 월급 같은 오류 방지)", () => {
+    const history = buildHistoryIndex([historyRow({ txnType: "수입", category: "저축", subcategory: "미분류", stdCategory: "월급" })]);
+    const transfer = transaction({ txnType: "이체", category: "저축", subcategory: "미분류", description: "적금" });
+    expect(mapStdCategory(transfer, new Map(), new Map(), [], { history, historyFirst: true })).toBeNull();
   });
 });
 
-describe("buildMerchantMemory", () => {
-  function memoryRow(overrides: Partial<MerchantMemorySourceRow>): MerchantMemorySourceRow {
-    return {
-      description: "스타벅스",
-      txnType: "지출",
-      stdCategory: "식비",
-      categoryLocked: true,
-      category: "카페",
-      subcategory: "미분류",
-      ...overrides,
-    };
-  }
+function historyRow(overrides: Partial<HistorySourceRow>): HistorySourceRow {
+  return { description: "가게", txnType: "지출", category: "식비", subcategory: "식비", stdCategory: "식비", ...overrides };
+}
 
-  test("잠긴 행에서 80% 이상 일치하는 (가맹점, 거래유형)만 기억한다", () => {
-    const rows = [
-      memoryRow({}),
-      memoryRow({}),
-      memoryRow({}),
-      memoryRow({ stdCategory: "카페" }), // 3/4=75% < 80% -> 기억 안 함
-    ];
-    expect(buildMerchantMemory(rows).get("스타벅스|지출")).toBeUndefined();
+describe("predictFromHistory (가맹점+분류 → 분류 → 대분류 → 가맹점)", () => {
+  const history = buildHistoryIndex([
+    // "서비스구독"은 보통 구독이지만, 쏘카만 렌트카
+    historyRow({ description: "넷플릭스", category: "온라인쇼핑", subcategory: "서비스구독", stdCategory: "구독" }),
+    historyRow({ description: "유튜브", category: "온라인쇼핑", subcategory: "서비스구독", stdCategory: "구독" }),
+    historyRow({ description: "쏘카", category: "온라인쇼핑", subcategory: "서비스구독", stdCategory: "렌트카" }),
+    historyRow({ description: "김밥집", category: "식비", subcategory: "식비", stdCategory: "식비" }),
+    historyRow({ description: "빵집", category: "식비", subcategory: "베이커리", stdCategory: "간식" }),
+  ]);
 
-    const dominant = [...rows.slice(0, 3), memoryRow({})]; // 4/4 = 100%
-    expect(buildMerchantMemory(dominant).get("스타벅스|지출")).toBe("식비");
+  test("같은 가맹점이 같은 뱅크샐러드 분류로 왔던 적이 있으면 그 카테고리(예외 가맹점)", () => {
+    expect(predictFromHistory(transaction({ txnType: "지출", category: "온라인쇼핑", subcategory: "서비스구독", description: "쏘카" }), history)).toBe("렌트카");
   });
 
-  test("잠기지 않은(category_locked=false) 행이나 std_category가 없는 행은 학습 대상에서 제외한다", () => {
-    const rows = [
-      memoryRow({ categoryLocked: false }),
-      memoryRow({ stdCategory: null }),
-    ];
-    expect(buildMerchantMemory(rows).size).toBe(0);
+  test("처음 보는 가맹점은 그 뱅크샐러드 분류의 최다 카테고리", () => {
+    expect(predictFromHistory(transaction({ txnType: "지출", category: "온라인쇼핑", subcategory: "서비스구독", description: "디즈니플러스" }), history)).toBe("구독");
   });
 
-  test("서울페이 상품권 구매 장부 행(category='서울페이', subcategory='구매')은 잠겨 있어도 학습에서 제외한다", () => {
-    const rows = [
-      memoryRow({ category: "서울페이", subcategory: "구매", stdCategory: "자산수정", description: "온누리상품권 구매" }),
-      memoryRow({ category: "서울페이", subcategory: "구매", stdCategory: "자산수정", description: "온누리상품권 구매" }),
-    ];
-    expect(buildMerchantMemory(rows).size).toBe(0);
-  });
-});
-
-describe("buildRawCategoryFallback", () => {
-  function fallbackRow(overrides: Partial<RawCategoryFallbackSourceRow>): RawCategoryFallbackSourceRow {
-    return { txnType: "지출", category: "기타소비", subcategory: "미분류", stdCategory: "생활용품", ...overrides };
-  }
-
-  test("이 가구의 기존 분류(잠겼든 자동 매핑됐든) 중 80% 이상 일치하는 조합만 폴백으로 쓴다", () => {
-    const rows = [fallbackRow({}), fallbackRow({}), fallbackRow({}), fallbackRow({ stdCategory: "잡화" })]; // 3/4=75%
-    expect(buildRawCategoryFallback(rows).get("지출|기타소비|미분류")).toBeUndefined();
-
-    const rows2 = [...rows.slice(0, 3), fallbackRow({})]; // 4/4=100%
-    expect(buildRawCategoryFallback(rows2).get("지출|기타소비|미분류")).toBe("생활용품");
+  test("분류 조합도 처음이면 대분류 기준, 그것도 없으면 가맹점 기준", () => {
+    expect(predictFromHistory(transaction({ txnType: "지출", category: "식비", subcategory: "한식", description: "처음가게" }), history)).toBe("식비");
+    expect(predictFromHistory(transaction({ txnType: "지출", category: "새분류", subcategory: "미분류", description: "김밥집" }), history)).toBe("식비");
   });
 
-  test("std_category가 없는 행은 집계에서 제외한다", () => {
-    expect(buildRawCategoryFallback([fallbackRow({ stdCategory: null })]).size).toBe(0);
+  test("자산수정·미분류·서울페이 구매 장부는 학습하지 않는다", () => {
+    const h = buildHistoryIndex([
+      historyRow({ stdCategory: "자산수정" }),
+      historyRow({ stdCategory: "미분류" }),
+      historyRow({ category: "서울페이", subcategory: "구매", stdCategory: "기타" }),
+    ]);
+    expect(predictFromHistory(transaction({ txnType: "지출", category: "식비", subcategory: "식비", description: "가게" }), h)).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
-import { and, eq, gte, isNull, lte, notInArray, or } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, notInArray, or, type SQL } from "drizzle-orm";
 import { getDb, type AppDb } from "@/lib/db";
 import { assetItems, transactions, uploads } from "@/lib/finance-db";
 import {
@@ -13,7 +13,7 @@ import {
   type ParsedTransaction,
   type ParsedUpload,
 } from "@/lib/finance-parse";
-import { deriveTransactionFields } from "@/lib/spending-derive";
+import { computeIncluded, deriveTransactionFields, isTransferCandidate, type DerivedResult } from "@/lib/spending-derive";
 import { requireHousehold } from "@/lib/require-household";
 import { getHouseholdPeople, isPersonId } from "@/lib/spending-queries";
 import { getOrCreateActiveUploadId } from "@/lib/manual-upload";
@@ -82,6 +82,14 @@ export async function uploadAction(formData: FormData) {
 
   const uploadId = randomUUID();
 
+  // 분류 이력과 "직접 고친 분류"는 기존 기간 거래를 지우기 전에 읽어 둔다(다시 올리는 기간의 이력도 쓰기 위해).
+  const context = await loadCategoryDerivationContext(db, householdId);
+  const lockedSnapshot: LockedSnapshot =
+    parsed.periodStart && parsed.periodEnd
+      ? await snapshotLockedRows(db, householdId, personId, parsed.periodStart, parsed.periodEnd,
+          or(isNull(transactions.category), notInArray(transactions.category, PRESERVED_CATEGORIES)))
+      : new Map();
+
   await db
     .update(uploads)
     .set({ isActive: false })
@@ -134,13 +142,13 @@ export async function uploadAction(formData: FormData) {
     );
   }
 
-  const context = await loadCategoryDerivationContext(db, householdId);
   const derived = deriveTransactionFields(parsed.transactions, context.mappingIndex, context.ruleIndex, context.keywordRules, {
-    merchantMemory: context.merchantMemory,
-    rawFallback: context.rawFallback,
+    history: context.history,
+    historyFirst: true,
   });
-  const transactionsWithDerived = parsed.transactions.map((t, i) => ({ t, d: derived[i] }));
-  const classifiedCount = derived.filter((d) => d.stdCategory !== null).length;
+  const transactionsWithDerived = parsed.transactions.map((t, i) => ({ t, d: withRestoredLock(t, derived[i], lockedSnapshot) }));
+  const classifiedCount = transactionsWithDerived.filter(({ d }) => d.stdCategory !== null).length;
+  const restoredCount = transactionsWithDerived.filter(({ d }) => d.categoryLocked).length;
 
   for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {
     await db.insert(transactions).values(
@@ -159,7 +167,8 @@ export async function uploadAction(formData: FormData) {
         stdCategory: d.stdCategory,
         included: d.included,
         isInternalTransfer: d.isInternalTransfer,
-        beneficiary: personId,
+        beneficiary: d.beneficiary ?? personId,
+        categoryLocked: d.categoryLocked,
       }))
     );
   }
@@ -173,7 +182,8 @@ export async function uploadAction(formData: FormData) {
   const exclusionSuffix = excludedCount > 0 ? `, 서울페이 상품권 구매 출금 ${excludedCount}건 집계 제외` : "";
   const classifiedSuffix = classifiedCount > 0 ? `, 자동 분류 ${classifiedCount}건` : "";
   const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
-  const summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${parsed.transactions.length}건 저장 완료${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
+  const restoredSuffix = restoredCount > 0 ? `, 직접 고친 분류 ${restoredCount}건 유지` : "";
+  const summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${parsed.transactions.length}건 저장 완료${exclusionSuffix}${classifiedSuffix}${restoredSuffix}${pairSuffix}`;
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
 }
 
@@ -204,6 +214,13 @@ async function handleSeoulPayUpload(
   const allDates = [...parsed.payments.map((p) => p.txnDate), ...parsed.purchases.map((p) => p.txnDate)];
   const periodStart = parsed.periodStart ?? (allDates.length ? allDates.reduce((a, b) => (a < b ? a : b)) : null);
   const periodEnd = parsed.periodEnd ?? (allDates.length ? allDates.reduce((a, b) => (a > b ? a : b)) : null);
+  const context = await loadCategoryDerivationContext(db, householdId);
+  const lockedSnapshot: LockedSnapshot =
+    periodStart && periodEnd
+      ? await snapshotLockedRows(db, householdId, personId, periodStart, periodEnd,
+          and(eq(transactions.category, "서울페이"), eq(transactions.subcategory, "결제")))
+      : new Map();
+
   if (periodStart && periodEnd) {
     await db.delete(transactions).where(and(
       eq(transactions.householdId, householdId),
@@ -213,8 +230,6 @@ async function handleSeoulPayUpload(
       lte(transactions.txnDate, periodEnd)
     ));
   }
-
-  const context = await loadCategoryDerivationContext(db, householdId);
 
   // 결제 내역: 기존 뱅크샐러드 업로드와 같은 mapStdCategory/computeIncluded 경로를 그대로 태운다.
   const paymentPseudos: ParsedTransaction[] = parsed.payments.map((p) => ({
@@ -228,11 +243,11 @@ async function handleSeoulPayUpload(
     paymentMethod: "서울페이",
   }));
   const derived = deriveTransactionFields(paymentPseudos, context.mappingIndex, context.ruleIndex, context.keywordRules, {
-    merchantMemory: context.merchantMemory,
-    rawFallback: context.rawFallback,
+    history: context.history,
+    historyFirst: true,
   });
-  const paymentRows = paymentPseudos.map((t, i) => ({ t, d: derived[i] }));
-  const classifiedCount = derived.filter((d) => d.stdCategory !== null).length;
+  const paymentRows = paymentPseudos.map((t, i) => ({ t, d: withRestoredLock(t, derived[i], lockedSnapshot) }));
+  const classifiedCount = paymentRows.filter(({ d }) => d.stdCategory !== null).length;
 
   for (const rows of chunk(paymentRows, INSERT_CHUNK_SIZE)) {
     await db.insert(transactions).values(
@@ -251,7 +266,8 @@ async function handleSeoulPayUpload(
         stdCategory: d.stdCategory,
         included: d.included,
         isInternalTransfer: d.isInternalTransfer,
-        beneficiary: personId,
+        beneficiary: d.beneficiary ?? personId,
+        categoryLocked: d.categoryLocked,
       }))
     );
   }
@@ -287,4 +303,66 @@ async function handleSeoulPayUpload(
   const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
   const summary = `${displayName}님 서울페이 결제 ${parsed.payments.length}건 추가${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
+}
+
+// ── 다시 올릴 때 "직접 고친 분류" 되살리기 ──────────────────────────────
+// 기간 삭제 후 재삽입하면 사용자가 고친(잠긴) 분류가 사라지므로, 지우기 전에 기억해 두었다가 날짜·시간·
+// 타입·금액·메모가 똑같은 거래가 다시 들어오면 그 카테고리·사용 대상·잠금을 그대로 되살린다.
+type LockedSnapshot = Map<string, { stdCategory: string | null; beneficiary: string }[]>;
+
+function restoreKey(t: { txnDate: string; txnTime: string | null; txnType: string; amount: number | string; description: string | null }): string {
+  return `${t.txnDate}|${(t.txnTime ?? "").slice(0, 8)}|${t.txnType}|${Number(t.amount)}|${(t.description ?? "").trim()}`;
+}
+
+async function snapshotLockedRows(
+  db: AppDb,
+  householdId: string,
+  personId: string,
+  periodStart: string,
+  periodEnd: string,
+  categoryCondition: SQL | undefined
+): Promise<LockedSnapshot> {
+  const rows = await db
+    .select({
+      txnDate: transactions.txnDate,
+      txnTime: transactions.txnTime,
+      txnType: transactions.txnType,
+      amount: transactions.amount,
+      description: transactions.description,
+      stdCategory: transactions.stdCategory,
+      beneficiary: transactions.beneficiary,
+    })
+    .from(transactions)
+    .where(and(
+      eq(transactions.householdId, householdId),
+      eq(transactions.personId, personId),
+      eq(transactions.categoryLocked, true),
+      gte(transactions.txnDate, periodStart),
+      lte(transactions.txnDate, periodEnd),
+      categoryCondition
+    ));
+  const snapshot: LockedSnapshot = new Map();
+  for (const row of rows) {
+    const key = restoreKey(row);
+    const list = snapshot.get(key) ?? [];
+    list.push({ stdCategory: row.stdCategory, beneficiary: row.beneficiary });
+    snapshot.set(key, list);
+  }
+  return snapshot;
+}
+
+function withRestoredLock(
+  t: ParsedTransaction,
+  d: DerivedResult,
+  snapshot: LockedSnapshot
+): DerivedResult & { beneficiary: string | null; categoryLocked: boolean } {
+  const saved = snapshot.get(restoreKey(t))?.shift(); // 같은 키가 여러 건이면 하나씩 소진
+  if (!saved) return { ...d, beneficiary: null, categoryLocked: false };
+  return {
+    ...d,
+    stdCategory: saved.stdCategory,
+    included: saved.stdCategory !== "자산수정" && computeIncluded(t, isTransferCandidate(t), d.isInternalTransfer),
+    beneficiary: saved.beneficiary,
+    categoryLocked: true,
+  };
 }
