@@ -3,6 +3,7 @@ import {
   flowLabel,
   getActiveTransactions,
   isBeneficiary,
+  isExcludedFromTotals,
   isPersonId,
   latestMonth,
   monthKeyOf,
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get("category");
   const q = searchParams.get("q");
 
-  const flowFilter = flow === "income" || flow === "expense" ? flow : "all";
+  const flowFilter = flow === "income" || flow === "expense" || flow === "excluded" ? flow : "all";
   const categoryFilter = category && category !== "all" ? category : "all";
   const query = q?.trim().slice(0, 50) ?? "";
 
@@ -48,12 +49,17 @@ export async function GET(request: NextRequest) {
   const personFilter: "all" | PersonId = isPersonId(person ?? undefined, personIds) ? (person as PersonId) : "all";
   const beneficiaryFilter = isBeneficiary(beneficiary, personIds) ? beneficiary! : "all";
 
-  const visibleTx = allTx.filter((t) => (t.included || t.stdCategory === "자산수정") && !isVoucherPurchaseRecord(t));
+  // 세부 내역 화면과 같은 기준 목록 전환: "집계 제외" 필터는 included=false인 행(장부용 서울페이
+  // 구매 행 제외)을, 그 외에는 기존과 같이 included이거나 자산수정인 행을 기준으로 한다.
+  const visibleTx =
+    flowFilter === "excluded"
+      ? allTx.filter((t) => isExcludedFromTotals(t) && !isVoucherPurchaseRecord(t))
+      : allTx.filter((t) => (t.included || t.stdCategory === "자산수정") && !isVoucherPurchaseRecord(t));
   const month = monthParam && MONTH_RE.test(monthParam) ? monthParam : latestMonth(visibleTx);
 
   const monthTx = visibleTx.filter((t) => monthKeyOf(t.txnDate) === month);
   const filtered = (personFilter === "all" ? monthTx : monthTx.filter((t) => t.personId === personFilter))
-    .filter((t) => flowFilter === "all" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
+    .filter((t) => flowFilter === "all" || flowFilter === "excluded" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
     .filter((t) => beneficiaryFilter === "all" || t.beneficiary === beneficiaryFilter)
     .filter((t) => categoryFilter === "all" || t.stdCategory === categoryFilter)
     .filter((t) => {

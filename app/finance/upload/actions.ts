@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { and, eq, gte, isNull, lte, notInArray, or } from "drizzle-orm";
 import { getDb, type AppDb } from "@/lib/db";
-import { assetItems, categoryKeywordRules, categoryMappings, categoryRules, transactions, uploads } from "@/lib/finance-db";
+import { assetItems, transactions, uploads } from "@/lib/finance-db";
 import {
   detectUploadFileKind,
   parseSeoulPayFile,
@@ -13,11 +13,13 @@ import {
   type ParsedTransaction,
   type ParsedUpload,
 } from "@/lib/finance-parse";
-import { buildMappingIndex, buildRuleIndex, deriveTransactionFields } from "@/lib/spending-derive";
+import { deriveTransactionFields } from "@/lib/spending-derive";
 import { requireHousehold } from "@/lib/require-household";
 import { getHouseholdPeople, isPersonId } from "@/lib/spending-queries";
 import { getOrCreateActiveUploadId } from "@/lib/manual-upload";
 import { applyVoucherPurchaseExclusion } from "@/lib/voucher-exclusion";
+import { loadCategoryDerivationContext } from "@/lib/rederive-transactions";
+import { applyHouseholdTransferPairs } from "@/lib/household-transfer-pairs";
 
 // neon-http는 요청 하나에 실어보낼 수 있는 페이로드 크기에 한도가 있어
 // 거래 내역이 많은 파일은 한 번에 insert하면 "value too large to transmit" 오류가 난다.
@@ -132,15 +134,13 @@ export async function uploadAction(formData: FormData) {
     );
   }
 
-  const [mappingRows, ruleRows, keywordRuleRows] = await Promise.all([
-    db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
-    db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
-    db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
-  ]);
-  const mappingIndex = buildMappingIndex(mappingRows);
-  const ruleIndex = buildRuleIndex(ruleRows);
-  const derived = deriveTransactionFields(parsed.transactions, mappingIndex, ruleIndex, keywordRuleRows);
+  const context = await loadCategoryDerivationContext(db, householdId);
+  const derived = deriveTransactionFields(parsed.transactions, context.mappingIndex, context.ruleIndex, context.keywordRules, {
+    merchantMemory: context.merchantMemory,
+    rawFallback: context.rawFallback,
+  });
   const transactionsWithDerived = parsed.transactions.map((t, i) => ({ t, d: derived[i] }));
+  const classifiedCount = derived.filter((d) => d.stdCategory !== null).length;
 
   for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {
     await db.insert(transactions).values(
@@ -167,8 +167,13 @@ export async function uploadAction(formData: FormData) {
   // 뱅크샐러드 재업로드로 새 카드결제 출금 거래가 다시 들어왔을 수 있으니, 이미 서울페이 구매로
   // 잠긴 적 없는 것들에 대해 매칭을 다시 시도한다(applyVoucherPurchaseExclusion은 멱등).
   const { excludedCount } = await applyVoucherPurchaseExclusion(db, householdId, personId);
+  // 가구 단위 계좌이동 짝짓기(배우자 간 이체 등)는 rederive 성격의 std_category/included 재계산이
+  // 끝난 뒤에 실행해야 한다(household-transfer-pairs.ts 순서 계약 참고).
+  const { pairs } = await applyHouseholdTransferPairs(db, householdId);
   const exclusionSuffix = excludedCount > 0 ? `, 서울페이 상품권 구매 출금 ${excludedCount}건 집계 제외` : "";
-  const summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${parsed.transactions.length}건 저장 완료${exclusionSuffix}`;
+  const classifiedSuffix = classifiedCount > 0 ? `, 자동 분류 ${classifiedCount}건` : "";
+  const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
+  const summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${parsed.transactions.length}건 저장 완료${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
 }
 
@@ -209,13 +214,7 @@ async function handleSeoulPayUpload(
     ));
   }
 
-  const [mappingRows, ruleRows, keywordRuleRows] = await Promise.all([
-    db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
-    db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
-    db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
-  ]);
-  const mappingIndex = buildMappingIndex(mappingRows);
-  const ruleIndex = buildRuleIndex(ruleRows);
+  const context = await loadCategoryDerivationContext(db, householdId);
 
   // 결제 내역: 기존 뱅크샐러드 업로드와 같은 mapStdCategory/computeIncluded 경로를 그대로 태운다.
   const paymentPseudos: ParsedTransaction[] = parsed.payments.map((p) => ({
@@ -228,8 +227,12 @@ async function handleSeoulPayUpload(
     amount: p.amount,
     paymentMethod: "서울페이",
   }));
-  const derived = deriveTransactionFields(paymentPseudos, mappingIndex, ruleIndex, keywordRuleRows);
+  const derived = deriveTransactionFields(paymentPseudos, context.mappingIndex, context.ruleIndex, context.keywordRules, {
+    merchantMemory: context.merchantMemory,
+    rawFallback: context.rawFallback,
+  });
   const paymentRows = paymentPseudos.map((t, i) => ({ t, d: derived[i] }));
+  const classifiedCount = derived.filter((d) => d.stdCategory !== null).length;
 
   for (const rows of chunk(paymentRows, INSERT_CHUNK_SIZE)) {
     await db.insert(transactions).values(
@@ -278,7 +281,10 @@ async function handleSeoulPayUpload(
   }
 
   const { excludedCount } = await applyVoucherPurchaseExclusion(db, householdId, personId);
+  const { pairs } = await applyHouseholdTransferPairs(db, householdId);
   const exclusionSuffix = excludedCount > 0 ? `, 상품권 구매 출금 ${excludedCount}건 집계 제외` : "";
-  const summary = `${displayName}님 서울페이 결제 ${parsed.payments.length}건 추가${exclusionSuffix}`;
+  const classifiedSuffix = classifiedCount > 0 ? `, 자동 분류 ${classifiedCount}건` : "";
+  const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
+  const summary = `${displayName}님 서울페이 결제 ${parsed.payments.length}건 추가${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
 }

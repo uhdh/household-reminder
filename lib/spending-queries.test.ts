@@ -3,7 +3,9 @@ import {
   classifySpendingEmptyState,
   compareMonthlySummaries,
   countsInTotals,
+  excludedReasonLabel,
   flowLabel,
+  isExcludedFromTotals,
   summarizeMonthlyTransactions,
   unmappedTransferExclusion,
   type Txn,
@@ -180,5 +182,20 @@ describe("classifySpendingEmptyState", () => {
 
   test("returns null when the viewed period has data", () => {
     expect(classifySpendingEmptyState(householdTx, householdTx)).toBeNull();
+  });
+});
+
+describe("isExcludedFromTotals / excludedReasonLabel (세부 내역 '집계 제외' 필터)", () => {
+  test("included=false인 행만 집계 제외 목록에 잡힌다", () => {
+    expect(isExcludedFromTotals(makeTxn({ included: false }))).toBe(true);
+    expect(isExcludedFromTotals(makeTxn({ included: true }))).toBe(false);
+  });
+
+  test("is_internal_transfer이면 '내 계좌 이동', std_category가 '자산수정'이면 '집계 제외', 그 외엔 '소액·기타 제외'", () => {
+    expect(excludedReasonLabel(makeTxn({ isInternalTransfer: true, stdCategory: null }))).toBe("내 계좌 이동");
+    expect(excludedReasonLabel(makeTxn({ isInternalTransfer: false, stdCategory: "자산수정" }))).toBe("집계 제외");
+    expect(excludedReasonLabel(makeTxn({ isInternalTransfer: false, stdCategory: "식비" }))).toBe("소액·기타 제외");
+    // is_internal_transfer가 우선순위 최상단(둘 다 해당해도 '내 계좌 이동'을 보여준다)
+    expect(excludedReasonLabel(makeTxn({ isInternalTransfer: true, stdCategory: "자산수정" }))).toBe("내 계좌 이동");
   });
 });

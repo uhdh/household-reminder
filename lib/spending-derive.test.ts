@@ -1,6 +1,15 @@
 import { describe, expect, test } from "vitest";
 import type { ParsedTransaction } from "@/lib/finance-parse/types";
-import { buildRuleIndex, deriveTransactionFields, mapStdCategory, matchSelfTransferPairs } from "@/lib/spending-derive";
+import {
+  buildMerchantMemory,
+  buildRawCategoryFallback,
+  buildRuleIndex,
+  deriveTransactionFields,
+  mapStdCategory,
+  matchSelfTransferPairs,
+  type MerchantMemorySourceRow,
+  type RawCategoryFallbackSourceRow,
+} from "@/lib/spending-derive";
 
 function transaction(overrides: Partial<ParsedTransaction>): ParsedTransaction {
   return {
@@ -111,5 +120,100 @@ describe("mapStdCategory", () => {
     expect(suggestKeywordFromDescription("쿠팡(쿠페이)_나이스")).toBe("쿠팡(쿠페이)");
     expect(suggestKeywordFromDescription("우아한형제들_배민페이_알뜰배달_")).toBe("우아한형제들");
     expect(suggestKeywordFromDescription("SK텔레콤(자동납부)")).toBe("SK텔레콤");
+  });
+
+  test("우선순위: 가맹점 기억은 원본 매핑·내장 급여 규칙보다 위, 결제수단/키워드 규칙보다는 아래", () => {
+    const mappings = new Map([["지출|카페|미분류", "카페"]]);
+    const memory = new Map([["스타벅스|지출", "식비"]]);
+
+    // 매핑보다 우선
+    const spendRow = transaction({ txnType: "지출", category: "카페", subcategory: "미분류", description: "스타벅스", paymentMethod: "체크카드" });
+    expect(mapStdCategory(spendRow, mappings, new Map(), [], { merchantMemory: memory })).toBe("식비");
+
+    // 내장 급여 규칙보다 우선
+    const salaryMemory = new Map([["OO상사급여|수입", "기타수입"]]);
+    const salaryRow = transaction({ txnType: "수입", description: "OO상사급여", category: "금융수입", subcategory: "미분류" });
+    expect(mapStdCategory(salaryRow, new Map(), new Map(), [], { merchantMemory: salaryMemory })).toBe("기타수입");
+
+    // 결제수단 규칙이 가맹점 기억보다 우선
+    const rules = buildRuleIndex([{ txnType: "지출", paymentMethod: "체크카드", stdCategory: "결제수단우선" }]);
+    expect(mapStdCategory(spendRow, mappings, rules, [], { merchantMemory: memory })).toBe("결제수단우선");
+
+    // 키워드 규칙이 가맹점 기억보다 우선
+    const keywordRules = [{ txnType: "지출", keyword: "스타벅스", stdCategory: "키워드우선" }];
+    expect(mapStdCategory(spendRow, mappings, new Map(), keywordRules, { merchantMemory: memory })).toBe("키워드우선");
+  });
+
+  test("우선순위: 원본 조합 다수결 폴백은 매핑에도 없을 때만, null보다는 위에서 적용된다", () => {
+    const row = transaction({ txnType: "지출", category: "기타소비", subcategory: "미분류", description: "알수없는가맹점" });
+    expect(mapStdCategory(row, new Map())).toBeNull(); // 폴백 없으면 그대로 null
+
+    const fallback = new Map([["지출|기타소비|미분류", "생활용품"]]);
+    expect(mapStdCategory(row, new Map(), new Map(), [], { rawFallback: fallback })).toBe("생활용품");
+
+    // 매핑이 있으면 폴백보다 매핑이 이긴다
+    const mappings = new Map([["지출|기타소비|미분류", "매핑값"]]);
+    expect(mapStdCategory(row, mappings, new Map(), [], { rawFallback: fallback })).toBe("매핑값");
+  });
+});
+
+describe("buildMerchantMemory", () => {
+  function memoryRow(overrides: Partial<MerchantMemorySourceRow>): MerchantMemorySourceRow {
+    return {
+      description: "스타벅스",
+      txnType: "지출",
+      stdCategory: "식비",
+      categoryLocked: true,
+      category: "카페",
+      subcategory: "미분류",
+      ...overrides,
+    };
+  }
+
+  test("잠긴 행에서 80% 이상 일치하는 (가맹점, 거래유형)만 기억한다", () => {
+    const rows = [
+      memoryRow({}),
+      memoryRow({}),
+      memoryRow({}),
+      memoryRow({ stdCategory: "카페" }), // 3/4=75% < 80% -> 기억 안 함
+    ];
+    expect(buildMerchantMemory(rows).get("스타벅스|지출")).toBeUndefined();
+
+    const dominant = [...rows.slice(0, 3), memoryRow({})]; // 4/4 = 100%
+    expect(buildMerchantMemory(dominant).get("스타벅스|지출")).toBe("식비");
+  });
+
+  test("잠기지 않은(category_locked=false) 행이나 std_category가 없는 행은 학습 대상에서 제외한다", () => {
+    const rows = [
+      memoryRow({ categoryLocked: false }),
+      memoryRow({ stdCategory: null }),
+    ];
+    expect(buildMerchantMemory(rows).size).toBe(0);
+  });
+
+  test("서울페이 상품권 구매 장부 행(category='서울페이', subcategory='구매')은 잠겨 있어도 학습에서 제외한다", () => {
+    const rows = [
+      memoryRow({ category: "서울페이", subcategory: "구매", stdCategory: "자산수정", description: "온누리상품권 구매" }),
+      memoryRow({ category: "서울페이", subcategory: "구매", stdCategory: "자산수정", description: "온누리상품권 구매" }),
+    ];
+    expect(buildMerchantMemory(rows).size).toBe(0);
+  });
+});
+
+describe("buildRawCategoryFallback", () => {
+  function fallbackRow(overrides: Partial<RawCategoryFallbackSourceRow>): RawCategoryFallbackSourceRow {
+    return { txnType: "지출", category: "기타소비", subcategory: "미분류", stdCategory: "생활용품", ...overrides };
+  }
+
+  test("이 가구의 기존 분류(잠겼든 자동 매핑됐든) 중 80% 이상 일치하는 조합만 폴백으로 쓴다", () => {
+    const rows = [fallbackRow({}), fallbackRow({}), fallbackRow({}), fallbackRow({ stdCategory: "잡화" })]; // 3/4=75%
+    expect(buildRawCategoryFallback(rows).get("지출|기타소비|미분류")).toBeUndefined();
+
+    const rows2 = [...rows.slice(0, 3), fallbackRow({})]; // 4/4=100%
+    expect(buildRawCategoryFallback(rows2).get("지출|기타소비|미분류")).toBe("생활용품");
+  });
+
+  test("std_category가 없는 행은 집계에서 제외한다", () => {
+    expect(buildRawCategoryFallback([fallbackRow({ stdCategory: null })]).size).toBe(0);
   });
 });

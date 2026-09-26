@@ -245,3 +245,58 @@ describe("uploadAction - 서울페이", () => {
     expect(seoulpayRows[0].uploadId).toBe(activeUpload.id);
   });
 });
+
+describe("uploadAction - 가맹점 기억(merchant memory)", () => {
+  afterEach(() => {
+    setDbForTesting(null);
+    mockParseUploadFile.mockReset();
+  });
+
+  test("이전에 사용자가 직접 고쳐 잠근(locked) 가맹점과 같은 거래는 매핑이 없어도 기억으로 자동 분류된다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(people).values([{ id: "husband", householdId: HOUSEHOLD_ID, displayName: "지훈" }]);
+
+    const oldUploadId = "00000000-0000-4000-8000-0000000000d1";
+    await db.insert(uploads).values({ id: oldUploadId, householdId: HOUSEHOLD_ID, personId: "husband", sourceFilename: "이전 업로드.xlsx", isActive: false });
+    // 이전 업로드에서 사용자가 "스타벅스"를 직접 "식비"로 고쳐 잠근 거래(매핑 테이블에는 없는 원본 조합).
+    await db.insert(transactions).values({
+      householdId: HOUSEHOLD_ID,
+      uploadId: oldUploadId,
+      personId: "husband",
+      txnDate: "2026-08-05",
+      txnType: "지출",
+      category: "카페",
+      subcategory: "미분류",
+      description: "스타벅스",
+      amount: "-5000",
+      paymentMethod: "체크카드",
+      stdCategory: "식비",
+      included: true,
+      isInternalTransfer: false,
+      beneficiary: "husband",
+      categoryLocked: true,
+    });
+
+    mockParseUploadFile.mockResolvedValue({
+      customerName: null,
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-30",
+      assetItems: [],
+      transactions: [
+        { txnDate: "2026-09-06", txnTime: null, txnType: "지출", category: "카페", subcategory: "미분류", description: "스타벅스", amount: -4500, paymentMethod: "체크카드" },
+      ],
+    });
+
+    const { uploadAction } = await import("./actions");
+    const bankFile = new File(["dummy"], "가계부_2026-09-01~2026-09-30.xlsx");
+    const successUrl = await expectRedirect(uploadAction(uploadForm(bankFile)));
+    const message = decodeURIComponent(successUrl.split("success=")[1]);
+    expect(message).toContain("자동 분류 1건");
+
+    const newRow = (await db.select().from(transactions)).find((t) => t.txnDate === "2026-09-06")!;
+    expect(newRow.stdCategory).toBe("식비"); // 매핑 테이블엔 없지만 가맹점 기억으로 분류됨
+    expect(newRow.categoryLocked).toBe(false); // 자동 분류일 뿐 잠기지는 않음
+  });
+});

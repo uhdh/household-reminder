@@ -192,6 +192,22 @@ export async function getLatestVisibleMonth(householdId: string): Promise<string
   return maxDate ? maxDate.slice(0, 7) : currentMonthYear().month;
 }
 
+/**
+ * 세부 내역 "구분" 필터의 "집계 제외"(flow=excluded) 옵션이 보여줄 행: included=false인
+ * 거래(단, 서울페이 상품권 구매 장부 행은 isVoucherPurchaseRecord로 화면단에서 이미 따로
+ * 제외한다 - 이 함수는 그 이후의 included=false 판정만 맡는다).
+ */
+export function isExcludedFromTotals(t: { included: boolean }): boolean {
+  return !t.included;
+}
+
+/** "집계 제외" 목록에서 각 행 옆에 보여줄 짧은 사유 라벨. */
+export function excludedReasonLabel(t: { isInternalTransfer: boolean; stdCategory: string | null }): string {
+  if (t.isInternalTransfer) return "내 계좌 이동";
+  if (t.stdCategory === "자산수정") return "집계 제외";
+  return "소액·기타 제외";
+}
+
 export function beneficiaryLabel(value: string, displayNameByPerson: Map<string, string>): string {
   if (value === "joint") return "우리";
   return displayNameByPerson.get(value) ?? value;

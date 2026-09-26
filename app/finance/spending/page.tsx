@@ -9,12 +9,14 @@ import {
   MONTH_RE,
   beneficiaryLabel,
   classifySpendingEmptyStateScoped,
+  excludedReasonLabel,
   flowLabel,
   getActiveTransactionsInRange,
   getLatestVisibleMonth,
   getMerchantHistory,
   hasAnyTransaction,
   isBeneficiary,
+  isExcludedFromTotals,
   isPersonId,
   shiftMonth,
   toNum,
@@ -107,7 +109,7 @@ export default async function SpendingPage({
   const categoryOptions = [...budgetRows]
     .sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder))
     .map((b) => ({ name: b.name, kind: b.kind }));
-  const flowFilter = flow === "income" || flow === "expense" ? flow : "all";
+  const flowFilter = flow === "income" || flow === "expense" || flow === "excluded" ? flow : "all";
   const beneficiaryFilter = isBeneficiary(beneficiary, personIds) ? beneficiary : "all";
   const categoryFilter = category === "미분류" ? "미분류" : categoryOptions.some((option) => option.name === category) ? category! : "all";
   const query = q?.trim().slice(0, 50) ?? "";
@@ -115,6 +117,10 @@ export default async function SpendingPage({
   // 세부 내역 화면에는 계속 노출한다. 다만 서울페이 상품권 구매 장부용 행은 집계 제외를 위한
   // 내부 기록일 뿐이라 예외적으로 숨긴다.
   const monthTx = monthRowsAll.filter((t) => (t.included || t.stdCategory === "자산수정") && !isVoucherPurchaseRecord(t));
+  // "집계 제외"(flow=excluded) 필터 전용 목록: included=false인 거래(서울페이 상품권 구매
+  // 장부 행은 여기서도 예외적으로 숨긴다). 기본 목록(monthTx)과는 별도로, 이 필터를 골랐을
+  // 때만 기준 목록을 바꿔치기한다 - 기존 기본 목록 동작(monthTx)은 그대로다.
+  const excludedTx = monthRowsAll.filter((t) => isExcludedFromTotals(t) && !isVoucherPurchaseRecord(t));
   // 가구 전체에 거래가 하나도 없을 때만 온보딩형 빈 상태를 보여준다. 필터·월 선택으로 인한
   // "이 조건엔 없음"은 아래 목록의 기존 안내 문구로 충분하다.
   const isHouseholdEmpty = classifySpendingEmptyStateScoped(householdHasAny, monthTx) === "onboarding";
@@ -133,8 +139,10 @@ export default async function SpendingPage({
       : [];
 
   const monthPersonTx = personFilter === "all" ? monthTx : monthTx.filter((t) => t.personId === personFilter);
-  const filtered = monthPersonTx
-    .filter((t) => flowFilter === "all" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
+  const filterBaseTx =
+    flowFilter === "excluded" ? (personFilter === "all" ? excludedTx : excludedTx.filter((t) => t.personId === personFilter)) : monthPersonTx;
+  const filtered = filterBaseTx
+    .filter((t) => flowFilter === "all" || flowFilter === "excluded" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
     .filter((t) => beneficiaryFilter === "all" || t.beneficiary === beneficiaryFilter)
     .filter((t) => categoryFilter === "all" || (categoryFilter === "미분류" ? !t.stdCategory : t.stdCategory === categoryFilter))
     .filter((t) => {
@@ -242,6 +250,11 @@ export default async function SpendingPage({
                         readOnly={readOnly}
                       />
                       {rawCategory !== displayedCategory && <span className="text-[10px] text-ink-muted/70">원본: {rawCategory}</span>}
+                      {flowFilter === "excluded" && (
+                        <span className="rounded-r1 bg-bg-neutral-weak px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
+                          {excludedReasonLabel(t)}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="col-start-3 row-start-2 justify-self-end md:table-cell md:whitespace-nowrap md:px-3">
@@ -315,6 +328,7 @@ export default async function SpendingPage({
             <option value="all">전체</option>
             <option value="expense">지출</option>
             <option value="income">입금</option>
+            <option value="excluded">집계 제외</option>
           </SelectInput>
         </label>
         <label className="min-w-24 flex-1 text-[12px] font-medium text-ink-muted sm:flex-none">

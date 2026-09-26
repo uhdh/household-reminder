@@ -1,4 +1,5 @@
 import type { ParsedTransaction } from "@/lib/finance-parse/types";
+import { isVoucherPurchaseRecord } from "@/lib/voucher-exclusion";
 
 export type CategoryMapping = {
   txnType: string;
@@ -56,6 +57,10 @@ function ruleKey(txnType: string, paymentMethod: string) {
   return `${txnType}|${paymentMethod}`;
 }
 
+function memoryKey(merchantKey: string, txnType: string) {
+  return `${merchantKey}|${txnType}`;
+}
+
 export function buildRuleIndex(rules: CategoryRule[]): Map<string, string> {
   return new Map(rules.map((rule) => [ruleKey(rule.txnType, rule.paymentMethod), rule.stdCategory]));
 }
@@ -68,11 +73,104 @@ export function buildMappingIndex(mappings: CategoryMapping[]): Map<string, stri
   return idx;
 }
 
+// 가맹점 기억/원본 조합 다수결 폴백 둘 다 "이 표준카테고리가 전체의 80% 이상을 차지하는가"만
+// 보면 되므로 집계 로직을 공유한다. 못 미더우면(과반이어도 80% 미만) null - 억지로 추측하지 않는다.
+const DOMINANCE_THRESHOLD = 0.8;
+
+function dominantCategory(byCategory: Map<string, number>): string | null {
+  let total = 0;
+  let bestCategory: string | null = null;
+  let bestCount = 0;
+  for (const [category, count] of byCategory) {
+    total += count;
+    if (count > bestCount) {
+      bestCount = count;
+      bestCategory = category;
+    }
+  }
+  return bestCategory !== null && bestCount / total >= DOMINANCE_THRESHOLD ? bestCategory : null;
+}
+
+export type MerchantMemoryIndex = Map<string, string>; // key: `${suggestKeywordFromDescription(description)}|${txnType}`
+export type RawCategoryFallbackIndex = Map<string, string>; // key: mapKey(txnType, rawCategory, rawSubcategory)와 동일
+
+export type MerchantMemorySourceRow = {
+  description: string | null;
+  txnType: string;
+  stdCategory: string | null;
+  categoryLocked: boolean;
+  category: string | null;
+  subcategory: string | null;
+};
+
+/**
+ * "가맹점 기억": 사용자가 직접 고쳐서 잠근(category_locked=true) 거래들에서, (가맹점 키, 거래유형)별로
+ * 표준카테고리가 압도적으로(80% 이상) 일치하면 그 값을 기억해 둔다. 서울페이 상품권 구매 장부
+ * 행(isVoucherPurchaseRecord)은 항상 '자산수정'으로 고정 잠금된 것일 뿐 사용자가 실제로 분류를
+ * "고른" 게 아니므로 학습 대상에서 제외한다.
+ */
+export function buildMerchantMemory(rows: MerchantMemorySourceRow[]): MerchantMemoryIndex {
+  const tally = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    if (!row.categoryLocked || !row.stdCategory) continue;
+    if (isVoucherPurchaseRecord(row)) continue;
+    const merchantKey = suggestKeywordFromDescription(row.description);
+    if (!merchantKey) continue;
+    const key = memoryKey(merchantKey, row.txnType);
+    const byCategory = tally.get(key) ?? new Map<string, number>();
+    byCategory.set(row.stdCategory, (byCategory.get(row.stdCategory) ?? 0) + 1);
+    tally.set(key, byCategory);
+  }
+
+  const memory: MerchantMemoryIndex = new Map();
+  for (const [key, byCategory] of tally) {
+    const winner = dominantCategory(byCategory);
+    if (winner) memory.set(key, winner);
+  }
+  return memory;
+}
+
+export type RawCategoryFallbackSourceRow = {
+  txnType: string;
+  category: string | null;
+  subcategory: string | null;
+  stdCategory: string | null;
+};
+
+/**
+ * 매핑 테이블에 없는 (거래유형, 원본 대분류, 원본 소분류) 조합도, 이 가구에서 이미 분류된(잠겼든
+ * 자동 매핑됐든 std_category가 있는) 거래들 중 같은 조합이 압도적으로(80% 이상) 같은 표준카테고리로
+ * 쓰였다면 그 값을 최후의 폴백으로 쓴다.
+ */
+export function buildRawCategoryFallback(rows: RawCategoryFallbackSourceRow[]): RawCategoryFallbackIndex {
+  const tally = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    if (!row.stdCategory) continue;
+    const key = mapKey(row.txnType, row.category ?? "미분류", row.subcategory ?? "미분류");
+    const byCategory = tally.get(key) ?? new Map<string, number>();
+    byCategory.set(row.stdCategory, (byCategory.get(row.stdCategory) ?? 0) + 1);
+    tally.set(key, byCategory);
+  }
+
+  const fallback: RawCategoryFallbackIndex = new Map();
+  for (const [key, byCategory] of tally) {
+    const winner = dominantCategory(byCategory);
+    if (winner) fallback.set(key, winner);
+  }
+  return fallback;
+}
+
+export type MapStdCategoryOptions = {
+  merchantMemory?: MerchantMemoryIndex;
+  rawFallback?: RawCategoryFallbackIndex;
+};
+
 export function mapStdCategory(
   txn: ParsedTransaction,
   mappingIndex: Map<string, string>,
   ruleIndex: Map<string, string> = new Map(),
-  keywordRules: CategoryKeywordRule[] = []
+  keywordRules: CategoryKeywordRule[] = [],
+  options: MapStdCategoryOptions = {}
 ): string | null {
   const description = (txn.description ?? "").trim();
 
@@ -88,13 +186,29 @@ export function mapStdCategory(
   const ruleCategory = ruleIndex.get(ruleKey(txn.txnType, txn.paymentMethod ?? ""));
   if (ruleCategory) return ruleCategory;
 
-  // 3. 내장 키워드 규칙(모든 가구 공통분만; 가구별 규칙은 keywordRules로 관리)
+  // 3. 가맹점 기억(사용자가 과거 이 가맹점을 직접 분류해 잠근 이력)
+  if (options.merchantMemory) {
+    const merchantKey = suggestKeywordFromDescription(txn.description);
+    const remembered = merchantKey ? options.merchantMemory.get(memoryKey(merchantKey, txn.txnType)) : undefined;
+    if (remembered) return remembered;
+  }
+
+  // 4. 내장 키워드 규칙(모든 가구 공통분만; 가구별 규칙은 keywordRules로 관리)
   if (txn.txnType === "수입" && SALARY_KEYWORDS.some((kw) => description.includes(kw))) return "월급";
 
-  // 4. 원본 엑셀 대분류/소분류 매핑
+  // 5. 원본 엑셀 대분류/소분류 매핑
   const rawCategory = txn.category ?? "미분류";
   const rawSubcategory = txn.subcategory ?? "미분류";
-  return mappingIndex.get(mapKey(txn.txnType, rawCategory, rawSubcategory)) ?? null;
+  const mapped = mappingIndex.get(mapKey(txn.txnType, rawCategory, rawSubcategory));
+  if (mapped) return mapped;
+
+  // 6. 원본 조합 다수결 폴백(매핑에도 없는 조합을 이 가구의 기존 분류 이력으로 추정)
+  if (options.rawFallback) {
+    const fallback = options.rawFallback.get(mapKey(txn.txnType, rawCategory, rawSubcategory));
+    if (fallback) return fallback;
+  }
+
+  return null;
 }
 
 export function isTransferCandidate(txn: ParsedTransaction): boolean {
@@ -202,13 +316,14 @@ export function deriveTransactionFields(
   transactions: ParsedTransaction[],
   mappingIndex: Map<string, string>,
   ruleIndex: Map<string, string> = new Map(),
-  keywordRules: CategoryKeywordRule[] = []
+  keywordRules: CategoryKeywordRule[] = [],
+  options: MapStdCategoryOptions = {}
 ): DerivedResult[] {
   const matched = matchSelfTransferPairs(transactions);
   return transactions.map((txn, i) => {
     const isTransferCand = isTransferCandidate(txn);
     const isMatchedPair = matched[i];
-    const stdCategory = mapStdCategory(txn, mappingIndex, ruleIndex, keywordRules);
+    const stdCategory = mapStdCategory(txn, mappingIndex, ruleIndex, keywordRules, options);
     return {
       stdCategory,
       included: stdCategory !== "자산수정" && computeIncluded(txn, isTransferCand, isMatchedPair),

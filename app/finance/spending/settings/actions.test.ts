@@ -5,16 +5,27 @@ import { drizzle } from "drizzle-orm/pglite";
 import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { setDbForTesting } from "@/lib/db";
-import { categoryKeywordRules, categoryMappings, categoryRules, transactions } from "@/lib/finance-db";
+import { categoryKeywordRules, categoryMappings, categoryRules, people, transactions, uploads } from "@/lib/finance-db";
 
 const HOUSEHOLD_ID = vi.hoisted(() => "00000000-0000-4000-8000-000000000001");
+const UPLOAD_ID = "00000000-0000-0000-0000-000000000001";
 
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/require-household", () => ({
   requireHousehold: vi.fn().mockResolvedValue({ userId: "test-user", householdId: HOUSEHOLD_ID, role: "owner", email: "test@example.com" }),
 }));
 
+// people/uploads: 매핑·규칙 편집 액션이 rederiveTransactions 뒤에 applyHouseholdTransferPairs를
+// 호출하게 되면서(getActiveTransactions가 이 두 테이블을 읽는다) 함께 필요해졌다.
 async function createSchema(db: ReturnType<typeof drizzle>) {
+  await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`
+    CREATE TABLE uploads (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, person_id text NOT NULL, source_filename text NOT NULL,
+      period_start date, period_end date, is_active boolean NOT NULL DEFAULT true, uploaded_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
   await db.execute(sql`
     CREATE TABLE transactions (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL,
@@ -44,12 +55,14 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
       UNIQUE (household_id, keyword)
     )
   `);
+  await db.insert(people).values({ id: "husband", householdId: HOUSEHOLD_ID, displayName: "남편" });
+  await db.insert(uploads).values({ id: UPLOAD_ID, householdId: HOUSEHOLD_ID, personId: "husband", sourceFilename: "테스트", isActive: true });
 }
 
 function txnRow(overrides: Partial<typeof transactions.$inferInsert>) {
   return {
     householdId: HOUSEHOLD_ID,
-    uploadId: "00000000-0000-0000-0000-000000000001",
+    uploadId: UPLOAD_ID,
     personId: "husband",
     txnDate: "2026-08-10",
     txnType: "지출",
@@ -73,11 +86,14 @@ describe("settings actions -> rederiveTransactions 연동", () => {
     const db = drizzle();
     setDbForTesting(db);
     await createSchema(db);
+    // 잠긴 행과 미분류 행은 서로 다른 가맹점이어야 한다 - 설명이 같으면 가맹점 기억이 끼어들어
+    // (locked 행이 학습시킨 값을 unlocked 행이 그대로 물려받아) 이 테스트가 확인하려는
+    // "새 매핑대로 재계산" 경로와 구분이 안 된다.
     const [locked, unlocked] = await db
       .insert(transactions)
       .values([
-        txnRow({ stdCategory: "기타", categoryLocked: true }),
-        txnRow({ stdCategory: null, categoryLocked: false }),
+        txnRow({ description: "동네정육점", stdCategory: "기타", categoryLocked: true }),
+        txnRow({ description: "다른식당", stdCategory: null, categoryLocked: false }),
       ])
       .returning();
 
@@ -185,5 +201,31 @@ describe("settings actions -> rederiveTransactions 연동", () => {
 
     const [after] = await db.select().from(transactions).where(eq(transactions.id, row.id));
     expect(after.stdCategory).toBeNull();
+  });
+});
+
+describe("rederivePreviewAction / rederiveAllAction - 미리보기는 쓰지 않고, 적용만 실제로 쓴다", () => {
+  afterEach(() => setDbForTesting(null));
+
+  test("미리보기(dryRun)는 변경 건수만 알려주고 DB는 그대로다 - 적용해야 실제로 바뀐다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(categoryMappings).values({ householdId: HOUSEHOLD_ID, txnType: "지출", rawCategory: "식비", rawSubcategory: "한식", stdCategory: "한식비" });
+    const [row] = await db.insert(transactions).values(txnRow({ stdCategory: null })).returning();
+
+    const { rederivePreviewAction, rederiveAllAction } = await import("./actions");
+
+    const preview = await rederivePreviewAction();
+    expect(preview.changed).toBe(1);
+    expect(preview.reclassified).toBe(1);
+    expect(preview.transitions?.[0]).toMatchObject({ from: null, to: "한식비", count: 1 });
+    const [afterPreview] = await db.select().from(transactions).where(eq(transactions.id, row.id));
+    expect(afterPreview.stdCategory).toBeNull(); // 미리보기는 아직 아무것도 안 바꾼다
+
+    const applied = await rederiveAllAction();
+    expect(applied.changed).toBe(1);
+    const [afterApply] = await db.select().from(transactions).where(eq(transactions.id, row.id));
+    expect(afterApply.stdCategory).toBe("한식비"); // 적용해야 실제로 바뀐다
   });
 });
