@@ -149,7 +149,21 @@ async function main() {
   // ── B. 이체 제외 ───────────────────────────────────────────
   const counted = (t: Txn) => t.included && !(t.txnType === "이체" && !t.stdCategory);
   const transfers = txns.filter((t) => t.txnType === "이체");
-  console.log(`\n[B] 이체 타입 ${transfers.length}건: 집계에 포함 ${transfers.filter(counted).length} / 자기계좌이체 짝 ${transfers.filter((t) => t.isInternalTransfer).length}`);
+  const internal = txns.filter((t) => t.isInternalTransfer);
+  const byInternalType = new Map<string, number>();
+  for (const t of internal) {
+    const k = `${t.txnType}${counted(t) ? "(집계 포함)" : ""}`;
+    byInternalType.set(k, (byInternalType.get(k) ?? 0) + 1);
+  }
+  console.log(`\n[B0] 자기계좌이체 짝 표시 ${internal.length}건, 그중 아직 집계에 잡힘 ${internal.filter(counted).length}건 / ${[...byInternalType].map(([k, v]) => `${k} ${v}`).join(", ")}`);
+  const nonTransferInternalByMonth = new Map<string, number>();
+  for (const t of internal) {
+    if (t.txnType === "이체") continue;
+    const m = t.txnDate.slice(0, 7);
+    nonTransferInternalByMonth.set(m, (nonTransferInternalByMonth.get(m) ?? 0) + 1);
+  }
+  console.log(`     수입·지출인데 짝 표시된 거래의 월 분포: ${[...nonTransferInternalByMonth].sort().map(([k, v]) => `${k} ${v}`).join(", ")}`);
+  console.log(`[B] 이체 타입 ${transfers.length}건: 집계에 포함 ${transfers.filter(counted).length} / 자기계좌이체 짝 ${transfers.filter((t) => t.isInternalTransfer).length}`);
 
   // 반대 부호·같은 금액·±1일 짝 찾기 (사람 간 / 같은 사람 내 설명 불일치)
   const byAmount = new Map<number, Txn[]>();
