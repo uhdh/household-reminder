@@ -186,21 +186,23 @@ export function mapStdCategory(
   const ruleCategory = ruleIndex.get(ruleKey(txn.txnType, txn.paymentMethod ?? ""));
   if (ruleCategory) return ruleCategory;
 
-  // 3. 가맹점 기억(사용자가 과거 이 가맹점을 직접 분류해 잠근 이력)
+  // 3. 내장 키워드 규칙(모든 가구 공통분만; 가구별 규칙은 keywordRules로 관리)
+  if (txn.txnType === "수입" && SALARY_KEYWORDS.some((kw) => description.includes(kw))) return "월급";
+
+  // 4. 원본 엑셀 대분류/소분류 매핑
+  const rawCategory = txn.category ?? "미분류";
+  const rawSubcategory = txn.subcategory ?? "미분류";
+  const mapped = mappingIndex.get(mapKey(txn.txnType, rawCategory, rawSubcategory));
+  if (mapped) return mapped;
+
+  // 5. 가맹점 기억(사용자가 과거 이 가맹점을 직접 분류해 잠근 이력). 잠긴 거래는 대부분 "자동 분류를
+  // 고친 예외"라서, 이것을 매핑보다 앞에 두면 예외에서 배운 값이 멀쩡히 자동 분류된 다수를 덮어쓴다
+  // (실데이터 미리보기에서 월급→보너스 104건 등으로 확인). 그래서 앞 규칙이 모두 비었을 때만 채운다.
   if (options.merchantMemory) {
     const merchantKey = suggestKeywordFromDescription(txn.description);
     const remembered = merchantKey ? options.merchantMemory.get(memoryKey(merchantKey, txn.txnType)) : undefined;
     if (remembered) return remembered;
   }
-
-  // 4. 내장 키워드 규칙(모든 가구 공통분만; 가구별 규칙은 keywordRules로 관리)
-  if (txn.txnType === "수입" && SALARY_KEYWORDS.some((kw) => description.includes(kw))) return "월급";
-
-  // 5. 원본 엑셀 대분류/소분류 매핑
-  const rawCategory = txn.category ?? "미분류";
-  const rawSubcategory = txn.subcategory ?? "미분류";
-  const mapped = mappingIndex.get(mapKey(txn.txnType, rawCategory, rawSubcategory));
-  if (mapped) return mapped;
 
   // 6. 원본 조합 다수결 폴백(매핑에도 없는 조합을 이 가구의 기존 분류 이력으로 추정)
   if (options.rawFallback) {

@@ -122,24 +122,27 @@ describe("mapStdCategory", () => {
     expect(suggestKeywordFromDescription("SK텔레콤(자동납부)")).toBe("SK텔레콤");
   });
 
-  test("우선순위: 가맹점 기억은 원본 매핑·내장 급여 규칙보다 위, 결제수단/키워드 규칙보다는 아래", () => {
+  test("우선순위: 가맹점 기억은 매핑·급여 규칙이 비었을 때만 채우고, 원본 조합 폴백보다는 위", () => {
     const mappings = new Map([["지출|카페|미분류", "카페"]]);
     const memory = new Map([["스타벅스|지출", "식비"]]);
 
-    // 매핑보다 우선
+    // 매핑이 있으면 매핑이 이긴다(잠긴 예외에서 배운 값이 멀쩡한 자동 분류를 덮어쓰지 않도록)
     const spendRow = transaction({ txnType: "지출", category: "카페", subcategory: "미분류", description: "스타벅스", paymentMethod: "체크카드" });
-    expect(mapStdCategory(spendRow, mappings, new Map(), [], { merchantMemory: memory })).toBe("식비");
+    expect(mapStdCategory(spendRow, mappings, new Map(), [], { merchantMemory: memory })).toBe("카페");
 
-    // 내장 급여 규칙보다 우선
+    // 내장 급여 규칙도 가맹점 기억보다 우선
     const salaryMemory = new Map([["OO상사급여|수입", "기타수입"]]);
     const salaryRow = transaction({ txnType: "수입", description: "OO상사급여", category: "금융수입", subcategory: "미분류" });
-    expect(mapStdCategory(salaryRow, new Map(), new Map(), [], { merchantMemory: salaryMemory })).toBe("기타수입");
+    expect(mapStdCategory(salaryRow, new Map(), new Map(), [], { merchantMemory: salaryMemory })).toBe("월급");
 
-    // 결제수단 규칙이 가맹점 기억보다 우선
+    // 매핑이 없는 조합이면 가맹점 기억이 채우고, 원본 조합 폴백보다 우선한다
+    const unmappedRow = transaction({ txnType: "지출", category: "기타소비", subcategory: "미분류", description: "스타벅스" });
+    const fallback = new Map([["지출|기타소비|미분류", "기타"]]);
+    expect(mapStdCategory(unmappedRow, new Map(), new Map(), [], { merchantMemory: memory, rawFallback: fallback })).toBe("식비");
+
+    // 결제수단·키워드 규칙은 여전히 최우선
     const rules = buildRuleIndex([{ txnType: "지출", paymentMethod: "체크카드", stdCategory: "결제수단우선" }]);
     expect(mapStdCategory(spendRow, mappings, rules, [], { merchantMemory: memory })).toBe("결제수단우선");
-
-    // 키워드 규칙이 가맹점 기억보다 우선
     const keywordRules = [{ txnType: "지출", keyword: "스타벅스", stdCategory: "키워드우선" }];
     expect(mapStdCategory(spendRow, mappings, new Map(), keywordRules, { merchantMemory: memory })).toBe("키워드우선");
   });
