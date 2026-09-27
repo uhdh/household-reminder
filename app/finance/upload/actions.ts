@@ -36,7 +36,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export async function uploadAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId: viewerPersonId } = await requireHousehold();
   const personId = String(formData.get("personId") ?? "");
   const file = formData.get("file");
   // 비어있으면 undefined로 - decryptWorkbookBuffer는 빈 문자열도 "비밀번호 없음"으로 취급해야 한다.
@@ -70,7 +70,7 @@ export async function uploadAction(formData: FormData) {
   }
 
   if (kind === "seoulpay") {
-    await handleSeoulPayUpload(db, householdId, personId, displayName, workBuffer, defaultBeneficiary);
+    await handleSeoulPayUpload(db, householdId, personId, viewerPersonId, displayName, workBuffer, defaultBeneficiary);
     return;
   }
 
@@ -80,6 +80,10 @@ export async function uploadAction(formData: FormData) {
   } catch (e) {
     const message = e instanceof Error ? e.message : "파일을 처리하는 중 오류가 발생했습니다.";
     redirect("/finance/upload?error=" + encodeURIComponent(message));
+  }
+
+  if (parsed.periodStart && parsed.periodEnd) {
+    await rejectIfOthersPrivateInPeriod(db, householdId, personId, viewerPersonId, parsed.periodStart, parsed.periodEnd);
   }
 
   const uploadId = randomUUID();
@@ -199,6 +203,7 @@ async function handleSeoulPayUpload(
   db: AppDb,
   householdId: string,
   personId: string,
+  viewerPersonId: string | null,
   displayName: string,
   buffer: ArrayBuffer,
   defaultBeneficiary: string
@@ -211,13 +216,16 @@ async function handleSeoulPayUpload(
     redirect("/finance/upload?error=" + encodeURIComponent(message));
   }
 
-  const uploadId = await getOrCreateActiveUploadId(db, householdId, personId);
-
   // 재업로드 멱등성: 조회기간(없으면 파싱된 날짜의 최소~최대)에 걸치는 이 사람의 기존 서울페이
   // 행을 지우고 다시 넣는다. 뱅크샐러드 거래는 category가 달라 이 delete에 걸리지 않는다.
   const allDates = [...parsed.payments.map((p) => p.txnDate), ...parsed.purchases.map((p) => p.txnDate)];
   const periodStart = parsed.periodStart ?? (allDates.length ? allDates.reduce((a, b) => (a < b ? a : b)) : null);
   const periodEnd = parsed.periodEnd ?? (allDates.length ? allDates.reduce((a, b) => (a > b ? a : b)) : null);
+  if (periodStart && periodEnd) {
+    await rejectIfOthersPrivateInPeriod(db, householdId, personId, viewerPersonId, periodStart, periodEnd);
+  }
+
+  const uploadId = await getOrCreateActiveUploadId(db, householdId, personId);
   const context = await loadCategoryDerivationContext(db, householdId);
   const lockedSnapshot: LockedSnapshot =
     periodStart && periodEnd
@@ -308,6 +316,36 @@ async function handleSeoulPayUpload(
   const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
   const summary = `${displayName}님 서울페이 결제 ${parsed.payments.length}건 추가${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
+}
+
+/**
+ * 다른 사람을 보유자로 골라 올리면 그 사람의 기간 거래가 지워지고 교체된다. 그 기간에 그 사람이
+ * "나만 보기"로 표시한 거래가 하나라도 있으면(조회자가 연결 전이어도) 아무것도 쓰기 전에 거부한다 -
+ * 본인 몫 업로드는 막지 않는다. 기간 밖 비공개 행은 applyVoucherPurchaseExclusion이 여전히 건드릴 수 있다.
+ */
+async function rejectIfOthersPrivateInPeriod(
+  db: AppDb,
+  householdId: string,
+  personId: string,
+  viewerPersonId: string | null,
+  periodStart: string,
+  periodEnd: string
+): Promise<void> {
+  if (personId === viewerPersonId) return;
+  const [hit] = await db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(and(
+      eq(transactions.householdId, householdId),
+      eq(transactions.personId, personId),
+      eq(transactions.isPrivate, true),
+      gte(transactions.txnDate, periodStart),
+      lte(transactions.txnDate, periodEnd)
+    ))
+    .limit(1);
+  if (hit) {
+    redirect("/finance/upload?error=" + encodeURIComponent("다른 사람이 '나만 보기'로 표시한 거래가 있는 기간이에요. 그 사람이 직접 올려주세요."));
+  }
 }
 
 // ── 다시 올릴 때 "직접 고친 분류"와 "나만 보기" 되살리기 ─────────────────────

@@ -7,6 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { setDbForTesting } from "@/lib/db";
 import { people, transactions, uploads } from "@/lib/finance-db";
+import { requireHousehold } from "@/lib/require-household";
 
 const HOUSEHOLD_ID = vi.hoisted(() => "00000000-0000-4000-8000-000000000099");
 const mockParseUploadFile = vi.hoisted(() => vi.fn());
@@ -407,5 +408,94 @@ describe("uploadAction - 가맹점 기억(merchant memory)", () => {
 
     await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "mine.xlsx")))); // 체크 안 함 = 업로더
     expect((await db.select().from(transactions))[0].beneficiary).toBe("husband");
+  });
+});
+
+// 다른 사람을 보유자로 골라 올리면 그 사람의 기간 거래가 교체되므로, 그 기간에 그 사람의 나만 보기
+// 거래가 있으면 업로드를 거부한다(본인 업로드는 항상 허용).
+describe("uploadAction - 다른 사람 대신 올릴 때 나만 보기 보호", () => {
+  afterEach(() => {
+    setDbForTesting(null);
+    mockParseUploadFile.mockReset();
+  });
+
+  const PRIV_UPLOAD_ID = "00000000-0000-4000-8000-0000000000e1";
+
+  function viewAs(personId: string | null) {
+    vi.mocked(requireHousehold).mockResolvedValueOnce({ userId: "test-user", householdId: HOUSEHOLD_ID, role: "owner", email: "test@example.com", personId });
+  }
+
+  async function seed(privateRow: Partial<typeof transactions.$inferInsert> = {}) {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(people).values([
+      { id: "husband", householdId: HOUSEHOLD_ID, displayName: "지훈" },
+      { id: "wife", householdId: HOUSEHOLD_ID, displayName: "수아" },
+    ]);
+    await db.insert(uploads).values({ id: PRIV_UPLOAD_ID, householdId: HOUSEHOLD_ID, personId: "husband", sourceFilename: "h.xlsx", isActive: true });
+    const [priv] = await db.insert(transactions).values({
+      householdId: HOUSEHOLD_ID, uploadId: PRIV_UPLOAD_ID, personId: "husband", txnDate: "2026-09-06", txnType: "지출",
+      category: "쇼핑", subcategory: "선물", description: "반지", amount: "-300000", paymentMethod: "카드", beneficiary: "husband", isPrivate: true,
+      ...privateRow,
+    }).returning();
+    return { db, priv };
+  }
+
+  function mockBankPeriod() {
+    mockParseUploadFile.mockResolvedValue({
+      customerName: null, periodStart: "2026-09-01", periodEnd: "2026-09-30", assetItems: [],
+      transactions: [{ txnDate: "2026-09-10", txnTime: null, txnType: "지출", category: "식비", subcategory: "한식", description: "점심", amount: -9000, paymentMethod: "카드" }],
+    });
+  }
+
+  for (const viewer of ["wife", null]) {
+    test(`조회자(${viewer ?? "연결 안 됨"})가 남편 몫으로 올리면, 남편의 나만 보기 거래가 있는 기간은 거부한다`, async () => {
+      const { db, priv } = await seed();
+      mockBankPeriod();
+      const { uploadAction } = await import("./actions");
+      viewAs(viewer);
+      const url = await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "h.xlsx"), "husband")));
+      expect(url).toContain("/finance/upload?error=");
+      expect(decodeURIComponent(url)).toContain("나만 보기");
+
+      const rows = await db.select().from(transactions);
+      expect(rows).toEqual([priv]); // 그대로, 새 거래도 없음
+      const uploadRows = await db.select().from(uploads);
+      expect(uploadRows).toHaveLength(1);
+      expect(uploadRows[0].isActive).toBe(true);
+    });
+  }
+
+  test("기간 안에 남편의 나만 보기 거래가 없으면 아내가 남편 몫으로 올려도 된다", async () => {
+    const { db } = await seed({ txnDate: "2026-08-20" }); // 교체 기간 밖
+    mockBankPeriod();
+    const { uploadAction } = await import("./actions");
+    viewAs("wife");
+    const url = await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "h.xlsx"), "husband")));
+    expect(url).toContain("success=");
+    expect(await db.select().from(transactions)).toHaveLength(2);
+  });
+
+  test("본인 몫으로 올리면 기간에 나만 보기 거래가 있어도 막지 않는다", async () => {
+    const { db } = await seed({ txnDate: "2026-09-10", txnTime: null, description: "점심", amount: "-9000", category: "식비", subcategory: "한식" });
+    mockBankPeriod();
+    const { uploadAction } = await import("./actions");
+    viewAs("husband");
+    const url = await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "h.xlsx"), "husband")));
+    expect(url).toContain("success=");
+    const rows = await db.select().from(transactions);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].isPrivate).toBe(true);
+  });
+
+  test("서울페이 파일도 조회자가 아닌 사람의 나만 보기 서울페이 거래가 기간에 있으면 거부한다", async () => {
+    const { db, priv } = await seed({ category: "서울페이", subcategory: "결제", paymentMethod: "서울페이", description: "동네마트" });
+    const { uploadAction } = await import("./actions");
+    viewAs("wife");
+    const file = await seoulPayFile({ payments: [["분식집", "2026-09-07 12:00:00", 8000, "결제"]] });
+    const url = await expectRedirect(uploadAction(uploadForm(file, "husband")));
+    expect(url).toContain("/finance/upload?error=");
+    expect(await db.select().from(transactions)).toEqual([priv]);
   });
 });

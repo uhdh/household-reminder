@@ -508,7 +508,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     <span className="font-semibold text-ink">{p.displayName}</span>
                     {p.id === personId ? (
                       <form action={setAllowanceAction} className="flex items-center gap-2">
-                        <TextInput type="number" name="allowance" min={0} step={1} defaultValue={allowance ?? ""} placeholder="한도 없음" className="min-h-11 w-32 px-3 py-2 text-right" />
+                        <TextInput type="number" name="allowance" aria-label="월 용돈 한도(원)" min={0} max={100000000} step={1} defaultValue={allowance ?? ""} placeholder="한도 없음" className="min-h-11 w-32 px-3 py-2 text-right" />
                         <ActionButton type="submit" className="min-h-11 px-4 py-2">저장</ActionButton>
                       </form>
                     ) : (

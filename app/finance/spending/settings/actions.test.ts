@@ -6,6 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { setDbForTesting } from "@/lib/db";
 import { categoryKeywordRules, categoryMappings, categoryRules, people, transactions, uploads } from "@/lib/finance-db";
+import { requireHousehold } from "@/lib/require-household";
 
 const HOUSEHOLD_ID = vi.hoisted(() => "00000000-0000-4000-8000-000000000001");
 const UPLOAD_ID = "00000000-0000-0000-0000-000000000001";
@@ -227,5 +228,80 @@ describe("rederivePreviewAction / rederiveAllAction - 미리보기는 쓰지 않
     expect(applied.changed).toBe(1);
     const [afterApply] = await db.select().from(transactions).where(eq(transactions.id, row.id));
     expect(afterApply.stdCategory).toBe("한식비"); // 적용해야 실제로 바뀐다
+  });
+});
+
+// 파트너가 규칙을 만들고 재계산·미리보기로 비공개 거래 설명에 특정 단어가 있는지 떠보지 못하게,
+// 재계산은 조회자가 볼 수 있는 행(공개 + 본인 결제)만 대상으로 한다.
+describe("재계산은 파트너의 나만 보기 거래를 건드리지 않는다", () => {
+  afterEach(() => setDbForTesting(null));
+
+  function viewAs(personId: string | null) {
+    vi.mocked(requireHousehold).mockResolvedValueOnce({ userId: "test-user", householdId: HOUSEHOLD_ID, role: "owner", email: "test@example.com", personId });
+  }
+
+  async function seed() {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(people).values({ id: "wife", householdId: HOUSEHOLD_ID, displayName: "아내" });
+    const [priv, pub] = await db
+      .insert(transactions)
+      .values([
+        txnRow({ description: "비밀상점 반지", isPrivate: true }),
+        txnRow({ personId: "wife", beneficiary: "wife", description: "비밀상점 커피" }),
+      ])
+      .returning();
+    return { db, priv, pub };
+  }
+
+  function keywordForm() {
+    const form = new FormData();
+    form.set("txnType", "지출");
+    form.set("keyword", "비밀상점");
+    form.set("stdCategory", "선물");
+    form.set("applyToExisting", "true");
+    return form;
+  }
+
+  test("파트너가 키워드 규칙을 추가하면 공개 행만 바뀌고 비공개 행은 그대로다", async () => {
+    const { db, priv, pub } = await seed();
+    const { upsertCategoryKeywordRuleAction } = await import("./actions");
+    viewAs("wife");
+    await upsertCategoryKeywordRuleAction(keywordForm());
+
+    const [afterPriv] = await db.select().from(transactions).where(eq(transactions.id, priv.id));
+    const [afterPub] = await db.select().from(transactions).where(eq(transactions.id, pub.id));
+    expect(afterPub.stdCategory).toBe("선물");
+    expect(afterPriv.stdCategory).toBeNull();
+  });
+
+  test("파트너(또는 연결 안 된 계정)의 재계산 미리보기는 비공개 행을 세지 않는다", async () => {
+    const { db } = await seed();
+    await db.insert(categoryKeywordRules).values({ householdId: HOUSEHOLD_ID, txnType: "지출", keyword: "비밀상점", stdCategory: "선물" });
+    const { rederivePreviewAction, rederiveAllAction } = await import("./actions");
+
+    viewAs("wife");
+    const preview = await rederivePreviewAction();
+    expect(preview.reclassified).toBe(1);
+    expect(preview.transitions).toEqual([expect.objectContaining({ from: null, to: "선물", count: 1 })]);
+
+    viewAs(null);
+    expect((await rederivePreviewAction()).reclassified).toBe(1);
+
+    viewAs("wife");
+    await rederiveAllAction();
+    const privRows = (await db.select().from(transactions)).filter((t) => t.isPrivate);
+    expect(privRows[0].stdCategory).toBeNull();
+  });
+
+  test("소유자가 같은 규칙을 추가하면 본인의 비공개 행도 재분류된다", async () => {
+    const { db, priv } = await seed();
+    const { upsertCategoryKeywordRuleAction } = await import("./actions");
+    viewAs("husband");
+    await upsertCategoryKeywordRuleAction(keywordForm());
+
+    const [afterPriv] = await db.select().from(transactions).where(eq(transactions.id, priv.id));
+    expect(afterPriv.stdCategory).toBe("선물");
   });
 });

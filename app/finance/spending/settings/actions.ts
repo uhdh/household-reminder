@@ -8,6 +8,7 @@ import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules
 import { requireHousehold } from "@/lib/require-household";
 import { escapeIlikePattern, rederiveTransactions, type CategoryTransition } from "@/lib/rederive-transactions";
 import { applyHouseholdTransferPairs } from "@/lib/household-transfer-pairs";
+import { visibleToViewer } from "@/lib/spending-private";
 
 const VALID_TXN_TYPES = new Set(["수입", "지출", "이체"]);
 const VALID_KINDS = new Set(["고정비", "변동비", "고정수입", "변동수입"]);
@@ -16,10 +17,11 @@ const VALID_KINDS = new Set(["고정비", "변동비", "고정수입", "변동�
  * 매핑/규칙 편집이 rederiveTransactions로 std_category/included를 다시 계산한 뒤, 가구 단위
  * 계좌이동 짝짓기(applyHouseholdTransferPairs)를 그 다음 순서로 실행한다(순서 계약은
  * lib/rederive-transactions.ts 참고 - 반대로 하면 안 됨). 편집 액션마다 반복되는 이 두 호출을
- * 한데 묶는다.
+ * 한데 묶는다. 재계산 대상은 조회자가 볼 수 있는 행(공개 + 본인 결제)으로 한정한다 - 파트너가 규칙을
+ * 만들어 비공개 거래의 설명을 떠보거나 몰래 재분류하지 못하게(그 행은 소유자가 재계산할 때만 갱신).
  */
-async function rederiveAndPairHousehold(db: AppDb, householdId: string, candidateFilter?: SQL) {
-  await rederiveTransactions(db, householdId, candidateFilter);
+async function rederiveAndPairHousehold(db: AppDb, householdId: string, viewerPersonId: string | null, candidateFilter?: SQL) {
+  await rederiveTransactions(db, householdId, and(candidateFilter, visibleToViewer(viewerPersonId)));
   await applyHouseholdTransferPairs(db, householdId);
 }
 
@@ -47,7 +49,7 @@ function keywordCandidateFilter(txnType: string, keyword: string) {
 }
 
 export async function upsertCategoryMappingAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const txnType = String(formData.get("txnType") ?? "").trim();
   const rawCategory = String(formData.get("rawCategory") ?? "").trim();
   const rawSubcategory = String(formData.get("rawSubcategory") ?? "").trim() || "미분류";
@@ -63,14 +65,14 @@ export async function upsertCategoryMappingAction(formData: FormData) {
         set: { stdCategory },
       });
 
-    await rederiveAndPairHousehold(db, householdId, mappingCandidateFilter(txnType, rawCategory, rawSubcategory));
+    await rederiveAndPairHousehold(db, householdId, personId, mappingCandidateFilter(txnType, rawCategory, rawSubcategory));
   }
 
   redirect("/finance/spending/settings");
 }
 
 export async function deleteCategoryMappingAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const id = String(formData.get("id") ?? "");
   if (id) {
     const db = getDb();
@@ -81,13 +83,13 @@ export async function deleteCategoryMappingAction(formData: FormData) {
       .limit(1);
     await db.delete(categoryMappings).where(and(eq(categoryMappings.id, id), eq(categoryMappings.householdId, householdId)));
     // 삭제된 매핑이 적용되던 거래도, 남은 규칙 우선순위대로 다시 계산한다(전에는 그대로 남아있었음).
-    if (mapping) await rederiveAndPairHousehold(db, householdId, mappingCandidateFilter(mapping.txnType, mapping.rawCategory, mapping.rawSubcategory));
+    if (mapping) await rederiveAndPairHousehold(db, householdId, personId, mappingCandidateFilter(mapping.txnType, mapping.rawCategory, mapping.rawSubcategory));
   }
   redirect("/finance/spending/settings");
 }
 
 export async function upsertCategoryRuleAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const txnType = String(formData.get("txnType") ?? "").trim();
   const paymentMethod = String(formData.get("paymentMethod") ?? "").trim();
   const stdCategory = String(formData.get("stdCategory") ?? "").trim();
@@ -101,14 +103,14 @@ export async function upsertCategoryRuleAction(formData: FormData) {
         target: [categoryRules.householdId, categoryRules.txnType, categoryRules.paymentMethod],
         set: { stdCategory },
       });
-    await rederiveAndPairHousehold(db, householdId, ruleCandidateFilter(txnType, paymentMethod));
+    await rederiveAndPairHousehold(db, householdId, personId, ruleCandidateFilter(txnType, paymentMethod));
   }
 
   redirect("/finance/spending/settings?tab=rules");
 }
 
 export async function deleteCategoryRuleAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const id = String(formData.get("id") ?? "");
   if (id) {
     const db = getDb();
@@ -118,13 +120,13 @@ export async function deleteCategoryRuleAction(formData: FormData) {
       .where(and(eq(categoryRules.id, id), eq(categoryRules.householdId, householdId)))
       .limit(1);
     await db.delete(categoryRules).where(and(eq(categoryRules.id, id), eq(categoryRules.householdId, householdId)));
-    if (rule) await rederiveAndPairHousehold(db, householdId, ruleCandidateFilter(rule.txnType, rule.paymentMethod));
+    if (rule) await rederiveAndPairHousehold(db, householdId, personId, ruleCandidateFilter(rule.txnType, rule.paymentMethod));
   }
   redirect("/finance/spending/settings?tab=rules");
 }
 
 export async function upsertCategoryKeywordRuleAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const txnType = String(formData.get("txnType") ?? "지출").trim();
   const keyword = String(formData.get("keyword") ?? "").trim();
   const stdCategory = String(formData.get("stdCategory") ?? "").trim();
@@ -142,7 +144,7 @@ export async function upsertCategoryKeywordRuleAction(formData: FormData) {
       });
 
     if (applyToExisting) {
-      await rederiveAndPairHousehold(db, householdId, keywordCandidateFilter(normalizedTxnType, keyword));
+      await rederiveAndPairHousehold(db, householdId, personId, keywordCandidateFilter(normalizedTxnType, keyword));
     }
   }
 
@@ -150,7 +152,7 @@ export async function upsertCategoryKeywordRuleAction(formData: FormData) {
 }
 
 export async function deleteCategoryKeywordRuleAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const id = String(formData.get("id") ?? "");
   if (id) {
     const db = getDb();
@@ -160,7 +162,7 @@ export async function deleteCategoryKeywordRuleAction(formData: FormData) {
       .where(and(eq(categoryKeywordRules.id, id), eq(categoryKeywordRules.householdId, householdId)))
       .limit(1);
     await db.delete(categoryKeywordRules).where(and(eq(categoryKeywordRules.id, id), eq(categoryKeywordRules.householdId, householdId)));
-    if (rule) await rederiveAndPairHousehold(db, householdId, keywordCandidateFilter(rule.txnType, rule.keyword));
+    if (rule) await rederiveAndPairHousehold(db, householdId, personId, keywordCandidateFilter(rule.txnType, rule.keyword));
   }
   redirect("/finance/spending/settings?tab=rules");
 }
@@ -176,12 +178,12 @@ export type RederiveState = {
 };
 
 // useActionState로 호출된다(prevState, formData). 매핑·규칙을 나중에 추가해 과거 거래에는
-// 반영되지 않은 경우를 위해, 가구 전체를 candidateFilter 없이(household 전체) 재계산한다.
+// 반영되지 않은 경우를 위해, 가구 전체(조회자가 볼 수 있는 행 = 공개 + 본인 결제)를 재계산한다.
 // 실제로 값을 바꾸는(dryRun 아닌) 버전 - rederive-card의 "적용" 버튼이 호출한다.
 export async function rederiveAllAction(): Promise<RederiveState> {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const db = getDb();
-  const summary = await rederiveTransactions(db, householdId);
+  const summary = await rederiveTransactions(db, householdId, visibleToViewer(personId));
   const { pairs } = await applyHouseholdTransferPairs(db, householdId);
   // 미분류 목록·집계가 방금 바뀐 값을 반영하도록 새로고침.
   revalidatePath("/finance/spending/settings");
@@ -193,9 +195,9 @@ export async function rederiveAllAction(): Promise<RederiveState> {
 // 호출해, 실제로 적용하기 전에 바뀔 내용(분류 변화 상위 항목·재분류/집계 변경 건수·새로
 // 제외될 계좌이동 쌍 수)을 보여준다.
 export async function rederivePreviewAction(): Promise<RederiveState> {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const db = getDb();
-  const summary = await rederiveTransactions(db, householdId, undefined, { dryRun: true });
+  const summary = await rederiveTransactions(db, householdId, visibleToViewer(personId), { dryRun: true });
   const { pairs } = await applyHouseholdTransferPairs(db, householdId, { dryRun: true });
   return { ...summary, pairs };
 }
