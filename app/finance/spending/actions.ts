@@ -8,6 +8,7 @@ import { getHouseholdPeople, isBeneficiary, isPersonId } from "@/lib/spending-qu
 import { requireHousehold } from "@/lib/require-household";
 import { rederiveTransactions } from "@/lib/rederive-transactions";
 import { getOrCreateActiveUploadId } from "@/lib/manual-upload";
+import { visibleToViewer } from "@/lib/spending-private";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,7 +19,7 @@ function spendingReturnTo(value: FormDataEntryValue | null): string {
 }
 
 export async function addManualTransactionAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId: viewerPersonId } = await requireHousehold();
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
   const personId = String(formData.get("personId") ?? "");
   const beneficiary = String(formData.get("beneficiary") ?? "");
@@ -27,11 +28,16 @@ export async function addManualTransactionAction(formData: FormData) {
   const description = String(formData.get("description") ?? "").trim().slice(0, 100);
   const paymentMethod = String(formData.get("paymentMethod") ?? "").trim().slice(0, 50);
   const amount = Number(String(formData.get("amount") ?? "").replaceAll(",", ""));
+  const isPrivate = formData.get("isPrivate") === "on";
 
   const householdPeople = await getHouseholdPeople(householdId);
   const knownIds = householdPeople.map((p) => p.id);
   if (!isPersonId(personId, knownIds) || !isBeneficiary(beneficiary, knownIds) || !ISO_DATE_RE.test(txnDate) || !stdCategory || !Number.isFinite(amount) || amount <= 0) {
     redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}addError=${encodeURIComponent("입력 내용을 다시 확인해주세요.")}`);
+  }
+  // 나만 보기는 내가 결제한 거래에만 쓸 수 있다(파트너 명의로 저장하면 나도 내용을 못 보는 거래가 된다).
+  if (isPrivate && personId !== viewerPersonId) {
+    redirect(`${returnTo}${returnTo.includes("?") ? "&" : "?"}addError=${encodeURIComponent("나만 보기는 내가 결제한 거래에만 쓸 수 있어요.")}`);
   }
 
   const db = getDb();
@@ -57,13 +63,14 @@ export async function addManualTransactionAction(formData: FormData) {
     included: stdCategory !== "자산수정",
     isInternalTransfer: false,
     beneficiary,
+    isPrivate,
   });
 
   redirect(returnTo);
 }
 
 export async function updateBeneficiaryAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId: viewerPersonId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const beneficiary = String(formData.get("beneficiary") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
@@ -71,31 +78,53 @@ export async function updateBeneficiaryAction(formData: FormData) {
   const knownIds = (await getHouseholdPeople(householdId)).map((p) => p.id);
   if (txnId && isBeneficiary(beneficiary, knownIds)) {
     const db = getDb();
-    await db.update(transactions).set({ beneficiary }).where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
+    await db.update(transactions).set({ beneficiary }).where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId), visibleToViewer(viewerPersonId)));
   }
 
   redirect(returnTo);
 }
 
 export async function deleteTransactionAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId: viewerPersonId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const returnTo = spendingReturnTo(formData.get("returnTo"));
 
   if (UUID_RE.test(txnId)) {
-    await getDb().delete(transactions).where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
+    await getDb()
+      .delete(transactions)
+      .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId), visibleToViewer(viewerPersonId)));
   }
 
   redirect(returnTo);
 }
 
 export async function deleteTransactionsAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId: viewerPersonId } = await requireHousehold();
   const returnTo = spendingReturnTo(formData.get("returnTo"));
   const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
 
   if (ids.length > 0) {
-    await getDb().delete(transactions).where(and(inArray(transactions.id, ids), eq(transactions.householdId, householdId)));
+    await getDb()
+      .delete(transactions)
+      .where(and(inArray(transactions.id, ids), eq(transactions.householdId, householdId), visibleToViewer(viewerPersonId)));
+  }
+
+  redirect(returnTo);
+}
+
+// "나만 보기" 켜기/끄기. 내가 결제한 거래(person_id = 나)만 바꿀 수 있다. 계정↔프로필 연결이 없는
+// 계정(personId null)은 아무 것도 못 바꾼다(fail-closed).
+export async function setTransactionPrivateAction(formData: FormData) {
+  const { householdId, personId } = await requireHousehold();
+  const txnId = String(formData.get("txnId") ?? "");
+  const isPrivate = formData.get("private") === "1";
+  const returnTo = spendingReturnTo(formData.get("returnTo"));
+
+  if (personId && UUID_RE.test(txnId)) {
+    await getDb()
+      .update(transactions)
+      .set({ isPrivate })
+      .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId), eq(transactions.personId, personId)));
   }
 
   redirect(returnTo);
@@ -112,13 +141,19 @@ const UNMAPPED_VALUE = "__미분류__";
 // 계산한다(값이 그대로 null로 남을 수도, 매핑/규칙에 걸려 자동으로 채워질 수도 있다).
 // stdCategory가 있으면 사용자가 직접 고른 것이므로 category_locked=true로 저장해, 이후 설정 탭의
 // 일괄 재계산(rederiveTransactions)이 이 거래를 건드리지 않도록 보호한다.
-async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, householdId: string, txnId: string, stdCategory: string | null) {
+async function applyStdCategoryToTransaction(
+  db: ReturnType<typeof getDb>,
+  householdId: string,
+  viewerPersonId: string | null | undefined,
+  txnId: string,
+  stdCategory: string | null
+) {
+  // 다른 가구의 id, 그리고 같은 가구 파트너의 "나만 보기" 거래는 절대 바뀌지 않는다.
+  const editable = and(eq(transactions.id, txnId), eq(transactions.householdId, householdId), visibleToViewer(viewerPersonId));
+
   if (stdCategory === null) {
-    await db
-      .update(transactions)
-      .set({ categoryLocked: false })
-      .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
-    await rederiveTransactions(db, householdId, eq(transactions.id, txnId));
+    await db.update(transactions).set({ categoryLocked: false }).where(editable);
+    await rederiveTransactions(db, householdId, and(eq(transactions.id, txnId), visibleToViewer(viewerPersonId)));
     return;
   }
 
@@ -129,7 +164,7 @@ async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, house
       isInternalTransfer: transactions.isInternalTransfer,
     })
     .from(transactions)
-    .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)))
+    .where(editable)
     .limit(1);
 
   if (!transaction) return;
@@ -140,28 +175,25 @@ async function applyStdCategoryToTransaction(db: ReturnType<typeof getDb>, house
       : transaction.stdCategory === "자산수정" && stdCategory
         ? !transaction.isInternalTransfer
         : transaction.included;
-  await db
-    .update(transactions)
-    .set({ stdCategory, included, categoryLocked: true })
-    .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId)));
+  await db.update(transactions).set({ stdCategory, included, categoryLocked: true }).where(editable);
 }
 
 export async function updateTransactionCategoryAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
   const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
 
   if (txnId) {
     const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
-    await applyStdCategoryToTransaction(getDb(), householdId, txnId, stdCategory);
+    await applyStdCategoryToTransaction(getDb(), householdId, personId, txnId, stdCategory);
   }
 
   redirect(returnTo);
 }
 
 export async function updateTransactionsCategoryAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const returnTo = spendingReturnTo(formData.get("returnTo"));
   const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
@@ -169,7 +201,7 @@ export async function updateTransactionsCategoryAction(formData: FormData) {
 
   if (ids.length > 0) {
     const db = getDb();
-    await Promise.all(ids.map((id) => applyStdCategoryToTransaction(db, householdId, id, stdCategory)));
+    await Promise.all(ids.map((id) => applyStdCategoryToTransaction(db, householdId, personId, id, stdCategory)));
   }
 
   redirect(returnTo);
@@ -184,7 +216,7 @@ function normalizeTxnType(txnType: string): string {
 // 기존 거래는 page.tsx가 미리 정확 일치로 골라준 applyTxnId 목록만 사용한다
 // (ILIKE 부분일치로 무관한 거래까지 바뀌는 것을 막기 위함).
 export async function createKeywordRuleAndApplyAction(formData: FormData) {
-  const { householdId } = await requireHousehold();
+  const { householdId, personId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const keyword = String(formData.get("keyword") ?? "").trim();
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "").trim();
@@ -207,11 +239,11 @@ export async function createKeywordRuleAndApplyAction(formData: FormData) {
       });
 
     if (txnId) {
-      await applyStdCategoryToTransaction(db, householdId, txnId, stdCategory);
+      await applyStdCategoryToTransaction(db, householdId, personId, txnId, stdCategory);
     }
 
     if (applyToExisting && applyTxnIds.length > 0) {
-      await Promise.all(applyTxnIds.map((id) => applyStdCategoryToTransaction(db, householdId, id, stdCategory)));
+      await Promise.all(applyTxnIds.map((id) => applyStdCategoryToTransaction(db, householdId, personId, id, stdCategory)));
     }
   }
 
