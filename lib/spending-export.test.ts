@@ -90,4 +90,36 @@ describe("exportTransactionsToExcel", () => {
     expect(row2?.getCell(8).value).toBe("아내");
     expect(row2?.getCell(9).value).toBe("아내");
   });
+
+  it("마스킹 행은 설명 '비공개 거래'로 나오고 금액·분류·결제수단·원본 분류는 비어 있다", async () => {
+    const masked: Txn & { masked: boolean } = {
+      id: "tx-secret",
+      householdId: "household-1",
+      uploadId: "u-1",
+      personId: "husband",
+      txnDate: "2026-08-25",
+      txnTime: "12:30:00",
+      txnType: "지출",
+      category: null,
+      subcategory: null,
+      description: null,
+      amount: "-50000.00",
+      paymentMethod: null,
+      stdCategory: "선물",
+      included: true,
+      isInternalTransfer: false,
+      beneficiary: "husband",
+      categoryLocked: false,
+      isPrivate: true,
+      masked: true,
+    };
+    const buffer = await exportTransactionsToExcel([masked], new Map([["husband", "남편"]]));
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer.buffer as ArrayBuffer);
+    const row = workbook.getWorksheet("세부내역")!.getRow(2);
+    expect(row.getCell(6).value).toBe("비공개 거래"); // 내용
+    expect(row.getCell(5).value ?? null).toBeNull(); // 금액
+    expect(row.getCell(4).value ?? "").toBe(""); // 카테고리
+    expect(row.getCell(7).value ?? "").toBe(""); // 결제수단
+  });
 });

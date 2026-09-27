@@ -11,6 +11,7 @@ import {
   type PersonId,
 } from "@/lib/spending-queries";
 import { exportTransactionsToExcel } from "@/lib/spending-export";
+import { rowMatchesCategory, rowMatchesQuery } from "@/lib/spending-private";
 import { isFinanceDemoMode } from "@/lib/finance-viewer-server";
 import { isVoucherPurchaseRecord } from "@/lib/voucher-exclusion";
 import { NoHouseholdError, requireHousehold } from "@/lib/require-household";
@@ -64,15 +65,8 @@ export async function GET(request: NextRequest) {
   const filtered = (personFilter === "all" ? monthTx : monthTx.filter((t) => t.personId === personFilter))
     .filter((t) => flowFilter === "all" || flowFilter === "excluded" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
     .filter((t) => beneficiaryFilter === "all" || t.beneficiary === beneficiaryFilter)
-    .filter((t) => categoryFilter === "all" || t.stdCategory === categoryFilter)
-    .filter((t) => {
-      if (!query) return true;
-      const haystack = [t.description, t.paymentMethod, t.category, t.subcategory, t.stdCategory]
-        .filter(Boolean)
-        .join(" ")
-        .toLocaleLowerCase("ko");
-      return haystack.includes(query.toLocaleLowerCase("ko"));
-    })
+    .filter((t) => rowMatchesCategory(t, categoryFilter))
+    .filter((t) => rowMatchesQuery(t, query))
     .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)));
 
   const buffer = await exportTransactionsToExcel(filtered, displayNameByPerson);

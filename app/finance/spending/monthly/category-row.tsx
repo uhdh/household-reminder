@@ -7,7 +7,9 @@ import { CategoryIcon } from "@/app/finance/spending/category-icon";
 export type CategoryTransaction = {
   id: string;
   description: string | null;
-  amount: number;
+  /** 파트너의 비공개 거래는 금액을 아예 내려보내지 않는다(null). */
+  amount: number | null;
+  masked?: boolean;
 };
 
 function usagePctOf(actual: number, budget: number | null): number | null {
@@ -129,8 +131,8 @@ export function CategoryRow({
         <ul className="mx-4 mb-3 divide-y divide-stroke-neutral-muted/60 border-t border-stroke-neutral-muted/60 text-[13px] sm:mx-6">
           {transactions.length > 0 ? transactions.map((transaction) => (
             <li key={transaction.id} className="flex items-center justify-between gap-3 py-2">
-              <span className="min-w-0 truncate text-ink-muted">{transaction.description || "메모 없음"}</span>
-              <span className="shrink-0 font-semibold tabular-nums text-ink">{formatKRW(transaction.amount)}</span>
+              <span className="min-w-0 truncate text-ink-muted">{transaction.masked ? "비공개 거래" : transaction.description || "메모 없음"}</span>
+              {transaction.amount !== null && <span className="shrink-0 font-semibold tabular-nums text-ink">{formatKRW(transaction.amount)}</span>}
             </li>
           )) : <li className="py-2 text-ink-muted">내역 없음</li>}
         </ul>

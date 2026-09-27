@@ -152,7 +152,11 @@ export default async function MonthlyPage({
   const transactionsFor = (category: string) => monthTx
     .filter((transaction) => flowLabel(transaction) === "지출" && (transaction.stdCategory ?? UNMAPPED) === category)
     .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)))
-    .map((transaction) => ({ id: transaction.id, description: transaction.description, amount: Math.abs(toNum(transaction.amount)) }));
+    .map((transaction) =>
+      transaction.masked
+        ? { id: transaction.id, description: null, amount: null, masked: true }
+        : { id: transaction.id, description: transaction.description, amount: Math.abs(toNum(transaction.amount)), masked: false }
+    );
 
   return (
     <div>

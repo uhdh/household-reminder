@@ -1,8 +1,12 @@
 import ExcelJS from "exceljs";
 import { beneficiaryLabel, flowLabel, toNum, type Txn } from "./spending-queries";
+import { PRIVATE_LABEL } from "./spending-private";
+
+/** 조회 계층이 돌려준 행(masked=true면 파트너의 비공개 거래) - masked가 없어도 그대로 내보낸다. */
+export type ExportRow = Txn & { masked?: boolean };
 
 export async function exportTransactionsToExcel(
-  transactions: Txn[],
+  transactions: ExportRow[],
   displayNameByPerson: Map<string, string> = new Map()
 ): Promise<Uint8Array> {
   const workbook = new ExcelJS.Workbook();
@@ -54,19 +58,20 @@ export async function exportTransactionsToExcel(
     const amountVal = toNum(t.amount);
     const payer = beneficiaryLabel(t.personId, displayNameByPerson);
     const beneficiaryText = beneficiaryLabel(t.beneficiary, displayNameByPerson);
+    const masked = t.masked === true; // 파트너의 비공개 거래: 내용·금액·분류·결제수단은 내보내지 않는다.
 
     const row = worksheet.addRow({
       txnDate: t.txnDate,
       txnTime: t.txnTime ?? "",
       flow,
-      stdCategory: t.stdCategory ?? "미분류",
-      amount: flow === "입금" ? Math.abs(amountVal) : -Math.abs(amountVal),
-      description: t.description ?? "",
-      paymentMethod: t.paymentMethod ?? "",
+      stdCategory: masked ? "" : (t.stdCategory ?? "미분류"),
+      amount: masked ? null : flow === "입금" ? Math.abs(amountVal) : -Math.abs(amountVal),
+      description: masked ? PRIVATE_LABEL : (t.description ?? ""),
+      paymentMethod: masked ? "" : (t.paymentMethod ?? ""),
       payer,
       beneficiary: beneficiaryText,
-      rawCategory: t.category ?? "",
-      rawSubcategory: t.subcategory ?? "",
+      rawCategory: masked ? "" : (t.category ?? ""),
+      rawSubcategory: masked ? "" : (t.subcategory ?? ""),
       included: t.included ? "Y" : "N",
     });
 

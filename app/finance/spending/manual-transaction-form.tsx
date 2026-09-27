@@ -8,6 +8,7 @@ export function ManualTransactionForm({
   categories,
   returnTo,
   open = false,
+  canPrivate,
 }: {
   month: string;
   defaultPerson: PersonId;
@@ -15,6 +16,7 @@ export function ManualTransactionForm({
   categories: { name: string; kind: string }[];
   returnTo: string;
   open?: boolean;
+  canPrivate: boolean;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const defaultDate = today.startsWith(month) ? today : `${month}-01`;
@@ -62,6 +64,15 @@ export function ManualTransactionForm({
           메모
           <input name="description" maxLength={100} placeholder="지출 내용을 입력하세요" className="seed-input mt-1.5 text-[14px]" />
         </label>
+        {canPrivate && (
+          <label className="flex items-start gap-2 text-[12px] font-medium text-ink-muted sm:col-span-2 lg:col-span-4">
+            <input type="checkbox" name="isPrivate" className="mt-0.5" />
+            <span>
+              나만 보기
+              <span className="ml-1 font-normal">파트너에게는 날짜와 &quot;비공개 거래&quot;만 보이고, 합계에는 포함돼요. 결제한 사람이 나일 때만 쓸 수 있어요.</span>
+            </span>
+          </label>
+        )}
         <div className="flex justify-end sm:col-span-2 lg:col-span-4">
           <button type="submit" className="seed-primary-button px-5">저장</button>
         </div>

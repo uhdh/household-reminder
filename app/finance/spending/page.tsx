@@ -40,6 +40,9 @@ import { PersonFilter } from "./person-filter";
 import { CategoryFilter } from "./category-filter";
 import { MonthlyNavigator } from "./monthly/monthly-navigator";
 import { ManualTransactionForm } from "./manual-transaction-form";
+import { rowMatchesCategory, rowMatchesQuery } from "@/lib/spending-private";
+import { MaskedTransactionRow } from "./masked-row";
+import { PrivateToggle } from "./private-toggle";
 import { TransactionDeleteButton } from "./transaction-delete-button";
 import { SelectAllTransactions, TransactionBulkDeleteForm, TransactionCheckbox } from "./transaction-bulk-delete";
 import { DemoBanner } from "@/app/finance/_components/demo-banner";
@@ -142,28 +145,24 @@ export default async function SpendingPage({
   const monthPersonTx = personFilter === "all" ? monthTx : monthTx.filter((t) => t.personId === personFilter);
   const filterBaseTx =
     flowFilter === "excluded" ? (personFilter === "all" ? excludedTx : excludedTx.filter((t) => t.personId === personFilter)) : monthPersonTx;
-  const filtered = filterBaseTx
+  const passesBaseFilters = filterBaseTx
     .filter((t) => flowFilter === "all" || flowFilter === "excluded" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
-    .filter((t) => beneficiaryFilter === "all" || t.beneficiary === beneficiaryFilter)
-    .filter((t) => categoryFilter === "all" || (categoryFilter === "미분류" ? !t.stdCategory : t.stdCategory === categoryFilter))
-    .filter((t) => {
-      if (!query) return true;
-      const haystack = [t.description, t.paymentMethod, t.category, t.subcategory, t.stdCategory]
-        .filter(Boolean)
-        .join(" ")
-        .toLocaleLowerCase("ko");
-      return haystack.includes(query.toLocaleLowerCase("ko"));
-    })
+    .filter((t) => beneficiaryFilter === "all" || t.beneficiary === beneficiaryFilter);
+  // 비공개 거래는 분류·검색 조건으로 내용을 유추할 수 없게 조건이 있으면 목록에서 빠진다(rowMatches* 참고).
+  const filtered = passesBaseFilters
+    .filter((t) => rowMatchesCategory(t, categoryFilter))
+    .filter((t) => rowMatchesQuery(t, query))
     .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)));
+  const hiddenByFilterCount = passesBaseFilters.filter((t) => t.masked).length - filtered.filter((t) => t.masked).length;
 
-  // '자주 쓰는' 카테고리는 현재 화면에 보이는 목록 기준.
-  const frequentCategories = topFrequentCategories(filtered);
+  // '자주 쓰는' 카테고리는 현재 화면에 보이는 목록 기준(마스킹 행의 분류는 세지 않는다).
+  const frequentCategories = topFrequentCategories(filtered.filter((t) => !t.masked));
 
   // 분류 모드: 이번에 저장한 거래가 필터에서 빠지면서 목록의 첫 미분류 거래가 자연스럽게
   // "다음 미분류"가 된다. 그 다음 항목의 행 피커를 자동으로 연다.
-  const autoOpenTxnId = reviewMode ? findNextUnclassifiedId(filtered) : null;
+  const autoOpenTxnId = reviewMode ? findNextUnclassifiedId(filtered.filter((t) => !t.masked)) : null;
 
-  const reviewCandidates = monthPersonTx.filter((t) => !t.stdCategory);
+  const reviewCandidates = monthPersonTx.filter((t) => !t.stdCategory && !t.masked);
   const unclassifiedCount = reviewCandidates.length;
   const unclassifiedAmount = reviewCandidates.reduce((sum, t) => sum + Math.abs(toNum(t.amount)), 0);
 
@@ -216,6 +215,7 @@ export default async function SpendingPage({
               </tr>
             )}
             {filtered.map((t) => {
+              if (t.masked) return <MaskedTransactionRow key={t.id} t={t} displayNameByPerson={displayNameByPerson} />;
               const flow = flowLabel(t);
               const rawCategory = t.category ?? "미분류";
               const displayedCategory = t.stdCategory ?? "미분류";
@@ -271,7 +271,10 @@ export default async function SpendingPage({
                   </td>
                   <td className="col-start-2 row-start-1 min-w-0 md:table-cell md:px-3">
                     <div className="flex flex-col gap-0.5">
-                      <span className="truncate font-semibold text-ink md:font-normal md:text-ink-muted">{t.description ?? "-"}</span>
+                      <span className="truncate font-semibold text-ink md:font-normal md:text-ink-muted">
+                        {t.description ?? "-"}
+                        {t.isPrivate && <span className="ml-2 rounded-r1 bg-bg-neutral-weak px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">나만 보기</span>}
+                      </span>
                       {t.paymentMethod && <span className="hidden text-[10px] text-ink-muted/70 md:inline">{t.paymentMethod}</span>}
                     </div>
                   </td>
@@ -282,7 +285,12 @@ export default async function SpendingPage({
                     </span>
                   </td>
                   <td className="col-start-3 row-start-3 justify-self-end md:table-cell md:whitespace-nowrap md:px-3 md:text-right">
-                    {!readOnly && <TransactionDeleteButton txnId={t.id} returnTo={returnTo} />}
+                    {!readOnly && (
+                      <div className="flex items-center justify-end gap-1">
+                        {personId && t.personId === personId && <PrivateToggle txnId={t.id} isPrivate={t.isPrivate} returnTo={returnTo} />}
+                        <TransactionDeleteButton txnId={t.id} returnTo={returnTo} />
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -369,6 +377,10 @@ export default async function SpendingPage({
         <span className="ml-auto pb-3 text-[13px] text-ink-muted">{filtered.length}건</span>
       </form>
 
+      {hiddenByFilterCount > 0 && (
+        <p className="mb-3 text-[12px] text-ink-muted">비공개 거래 {hiddenByFilterCount}건은 분류·검색 조건에 걸리지 않아 목록에서 빠져 있어요. 합계에는 포함돼요.</p>
+      )}
+
       {unclassifiedCount > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-r3 border border-stroke-brand-weak bg-bg-brand-weak px-4 py-3 text-[14px] font-medium text-fg-neutral">
           <span>
@@ -415,6 +427,7 @@ export default async function SpendingPage({
           categories={categoryOptions}
           returnTo={returnTo}
           open={manual === "1"}
+          canPrivate={personId !== null}
         />
       )}
 
@@ -424,7 +437,7 @@ export default async function SpendingPage({
           transactionsTable
         ) : (
           <TransactionBulkDeleteForm
-            transactionIds={filtered.map((transaction) => transaction.id)}
+            transactionIds={filtered.filter((transaction) => !transaction.masked).map((transaction) => transaction.id)}
             returnTo={returnTo}
             categoryOptions={categoryOptions}
             frequentCategories={frequentCategories}

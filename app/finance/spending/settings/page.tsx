@@ -88,7 +88,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     { txnType: string; rawCategory: string; rawSubcategory: string; count: number; totalAmount: number }
   >();
   for (const t of allTx) {
-    if (t.stdCategory || !t.included) continue;
+    if (t.masked || t.stdCategory || !t.included) continue;
     const rawCategory = t.category ?? "미분류";
     const rawSubcategory = t.subcategory ?? "미분류";
     const key = `${t.txnType}|${rawCategory}|${rawSubcategory}`;
