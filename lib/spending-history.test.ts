@@ -49,7 +49,7 @@ describe("getActiveTransactions", () => {
       },
     ]);
 
-    const result = await getActiveTransactions(householdId);
+    const result = await getActiveTransactions(householdId, null);
 
     expect(result.transactions.map((row) => row.txnDate).sort()).toEqual(["2026-07-31", "2026-08-01"]);
     expect(result.transactions.find((row) => row.txnDate === "2026-08-01")?.amount).toBe("-2000");

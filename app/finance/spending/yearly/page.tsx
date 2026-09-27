@@ -86,14 +86,14 @@ export default async function YearlyPage({
 }) {
   const { year: yearParam, person } = await searchParams;
 
-  const { householdId, readOnly } = await resolveFinanceViewer();
+  const { householdId, readOnly, personId } = await resolveFinanceViewer();
   // maxYear(다음 해 이동 가능 여부)는 연도 파라미터 유무와 무관하게 항상 필요하므로 매번 조회한다.
   const [householdHasAny, latestPeriod] = await Promise.all([hasAnyTransaction(householdId), getLatestActivePeriod(householdId)]);
   const year = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : latestPeriod.year;
   const maxYear = Math.max(new Date().getFullYear(), latestPeriod.year);
 
   // 해당 연도만 SQL로 가져온다. household_id + txn_date 범위(그 해 1/1 ~ 다음 해 1/1 직전).
-  const { transactions: yearRangeTx, displayNameByPerson } = await getActiveTransactionsInRange(householdId, `${year}-01-01`, `${year + 1}-01-01`);
+  const { transactions: yearRangeTx, displayNameByPerson } = await getActiveTransactionsInRange(householdId, `${year}-01-01`, `${year + 1}-01-01`, personId);
   const personIds = Array.from(displayNameByPerson.keys());
   const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
   const periodTxAll = yearRangeTx.filter((t) => yearOf(t.txnDate) === year && (personFilter === "all" || t.personId === personFilter));

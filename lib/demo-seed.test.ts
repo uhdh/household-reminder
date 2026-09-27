@@ -155,13 +155,13 @@ describe("seedDemoHousehold", () => {
     expect(household).toBeDefined();
   });
 
-  test("getActiveTransactions(DEMO_HOUSEHOLD_ID)가 2026-01~08 각 달의 데이터를 반환한다", async () => {
+  test("getActiveTransactions(DEMO_HOUSEHOLD_ID, null)가 2026-01~08 각 달의 데이터를 반환한다", async () => {
     const db = drizzle();
     setDbForTesting(db);
     await createSchema(db);
     await seedDemoHousehold(db);
 
-    const { transactions: rows } = await getActiveTransactions(DEMO_HOUSEHOLD_ID);
+    const { transactions: rows } = await getActiveTransactions(DEMO_HOUSEHOLD_ID, null);
     const months = new Set(rows.map((r) => r.txnDate.slice(0, 7)));
     for (const m of ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08"]) {
       expect(months.has(m), `month ${m} should have transactions`).toBe(true);

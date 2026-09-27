@@ -100,10 +100,10 @@ describe("query scoping matches full-load-then-filter", () => {
     setDbForTesting(db);
     await seedBaseline(db);
 
-    const full = await getActiveTransactions(HOUSEHOLD_A);
+    const full = await getActiveTransactions(HOUSEHOLD_A, null);
     const expectedAugust = full.transactions.filter((t) => monthKeyOf(t.txnDate) === "2026-08").map((t) => t.id).sort();
 
-    const scoped = await getActiveTransactionsInRange(HOUSEHOLD_A, "2026-08-01", "2026-09-01");
+    const scoped = await getActiveTransactionsInRange(HOUSEHOLD_A, "2026-08-01", "2026-09-01", null);
     expect(scoped.transactions.map((t) => t.id).sort()).toEqual(expectedAugust);
     // 2월 첫날 거래(범위 밖)나 B의 거래가 섞여 들어오지 않는다.
     expect(scoped.transactions.some((t) => t.description === "2월 첫날 거래")).toBe(false);
@@ -119,7 +119,7 @@ describe("query scoping matches full-load-then-filter", () => {
     const prevMonth = shiftMonth(month, -1);
     expect(prevMonth).toBe("2025-12");
 
-    const scoped = await getActiveTransactionsInRange(HOUSEHOLD_A, `${prevMonth}-01`, `${shiftMonth(month, 1)}-01`);
+    const scoped = await getActiveTransactionsInRange(HOUSEHOLD_A, `${prevMonth}-01`, `${shiftMonth(month, 1)}-01`, null);
     const descriptions = scoped.transactions.map((t) => t.description).sort();
     expect(descriptions).toEqual(["12월 거래", "1월 거래", "1월 말 거래"].sort());
   });
@@ -129,7 +129,7 @@ describe("query scoping matches full-load-then-filter", () => {
     setDbForTesting(db);
     await seedBaseline(db);
 
-    const full = await getActiveTransactions(HOUSEHOLD_A);
+    const full = await getActiveTransactions(HOUSEHOLD_A, null);
     const includedTx = full.transactions.filter(countsInTotals);
     const expected = { month: latestMonth(includedTx), year: latestYear(includedTx) };
 
@@ -159,7 +159,7 @@ describe("query scoping matches full-load-then-filter", () => {
       txnRow({ id: uuid(), txnDate: "2026-09-20", included: false, stdCategory: "자산수정" }),
     ]);
 
-    const full = await getActiveTransactions(HOUSEHOLD_A);
+    const full = await getActiveTransactions(HOUSEHOLD_A, null);
     const visibleTx = full.transactions.filter((t) => t.included || t.stdCategory === "자산수정");
     expect(await getLatestVisibleMonth(HOUSEHOLD_A)).toBe(latestMonth(visibleTx));
     expect(await getLatestVisibleMonth(HOUSEHOLD_A)).toBe("2026-09");
@@ -180,12 +180,12 @@ describe("query scoping matches full-load-then-filter", () => {
     setDbForTesting(db);
     await seedBaseline(db);
 
-    const full = await getActiveTransactions(HOUSEHOLD_A);
+    const full = await getActiveTransactions(HOUSEHOLD_A, null);
     const expected = full.transactions
       .map(({ id, description, category, subcategory, stdCategory, txnType }) => ({ id, description, category, subcategory, stdCategory, txnType }))
       .sort((a, b) => a.id.localeCompare(b.id));
 
-    const history = await getMerchantHistory(HOUSEHOLD_A);
+    const history = await getMerchantHistory(HOUSEHOLD_A, null);
     expect(history.slice().sort((a, b) => a.id.localeCompare(b.id))).toEqual(expected);
     expect(history.some((row) => row.description === "B의 거래")).toBe(false);
   });
@@ -195,10 +195,10 @@ describe("query scoping matches full-load-then-filter", () => {
     setDbForTesting(db);
     await seedBaseline(db);
 
-    const full = await getActiveTransactions(HOUSEHOLD_A);
+    const full = await getActiveTransactions(HOUSEHOLD_A, null);
     const expected2026 = full.transactions.filter((t) => yearOf(t.txnDate) === 2026).map((t) => t.id).sort();
 
-    const scoped = await getActiveTransactionsInRange(HOUSEHOLD_A, "2026-01-01", "2027-01-01");
+    const scoped = await getActiveTransactionsInRange(HOUSEHOLD_A, "2026-01-01", "2027-01-01", null);
     expect(scoped.transactions.map((t) => t.id).sort()).toEqual(expected2026);
   });
 
@@ -217,7 +217,7 @@ describe("query scoping matches full-load-then-filter", () => {
       txnRow({ id: uuid(), uploadId: newUploadId, txnDate: "2026-08-01", amount: "-1000", description: "최신 버전" }),
     ]);
 
-    const scoped = await getActiveTransactionsInRange(HOUSEHOLD_A, "2026-08-01", "2026-09-01");
+    const scoped = await getActiveTransactionsInRange(HOUSEHOLD_A, "2026-08-01", "2026-09-01", null);
     expect(scoped.transactions).toHaveLength(1);
     expect(scoped.transactions[0].description).toBe("최신 버전");
   });

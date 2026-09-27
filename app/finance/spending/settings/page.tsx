@@ -55,14 +55,14 @@ function guessStdCategory(rawCategory: string, rawSubcategory: string, knownName
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string }> }) {
   const { tab, error, success } = await searchParams;
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
-  const { householdId, role } = await requireHouseholdOrOnboard();
+  const { householdId, role, personId } = await requireHouseholdOrOnboard();
   const db = getDb();
   const [mappings, rules, keywordRules, budgets, { transactions: allTx }, memberRows, invites, householdPeople, [household]] = await Promise.all([
     db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
     db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
     db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
     db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
-    getActiveTransactions(householdId),
+    getActiveTransactions(householdId, personId ?? null),
     db.select().from(householdMembers).where(eq(householdMembers.householdId, householdId)),
     db.select().from(householdInvites).where(eq(householdInvites.householdId, householdId)),
     getHouseholdPeople(householdId),

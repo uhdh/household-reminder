@@ -83,7 +83,7 @@ export default async function SpendingPage({
   } = await searchParams;
   const reviewMode = review === "1";
 
-  const { householdId, readOnly } = await resolveFinanceViewer();
+  const { householdId, readOnly, personId } = await resolveFinanceViewer();
   const db = getDb();
 
   // 월 파라미터가 없으면(기본값) 가구 전체에서 가장 최근 월을 찾아야 하므로 그때만 조회한다.
@@ -91,7 +91,7 @@ export default async function SpendingPage({
   const monthNeedsLookup = !(monthParam && MONTH_RE.test(monthParam));
   const [householdHasAny, history, budgetRows, latestVisibleMonth] = await Promise.all([
     hasAnyTransaction(householdId),
-    getMerchantHistory(householdId),
+    getMerchantHistory(householdId, personId),
     db.select().from(budgetCategories).where(eq(budgetCategories.householdId, householdId)),
     monthNeedsLookup ? getLatestVisibleMonth(householdId) : Promise.resolve(null),
   ]);
@@ -101,7 +101,8 @@ export default async function SpendingPage({
   const { transactions: monthRowsAll, displayNameByPerson } = await getActiveTransactionsInRange(
     householdId,
     `${month}-01`,
-    `${shiftMonth(month, 1)}-01`
+    `${shiftMonth(month, 1)}-01`,
+    personId
   );
 
   const personIds = Array.from(displayNameByPerson.keys());

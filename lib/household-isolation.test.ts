@@ -89,10 +89,10 @@ describe("household isolation", () => {
       txnRow({ id: "00000000-0000-4000-8000-0000000000b1", householdId: HOUSEHOLD_B, uploadId: "00000000-0000-0000-0000-000000000002", description: "가구B전용" }),
     ]);
 
-    const resultA = await getActiveTransactions(HOUSEHOLD_A);
+    const resultA = await getActiveTransactions(HOUSEHOLD_A, null);
     expect(resultA.transactions.map((t) => t.id)).toEqual(["00000000-0000-4000-8000-0000000000a1"]);
 
-    const resultB = await getActiveTransactions(HOUSEHOLD_B);
+    const resultB = await getActiveTransactions(HOUSEHOLD_B, null);
     expect(resultB.transactions.map((t) => t.id)).toEqual(["00000000-0000-4000-8000-0000000000b1"]);
   });
 

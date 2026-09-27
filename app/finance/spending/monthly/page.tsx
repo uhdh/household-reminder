@@ -81,7 +81,7 @@ export default async function MonthlyPage({
 }) {
   const { month: monthParam, person } = await searchParams;
 
-  const { householdId, readOnly } = await resolveFinanceViewer();
+  const { householdId, readOnly, personId } = await resolveFinanceViewer();
 
   // 월 파라미터가 없을 때만 가구 전체에서 최근 월을 조회한다(집계에 잡히는 거래 기준, latestMonth와 동치).
   const monthNeedsLookup = !(monthParam && MONTH_RE.test(monthParam));
@@ -93,7 +93,7 @@ export default async function MonthlyPage({
   const prevMonth = shiftMonth(month, -1);
 
   // 이번 달 + 전월(비교용)만 SQL로 가져온다. household_id + txn_date 범위(전월 1일 ~ 이번 달 다음 달 1일 직전).
-  const { transactions: rangeTx, displayNameByPerson } = await getActiveTransactionsInRange(householdId, `${prevMonth}-01`, `${shiftMonth(month, 1)}-01`);
+  const { transactions: rangeTx, displayNameByPerson } = await getActiveTransactionsInRange(householdId, `${prevMonth}-01`, `${shiftMonth(month, 1)}-01`, personId);
   const personIds = Array.from(displayNameByPerson.keys());
   const personFilter: "all" | PersonId = isPersonId(person, personIds) ? person : "all";
   const includedTx = rangeTx.filter(countsInTotals);

@@ -23,9 +23,12 @@ export async function GET(request: NextRequest) {
   // 다른 가구와 똑같은 경로(getActiveTransactions)로 내보낸다.
   const isDemo = await isFinanceDemoMode();
   let householdId = DEMO_HOUSEHOLD_ID;
+  let viewerPersonId: string | null = null;
   if (!isDemo) {
     try {
-      householdId = (await requireHousehold()).householdId;
+      const context = await requireHousehold();
+      householdId = context.householdId;
+      viewerPersonId = context.personId ?? null;
     } catch (error) {
       if (error instanceof NoHouseholdError) return new Response(null, { status: 401 });
       throw error;
@@ -44,7 +47,7 @@ export async function GET(request: NextRequest) {
   const categoryFilter = category && category !== "all" ? category : "all";
   const query = q?.trim().slice(0, 50) ?? "";
 
-  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions(householdId);
+  const { transactions: allTx, displayNameByPerson } = await getActiveTransactions(householdId, viewerPersonId);
   const personIds = Array.from(displayNameByPerson.keys());
   const personFilter: "all" | PersonId = isPersonId(person ?? undefined, personIds) ? (person as PersonId) : "all";
   const beneficiaryFilter = isBeneficiary(beneficiary, personIds) ? beneficiary! : "all";

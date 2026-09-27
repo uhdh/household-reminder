@@ -21,7 +21,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../lib/db";
 import { categoryKeywordRules, categoryMappings, categoryRules } from "../lib/finance-db";
 import { buildMappingIndex, buildRuleIndex, mapStdCategory, suggestKeywordFromDescription } from "../lib/spending-derive";
-import { getActiveTransactions, type Txn } from "../lib/spending-queries";
+import { getAllActiveTransactionsUnmasked, type Txn } from "../lib/spending-queries";
 import { findHouseholdTransferPairs } from "../lib/household-transfer-pairs";
 
 const HOUSEHOLD_ID = process.env.HOUSEHOLD_ID ?? "a1f94fe6-44b6-4a58-ab1a-6433606e3d86";
@@ -42,7 +42,7 @@ function dominant(tally: Map<string, number>): { category: string; share: number
 
 async function main() {
   const db = getDb();
-  const { transactions: all } = await getActiveTransactions(HOUSEHOLD_ID);
+  const { transactions: all } = await getAllActiveTransactionsUnmasked(HOUSEHOLD_ID);
   const [mappings, rules, keywordRules] = await Promise.all([
     db.select().from(categoryMappings).where(eq(categoryMappings.householdId, HOUSEHOLD_ID)),
     db.select().from(categoryRules).where(eq(categoryRules.householdId, HOUSEHOLD_ID)),

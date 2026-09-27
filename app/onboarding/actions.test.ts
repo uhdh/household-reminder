@@ -134,7 +134,7 @@ describe("createHouseholdAction", () => {
       beneficiary: peopleRows[0].id,
     });
 
-    const result = await getActiveTransactions(householdId);
+    const result = await getActiveTransactions(householdId, null);
     expect(result.transactions).toHaveLength(1);
   });
 

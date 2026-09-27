@@ -158,10 +158,10 @@ describe("addManualTransactionAction", () => {
     expect(manualTx.uploadId).toBe(newUpload.id);
 
     // 활성 거래 조회에는 수동 거래(1건) + 엑셀 거래(1건)만 남고, 다른 가구는 영향받지 않는다.
-    const active = await getActiveTransactions(HOUSEHOLD_ID);
+    const active = await getActiveTransactions(HOUSEHOLD_ID, null);
     expect(active.transactions).toHaveLength(2);
     expect(active.transactions.filter((t) => t.category === "직접 입력")).toHaveLength(1);
-    const otherHouseholdActive = await getActiveTransactions(OTHER_HOUSEHOLD);
+    const otherHouseholdActive = await getActiveTransactions(OTHER_HOUSEHOLD, null);
     expect(otherHouseholdActive.transactions).toHaveLength(0);
   });
 });

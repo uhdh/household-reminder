@@ -65,7 +65,7 @@ describe("household size generalization", () => {
     const people1 = await getHouseholdPeople(householdId);
     expect(people1).toEqual([{ id: "solo", displayName: "나" }]);
 
-    const { transactions: tx, displayNameByPerson } = await getActiveTransactions(householdId);
+    const { transactions: tx, displayNameByPerson } = await getActiveTransactions(householdId, null);
     expect(tx).toHaveLength(2);
     expect(displayNameByPerson.get("solo")).toBe("나");
 
@@ -96,7 +96,7 @@ describe("household size generalization", () => {
       txnRow({ householdId, uploadId: "00000000-0000-0000-0000-0000000000c3", personId: "wife", amount: "-500000" }),
     ]);
 
-    const { transactions: tx, displayNameByPerson } = await getActiveTransactions(householdId);
+    const { transactions: tx, displayNameByPerson } = await getActiveTransactions(householdId, null);
     // 기존 PERSON_LABELS와 동일한 라벨이 나와야 한다(이제는 people.display_name에서 온다).
     expect(displayNameByPerson.get("husband")).toBe("남편");
     expect(displayNameByPerson.get("wife")).toBe("아내");
@@ -133,7 +133,7 @@ describe("household size generalization", () => {
     const peopleRows = await getHouseholdPeople(householdId);
     expect(peopleRows.map((p) => p.id).sort()).toEqual(["p1", "p2", "p3"]);
 
-    const { transactions: tx } = await getActiveTransactions(householdId);
+    const { transactions: tx } = await getActiveTransactions(householdId, null);
     const summary = summarizeMonthlyTransactions(tx, kindOf, ["p1", "p2", "p3"]);
     expect(summary.totalExpenseByPerson).toEqual({ p1: 10000, p2: 20000, p3: 30000 });
     expect(summary.totalExpense).toBe(60000);

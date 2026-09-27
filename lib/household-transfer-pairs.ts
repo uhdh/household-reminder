@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { AppDb } from "@/lib/db";
 import { transactions } from "@/lib/finance-db";
-import { getActiveTransactions, toNum, type Txn } from "@/lib/spending-queries";
+import { getAllActiveTransactionsUnmasked, toNum, type Txn } from "@/lib/spending-queries";
 
 // 서울페이 결제/구매 장부 행은 뱅크샐러드 이체와 무관한 별도 출처라 후보에서 제외한다.
 const EXCLUDED_CATEGORY = "서울페이";
@@ -102,7 +102,7 @@ export async function applyHouseholdTransferPairs(
   householdId: string,
   options: { dryRun?: boolean } = {}
 ): Promise<{ pairs: number; rows: number }> {
-  const { transactions: activeTx } = await getActiveTransactions(householdId);
+  const { transactions: activeTx } = await getAllActiveTransactionsUnmasked(householdId);
   const matchedIds = findHouseholdTransferPairs(activeTx).flatMap(([a, b]) => [a.id, b.id]);
 
   if (matchedIds.length > 0 && !options.dryRun) {

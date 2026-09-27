@@ -1,6 +1,7 @@
 import { and, eq, gte, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { people, transactions, uploads } from "@/lib/finance-db";
+import { isMaskedFor, maskPrivateRows, type MaskedTxn } from "@/lib/spending-private";
 
 // 기존 "우리집" 가구는 이 두 id를 그대로 쓴다(마이그레이션으로 이미 people 행이 있음). 새 가구는
 // 온보딩/초대에서 uuid 문자열 id를 받는다 - PersonId는 이제 가구별 people.id 아무거나를 뜻하는
@@ -54,8 +55,11 @@ function dedupeActiveRows<T extends { personId: string; txnDate: string; uploadI
   return rows.filter((row) => latestUploadByDate.get(`${row.personId}|${row.txnDate}`) === row.uploadId);
 }
 
-/** 모든 업로드에서 누적된 거래 전체를 가져온다. 자산만 최신 업로드 스냅샷을 사용한다. */
-export async function getActiveTransactions(householdId: string): Promise<{
+/**
+ * 모든 업로드에서 누적된 거래 전체를 마스킹 없이 가져온다. 화면에 그대로 보여주지 않는 서버 작업(내 계좌
+ * 이동 짝짓기, 분석 스크립트)에서만 쓴다 - 사용자 화면·내보내기는 반드시 getActiveTransactions를 쓴다.
+ */
+export async function getAllActiveTransactionsUnmasked(householdId: string): Promise<{
   transactions: Txn[];
   displayNameByPerson: Map<string, string>;
 }> {
@@ -70,6 +74,18 @@ export async function getActiveTransactions(householdId: string): Promise<{
 }
 
 /**
+ * 모든 업로드에서 누적된 거래 전체를 가져온다. viewerPersonId(지금 보는 사람의 people.id, 모르면 null)가
+ * 아닌 다른 사람의 "나만 보기" 거래는 내용이 지워지고 masked=true가 된다(lib/spending-private.ts).
+ */
+export async function getActiveTransactions(
+  householdId: string,
+  viewerPersonId: string | null
+): Promise<{ transactions: MaskedTxn[]; displayNameByPerson: Map<string, string> }> {
+  const { transactions: rows, displayNameByPerson } = await getAllActiveTransactionsUnmasked(householdId);
+  return { transactions: maskPrivateRows(rows, viewerPersonId), displayNameByPerson };
+}
+
+/**
  * getActiveTransactions와 같지만 txn_date가 [fromDate, toDateExclusive) 범위인 행만 SQL WHERE로
  * 가져온다(household_id + 날짜 범위). 월별/연간/세부 내역 화면이 필요한 기간만 조회할 때 쓴다.
  * uploads는 가구당 행 수가 적어(파일 업로드 횟수만큼) 범위를 좁히지 않고 전체를 가져와도 무겁지 않다.
@@ -77,8 +93,9 @@ export async function getActiveTransactions(householdId: string): Promise<{
 export async function getActiveTransactionsInRange(
   householdId: string,
   fromDate: string,
-  toDateExclusive: string
-): Promise<{ transactions: Txn[]; displayNameByPerson: Map<string, string> }> {
+  toDateExclusive: string,
+  viewerPersonId: string | null
+): Promise<{ transactions: MaskedTxn[]; displayNameByPerson: Map<string, string> }> {
   const db = getDb();
   const [rows, uploadRows, peopleRows] = await Promise.all([
     db
@@ -89,7 +106,7 @@ export async function getActiveTransactionsInRange(
     getHouseholdPeople(householdId),
   ]);
   const displayNameByPerson = new Map<string, string>(peopleRows.map((p) => [p.id, p.displayName]));
-  return { transactions: dedupeActiveRows(rows, uploadRows), displayNameByPerson };
+  return { transactions: maskPrivateRows(dedupeActiveRows(rows, uploadRows), viewerPersonId), displayNameByPerson };
 }
 
 export type MerchantHistoryRow = {
@@ -104,9 +121,10 @@ export type MerchantHistoryRow = {
 /**
  * 세부 내역의 카테고리 추천/자주 쓰는/가맹점 건수/병합 토스트 대상 찾기는 가구 전체 과거
  * 이력이 필요하지만(특정 월로 좁힐 수 없음), 행 표시에 안 쓰는 컬럼(금액·결제수단·수혜자 등)은
- * 필요 없다. 필요한 컬럼만 select해 전송량을 줄인다.
+ * 필요 없다. 필요한 컬럼만 select해 전송량을 줄인다. 파트너의 "나만 보기" 거래는 카테고리 추천·
+ * 가맹점 건수로 새어 나가지 않도록 dedup 뒤에 제외한다.
  */
-export async function getMerchantHistory(householdId: string): Promise<MerchantHistoryRow[]> {
+export async function getMerchantHistory(householdId: string, viewerPersonId: string | null): Promise<MerchantHistoryRow[]> {
   const db = getDb();
   const [rows, uploadRows] = await Promise.all([
     db
@@ -115,6 +133,7 @@ export async function getMerchantHistory(householdId: string): Promise<MerchantH
         personId: transactions.personId,
         txnDate: transactions.txnDate,
         uploadId: transactions.uploadId,
+        isPrivate: transactions.isPrivate,
         description: transactions.description,
         category: transactions.category,
         subcategory: transactions.subcategory,
@@ -125,14 +144,16 @@ export async function getMerchantHistory(householdId: string): Promise<MerchantH
       .where(eq(transactions.householdId, householdId)),
     db.select().from(uploads).where(eq(uploads.householdId, householdId)),
   ]);
-  return dedupeActiveRows(rows, uploadRows).map(({ id, description, category, subcategory, stdCategory, txnType }) => ({
-    id,
-    description,
-    category,
-    subcategory,
-    stdCategory,
-    txnType,
-  }));
+  return dedupeActiveRows(rows, uploadRows)
+    .filter((row) => !isMaskedFor(row, viewerPersonId))
+    .map(({ id, description, category, subcategory, stdCategory, txnType }) => ({
+      id,
+      description,
+      category,
+      subcategory,
+      stdCategory,
+      txnType,
+    }));
 }
 
 /** 가구에 활성 거래가 하나라도 있는지(온보딩 빈 상태 판정용). 존재 여부만 필요하므로 dedup 없이 1행만 확인한다. */
