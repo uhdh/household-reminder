@@ -501,19 +501,22 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             </p>
             {allowanceError && <div className="mb-3 rounded-r2 bg-bg-critical-weak px-3 py-2 text-[12px] text-fg-critical">{allowanceError}</div>}
             <ul className="divide-y divide-hairline2 text-[14px]">
-              {householdPeople.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
-                  <span className="font-semibold text-ink">{p.displayName}</span>
-                  {p.id === personId ? (
-                    <form action={setAllowanceAction} className="flex items-center gap-2">
-                      <TextInput type="number" name="allowance" min={0} step={10000} defaultValue={allowances.get(p.id) ?? ""} placeholder="한도 없음" className="min-h-11 w-32 px-3 py-2 text-right" />
-                      <ActionButton type="submit" className="min-h-11 px-4 py-2">저장</ActionButton>
-                    </form>
-                  ) : (
-                    <span className="text-ink-muted">{allowances.get(p.id) != null ? formatKRW(allowances.get(p.id)!) : "설정 안 함"}</span>
-                  )}
-                </li>
-              ))}
+              {householdPeople.map((p) => {
+                const allowance = allowances.get(p.id) ?? null;
+                return (
+                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                    <span className="font-semibold text-ink">{p.displayName}</span>
+                    {p.id === personId ? (
+                      <form action={setAllowanceAction} className="flex items-center gap-2">
+                        <TextInput type="number" name="allowance" min={0} step={1} defaultValue={allowance ?? ""} placeholder="한도 없음" className="min-h-11 w-32 px-3 py-2 text-right" />
+                        <ActionButton type="submit" className="min-h-11 px-4 py-2">저장</ActionButton>
+                      </form>
+                    ) : (
+                      <span className="text-ink-muted">{allowance !== null ? formatKRW(allowance) : "설정 안 함"}</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
             {!personId && <p className="mt-3 text-[12px] text-ink-muted">이 계정은 아직 가구 구성원 프로필과 연결되지 않아 한도를 입력할 수 없어요.</p>}
           </div>
