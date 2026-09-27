@@ -348,14 +348,18 @@ describe("uploadAction - 가맹점 기억(merchant memory)", () => {
     ];
     const upload = async () => {
       mockParseUploadFile.mockResolvedValue({ customerName: null, periodStart: "2026-09-01", periodEnd: "2026-09-30", assetItems: [], transactions: txns });
-      await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "가계부.xlsx"))));
+      return await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "가계부.xlsx"))));
     };
 
     await upload();
     const first = (await db.select().from(transactions)).find((t) => t.txnDate === "2026-09-06")!;
     await db.update(transactions).set({ isPrivate: true }).where(eq(transactions.id, first.id)); // 분류는 안 고침
 
-    await upload();
+    // 재업로드는 본인(husband)이 하는 것이므로, 방금 비공개로 표시한 자기 거래가 있어도 거부되지 않는다.
+    vi.mocked(requireHousehold).mockResolvedValueOnce({ userId: "test-user", householdId: HOUSEHOLD_ID, role: "owner", email: "test@example.com", personId: "husband" });
+    const successUrl = await upload();
+    expect(successUrl).toContain("success=");
+
     const rows = await db.select().from(transactions);
     expect(rows).toHaveLength(2);
     const kept = rows.find((t) => t.txnDate === "2026-09-06")!;
