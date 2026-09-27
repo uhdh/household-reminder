@@ -95,6 +95,7 @@ describe("acceptInviteAction", () => {
 
     const peopleRows = await db.select().from(people).where(eq(people.householdId, household.id));
     expect(peopleRows.some((p) => p.displayName === "새구성원")).toBe(true);
+    expect(memberships[0].personId).toBe(peopleRows.find((p) => p.displayName === "새구성원")!.id);
 
     // 저장된 값이 해시이지 원문 토큰이 아님을 직접 확인.
     const [storedInvite] = await db.select().from(householdInvites).where(eq(householdInvites.id, invite.id));

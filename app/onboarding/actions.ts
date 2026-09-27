@@ -41,6 +41,8 @@ export async function createHouseholdAction(formData: FormData) {
   await db.insert(households).values({ id: householdId, name: householdName });
   await db.insert(householdMembers).values({ householdId, userId: user.id, role: "owner" });
   await db.insert(people).values({ id: personId, householdId, displayName });
+  // 이 계정이 방금 만든 프로필이라는 연결(나만 보기의 "누가 보는지"). 실패해도 personId null이면 fail-closed다.
+  await db.update(householdMembers).set({ personId }).where(eq(householdMembers.userId, user.id));
   await seedDefaultCategories(db, householdId, { generic: true });
 
   redirect("/finance");

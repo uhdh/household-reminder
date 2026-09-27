@@ -21,6 +21,8 @@ export interface HouseholdContext {
   householdId: string;
   role: string;
   email: string;
+  /** 이 계정에 연결된 부부 프로필(people.id). 연결 전이면 null(나만 보기 거래를 전부 못 본다). */
+  personId: string | null;
 }
 
 /**
@@ -41,7 +43,7 @@ export async function requireHousehold(): Promise<HouseholdContext> {
   if (memberships.length === 0) throw new NoHouseholdError();
   const membership = memberships.find((m) => m.role === "owner") ?? memberships[0];
 
-  return { userId: user.id, householdId: membership.householdId, role: membership.role, email };
+  return { userId: user.id, householdId: membership.householdId, role: membership.role, email, personId: membership.personId ?? null };
 }
 
 /** requireHousehold()와 같지만 소속 가구가 없으면 예외 대신 null을 반환한다(온보딩 화면 등에서 사용). */
@@ -68,6 +70,8 @@ export interface FinanceViewer {
   householdId: string;
   /** true면 샘플 가구(데모)를 보는 중 - 화면은 그대로 쓰되 모든 수정 컨트롤을 숨겨야 한다. */
   readOnly: boolean;
+  /** 지금 보는 사람의 people.id. 데모·연결 전이면 null(나만 보기 거래는 전부 마스킹). */
+  personId: string | null;
 }
 
 /**
@@ -76,7 +80,7 @@ export interface FinanceViewer {
  * 사용자의 가구를 반환한다(가구가 없으면 기존과 동일하게 /onboarding으로 보낸다).
  */
 export async function resolveFinanceViewer(): Promise<FinanceViewer> {
-  if (await isFinanceDemoMode()) return { householdId: DEMO_HOUSEHOLD_ID, readOnly: true };
-  const { householdId } = await requireHouseholdOrOnboard();
-  return { householdId, readOnly: false };
+  if (await isFinanceDemoMode()) return { householdId: DEMO_HOUSEHOLD_ID, readOnly: true, personId: null };
+  const { householdId, personId } = await requireHouseholdOrOnboard();
+  return { householdId, readOnly: false, personId };
 }

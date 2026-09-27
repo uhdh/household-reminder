@@ -41,7 +41,7 @@ describe("resolveFinanceViewer", () => {
 
     const result = await resolveFinanceViewer();
 
-    expect(result).toEqual({ householdId: DEMO_HOUSEHOLD_ID, readOnly: true });
+    expect(result).toEqual({ householdId: DEMO_HOUSEHOLD_ID, readOnly: true, personId: null });
     expect(mockAuth).not.toHaveBeenCalled();
   });
 
@@ -58,7 +58,23 @@ describe("resolveFinanceViewer", () => {
     const { resolveFinanceViewer } = await import("./require-household");
     const result = await resolveFinanceViewer();
 
-    expect(result).toEqual({ householdId: household.id, readOnly: false });
+    expect(result).toEqual({ householdId: household.id, readOnly: false, personId: null });
+  });
+
+  test("household_members.person_id가 있으면 뷰어 personId로 돌려준다", async () => {
+    mockIsFinanceDemoMode.mockResolvedValue(false);
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    const [household] = await db.insert(households).values({ name: "우리집" }).returning();
+    const [user] = await db.insert(users).values({ email: "a@example.com" }).returning();
+    await db.insert(householdMembers).values({ householdId: household.id, userId: user.id, role: "owner", personId: "husband" });
+    mockAuth.mockResolvedValue({ user: { email: "a@example.com" } });
+
+    const { resolveFinanceViewer, requireHousehold } = await import("./require-household");
+
+    expect((await resolveFinanceViewer()).personId).toBe("husband");
+    expect((await requireHousehold()).personId).toBe("husband");
   });
 
   test("데모가 아니고 소속 가구도 없으면 기존처럼 /onboarding으로 보낸다", async () => {

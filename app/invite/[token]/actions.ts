@@ -55,6 +55,7 @@ export async function acceptInviteAction(formData: FormData) {
   }
 
   await db.insert(people).values({ id: personId, householdId, displayName });
+  await db.update(householdMembers).set({ personId }).where(eq(householdMembers.userId, user.id));
 
   redirect("/finance");
 }

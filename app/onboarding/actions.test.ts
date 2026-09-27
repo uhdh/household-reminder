@@ -103,6 +103,7 @@ describe("createHouseholdAction", () => {
     const peopleRows = await db.select().from(people).where(eq(people.householdId, householdId));
     expect(peopleRows).toHaveLength(1);
     expect(peopleRows[0].displayName).toBe("나");
+    expect(memberships[0].personId).toBe(peopleRows[0].id);
     // 새 가구 구성원 id는 uuid 문자열이어야 한다(기존 'husband'/'wife'와 충돌 방지).
     expect(peopleRows[0].id).toMatch(/^[0-9a-f-]{36}$/);
 
