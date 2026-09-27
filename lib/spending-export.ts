@@ -58,11 +58,11 @@ export async function exportTransactionsToExcel(
     const amountVal = toNum(t.amount);
     const payer = beneficiaryLabel(t.personId, displayNameByPerson);
     const beneficiaryText = beneficiaryLabel(t.beneficiary, displayNameByPerson);
-    const masked = t.masked === true; // 파트너의 비공개 거래: 내용·금액·분류·결제수단은 내보내지 않는다.
+    const masked = t.masked === true; // 파트너의 비공개 거래: 시간·내용·금액·분류·결제수단은 내보내지 않는다.
 
     const row = worksheet.addRow({
       txnDate: t.txnDate,
-      txnTime: t.txnTime ?? "",
+      txnTime: masked ? "" : (t.txnTime ?? ""),
       flow,
       stdCategory: masked ? "" : (t.stdCategory ?? "미분류"),
       amount: masked ? null : flow === "입금" ? Math.abs(amountVal) : -Math.abs(amountVal),

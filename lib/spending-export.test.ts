@@ -91,8 +91,8 @@ describe("exportTransactionsToExcel", () => {
     expect(row2?.getCell(9).value).toBe("아내");
   });
 
-  it("마스킹 행은 설명 '비공개 거래'로 나오고 금액·분류·결제수단·원본 분류는 비어 있다", async () => {
-    const masked: Txn & { masked: boolean } = {
+  it("마스킹 행은 실제 값이 있어도 설명 '비공개 거래' 외 시간·금액·분류·결제수단·원본 분류를 내보내지 않는다", async () => {
+    const real: Txn = {
       id: "tx-secret",
       householdId: "household-1",
       uploadId: "u-1",
@@ -100,26 +100,43 @@ describe("exportTransactionsToExcel", () => {
       txnDate: "2026-08-25",
       txnTime: "12:30:00",
       txnType: "지출",
-      category: null,
-      subcategory: null,
-      description: null,
+      category: "쇼핑",
+      subcategory: "선물",
+      description: "아내 생일 선물",
       amount: "-50000.00",
-      paymentMethod: null,
+      paymentMethod: "신한카드",
       stdCategory: "선물",
       included: true,
       isInternalTransfer: false,
       beneficiary: "husband",
       categoryLocked: false,
       isPrivate: true,
-      masked: true,
     };
-    const buffer = await exportTransactionsToExcel([masked], new Map([["husband", "남편"]]));
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer.buffer as ArrayBuffer);
-    const row = workbook.getWorksheet("세부내역")!.getRow(2);
-    expect(row.getCell(6).value).toBe("비공개 거래"); // 내용
-    expect(row.getCell(5).value ?? null).toBeNull(); // 금액
-    expect(row.getCell(4).value ?? "").toBe(""); // 카테고리
-    expect(row.getCell(7).value ?? "").toBe(""); // 결제수단
+    const names = new Map([["husband", "남편"]]);
+    const readRow = async (rows: (Txn & { masked?: boolean })[]) => {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load((await exportTransactionsToExcel(rows, names)).buffer as ArrayBuffer);
+      return workbook.getWorksheet("세부내역")!.getRow(2);
+    };
+
+    const masked = await readRow([{ ...real, masked: true }]);
+    expect(masked.getCell(1).value).toBe("2026-08-25"); // 날짜는 유지
+    expect(masked.getCell(2).value ?? "").toBe(""); // 시간
+    expect(masked.getCell(4).value ?? "").toBe(""); // 카테고리
+    expect(masked.getCell(5).value ?? null).toBeNull(); // 금액
+    expect(masked.getCell(6).value).toBe("비공개 거래"); // 내용
+    expect(masked.getCell(7).value ?? "").toBe(""); // 결제수단
+    expect(masked.getCell(10).value ?? "").toBe(""); // 원본 대분류
+    expect(masked.getCell(11).value ?? "").toBe(""); // 원본 소분류
+
+    // 같은 값이라도 마스킹이 아니면 그대로 나온다(위 결과가 단순 빈 값 처리가 아니라 마스킹임을 증명).
+    const plain = await readRow([{ ...real, masked: false }]);
+    expect(plain.getCell(2).value).toBe("12:30:00");
+    expect(plain.getCell(4).value).toBe("선물");
+    expect(plain.getCell(5).value).toBe(-50000);
+    expect(plain.getCell(6).value).toBe("아내 생일 선물");
+    expect(plain.getCell(7).value).toBe("신한카드");
+    expect(plain.getCell(10).value).toBe("쇼핑");
+    expect(plain.getCell(11).value).toBe("선물");
   });
 });
