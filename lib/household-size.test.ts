@@ -9,7 +9,7 @@ import { people, transactions, uploads } from "@/lib/finance-db";
 import { getActiveTransactions, getHouseholdPeople, summarizeMonthlyTransactions } from "@/lib/spending-queries";
 
 async function createSchema(db: ReturnType<typeof drizzle>) {
-  await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, monthly_allowance integer, updated_at timestamptz NOT NULL DEFAULT now())`);
   await db.execute(sql`
     CREATE TABLE uploads (
       id uuid PRIMARY KEY, household_id uuid NOT NULL, person_id text NOT NULL, source_filename text NOT NULL,
@@ -21,7 +21,7 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
       id uuid PRIMARY KEY, household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
       txn_time time, txn_type text NOT NULL, category text, subcategory text, description text, amount numeric NOT NULL,
       payment_method text, std_category text, included boolean NOT NULL DEFAULT true, is_internal_transfer boolean NOT NULL DEFAULT false,
-      beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
+      beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false, is_private boolean NOT NULL DEFAULT false
     )
   `);
 }

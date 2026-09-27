@@ -33,8 +33,9 @@ export async function deleteHouseholdData(db: AppDb, householdId: string): Promi
   await db.delete(categoryRules).where(eq(categoryRules.householdId, householdId));
   await db.delete(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId));
   await db.delete(budgetCategories).where(eq(budgetCategories.householdId, householdId));
+  // household_members.person_id가 people을 참조하므로 구성원을 사람보다 먼저 지운다.
+  await db.delete(householdMembers).where(eq(householdMembers.householdId, householdId));
   await db.delete(people).where(eq(people.householdId, householdId));
   await db.delete(householdInvites).where(eq(householdInvites.householdId, householdId));
-  await db.delete(householdMembers).where(eq(householdMembers.householdId, householdId));
   await db.delete(households).where(eq(households.id, householdId));
 }

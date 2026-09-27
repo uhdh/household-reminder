@@ -8,7 +8,7 @@ import { migrateHouseholds } from "./migrate-households";
 
 async function createPreMigrationSchema(db: ReturnType<typeof drizzle>) {
   // 마이그레이션 전 실제 운영 스키마(household_id 없음, 전역 unique)를 그대로 재현.
-  await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, display_name text NOT NULL, monthly_allowance integer, updated_at timestamptz NOT NULL DEFAULT now())`);
   await db.execute(sql`
     CREATE TABLE uploads (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), person_id text NOT NULL, source_filename text NOT NULL,

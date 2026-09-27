@@ -29,7 +29,7 @@ function makeTxn(overrides: Partial<Txn>): Txn {
     included: true,
     isInternalTransfer: false,
     beneficiary: "husband",
-    categoryLocked: false,
+    categoryLocked: false, isPrivate: false,
     ...overrides,
   };
 }

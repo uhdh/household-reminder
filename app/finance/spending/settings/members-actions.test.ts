@@ -48,7 +48,7 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
   await db.execute(sql`CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, name text, created_at timestamptz NOT NULL DEFAULT now())`);
   await db.execute(sql`
     CREATE TABLE household_members (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, user_id uuid NOT NULL UNIQUE, role text NOT NULL,
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, user_id uuid NOT NULL UNIQUE, role text NOT NULL, person_id text,
       created_at timestamptz NOT NULL DEFAULT now()
     )
   `);
@@ -132,7 +132,7 @@ describe("leaveHouseholdAction / deleteHouseholdAction (위험 구역)", () => {
     await db.execute(sql`ALTER TABLE household_invites ADD CONSTRAINT hi_household_fk FOREIGN KEY (household_id) REFERENCES households(id)`);
     await db.execute(sql`ALTER TABLE household_invites ADD CONSTRAINT hi_created_by_fk FOREIGN KEY (created_by) REFERENCES users(id)`);
     await db.execute(sql`ALTER TABLE household_invites ADD CONSTRAINT hi_used_by_fk FOREIGN KEY (used_by) REFERENCES users(id)`);
-    await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL REFERENCES households(id), display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
+    await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL REFERENCES households(id), display_name text NOT NULL, monthly_allowance integer, updated_at timestamptz NOT NULL DEFAULT now())`);
     await db.execute(sql`
       CREATE TABLE uploads (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL REFERENCES households(id), person_id text NOT NULL REFERENCES people(id),
@@ -146,7 +146,7 @@ describe("leaveHouseholdAction / deleteHouseholdAction (위험 구역)", () => {
         upload_id uuid NOT NULL REFERENCES uploads(id) ON DELETE CASCADE, person_id text NOT NULL REFERENCES people(id),
         txn_date date NOT NULL, txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
         amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL DEFAULT true,
-        is_internal_transfer boolean NOT NULL DEFAULT false, beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
+        is_internal_transfer boolean NOT NULL DEFAULT false, beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false, is_private boolean NOT NULL DEFAULT false
       )
     `);
     await db.execute(sql`

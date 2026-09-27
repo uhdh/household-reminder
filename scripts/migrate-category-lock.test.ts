@@ -24,7 +24,8 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL,
       txn_date date NOT NULL, txn_time time, txn_type text NOT NULL, category text, subcategory text, description text,
       amount numeric NOT NULL, payment_method text, std_category text, included boolean NOT NULL DEFAULT true,
-      is_internal_transfer boolean NOT NULL DEFAULT false, beneficiary text NOT NULL
+      is_internal_transfer boolean NOT NULL DEFAULT false, beneficiary text NOT NULL,
+      is_private boolean NOT NULL DEFAULT false
       -- category_locked은 일부러 안 만든다: 마이그레이션 a)단계가 ADD COLUMN IF NOT EXISTS로 추가해야 한다.
     )
   `);

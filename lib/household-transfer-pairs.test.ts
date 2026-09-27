@@ -14,7 +14,7 @@ const UPLOAD_H = "00000000-0000-4000-8000-0000000000b1";
 const UPLOAD_W = "00000000-0000-4000-8000-0000000000b2";
 
 async function createSchema(db: ReturnType<typeof drizzle>) {
-  await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`CREATE TABLE people (id text PRIMARY KEY, household_id uuid NOT NULL, display_name text NOT NULL, monthly_allowance integer, updated_at timestamptz NOT NULL DEFAULT now())`);
   await db.execute(sql`
     CREATE TABLE uploads (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, person_id text NOT NULL, source_filename text NOT NULL,
@@ -26,7 +26,7 @@ async function createSchema(db: ReturnType<typeof drizzle>) {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL, upload_id uuid NOT NULL, person_id text NOT NULL, txn_date date NOT NULL,
       txn_time time, txn_type text NOT NULL, category text, subcategory text, description text, amount numeric NOT NULL,
       payment_method text, std_category text, included boolean NOT NULL DEFAULT true, is_internal_transfer boolean NOT NULL DEFAULT false,
-      beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false
+      beneficiary text NOT NULL, category_locked boolean NOT NULL DEFAULT false, is_private boolean NOT NULL DEFAULT false
     )
   `);
   await db.insert(people).values([

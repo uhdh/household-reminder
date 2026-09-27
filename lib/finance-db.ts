@@ -3,6 +3,7 @@ import {
   text,
   uuid,
   numeric,
+  integer,
   date,
   time,
   boolean,
@@ -34,6 +35,9 @@ export const householdMembers = pgTable(
     // 제약으로 고정했다. 여러 가구 동시 소속을 지원하게 되면 이 제약을 풀어야 한다).
     userId: uuid("user_id").notNull().references(() => users.id).unique(),
     role: text("role").notNull(), // 'owner' | 'member'
+    // 로그인 계정과 부부 프로필(people)의 연결. null이면 "지금 누가 보는지 모름" -> 나만 보기 거래를
+    // 전부 못 보고 토글도 못 한다(fail-closed). 온보딩/초대 수락/scripts/migrate-private-link.ts가 채운다.
+    personId: text("person_id").references(() => people.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   }
 );
@@ -52,6 +56,8 @@ export const people = pgTable("people", {
   id: text("id").primaryKey(), // 'husband' | 'wife'(기존 가구), 새 가구는 uuid 문자열
   householdId: uuid("household_id").notNull().references(() => households.id),
   displayName: text("display_name").notNull(),
+  // 월 용돈 한도(원). null이면 한도 없음. 본인 행만 본인이 수정한다(settings/members-actions.ts).
+  monthlyAllowance: integer("monthly_allowance"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -117,6 +123,9 @@ export const transactions = pgTable("transactions", {
   // 변경·삭제에 따른 일괄 재계산)가 절대 건드리지 않는다. "미분류로 되돌리기"를 하면 다시 false가 되어
   // 자동 분류(rederiveTransactions)로 복귀한다.
   categoryLocked: boolean("category_locked").notNull().default(false),
+  // "나만 보기": true면 같은 가구의 다른 구성원에게는 날짜와 "비공개 거래"만 보이고 금액·내용은 숨겨진다
+  // (합계·예산 집계에는 포함). 조회 계층(lib/spending-private.ts)이 마스킹한다.
+  isPrivate: boolean("is_private").notNull().default(false),
 });
 
 // 뱅크샐러드 원본 (타입, 대분류, 소분류) 조합을 표준카테고리로 정규화하는 매핑 테이블. 수기로 관리한다.
