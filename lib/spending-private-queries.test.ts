@@ -1,6 +1,7 @@
 // 나만 보기 조회 계층 검증(PGlite): 파트너 시점 마스킹, 소유자 시점, 연결 없음(fail-closed),
 // 범위 조회, 가맹점 이력 제외, 마스킹 후에도 합계가 유지되는지.
 import { drizzle } from "drizzle-orm/pglite";
+import { sql } from "drizzle-orm";
 import { afterEach, describe, expect, test } from "vitest";
 import { setDbForTesting } from "@/lib/db";
 import { createPrivateSchema, H, ID_PRIV_H, ID_PRIV_W, ID_PUB, seedPrivateHousehold } from "@/lib/spending-private-fixtures";
@@ -10,6 +11,8 @@ import {
   getActiveTransactionsInRange,
   getAllActiveTransactionsUnmasked,
   getMerchantHistory,
+  getPersonAllowances,
+  summarizeBeneficiarySpending,
   summarizeMonthlyTransactions,
 } from "@/lib/spending-queries";
 
@@ -87,5 +90,25 @@ describe("나만 보기 조회 마스킹", () => {
     const { transactions: rows } = await getAllActiveTransactionsUnmasked(H);
     expect(rows).toHaveLength(3);
     expect(rows.find((r) => r.id === ID_PRIV_H)!.description).toBe("아내 생일 선물");
+  });
+
+  test("개인 지출 합계는 파트너의 비공개 거래도 포함하고, 한도는 people에서 읽는다", async () => {
+    const db = await setup();
+    await db.execute(sql`UPDATE people SET monthly_allowance = 50000 WHERE id = 'husband'`);
+
+    const allowances = await getPersonAllowances(H);
+    expect(allowances.get("husband")).toBe(50000);
+    expect(allowances.get("wife")).toBeNull();
+
+    // 아내 시점: 남편의 비공개(-50,000)도 남편 개인 지출에 잡힌다.
+    const { transactions: rows } = await getActiveTransactionsInRange(H, "2026-08-01", "2026-09-01", "wife");
+    const summary = summarizeBeneficiarySpending(
+      rows,
+      [{ id: "husband", displayName: "남편" }, { id: "wife", displayName: "아내" }],
+      allowances
+    );
+    expect(summary.rows[0]).toMatchObject({ id: "husband", spent: 60000, allowance: 50000, over: 10000 });
+    expect(summary.rows[1]).toMatchObject({ id: "wife", spent: 30000, over: 0 });
+    expect(summary.joint).toBe(0);
   });
 });

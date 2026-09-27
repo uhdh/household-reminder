@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { signOut } from "@/auth";
 import { getDb } from "@/lib/db";
-import { households, householdInvites, householdMembers, users } from "@/lib/finance-db";
+import { households, householdInvites, householdMembers, people, users } from "@/lib/finance-db";
 import { generateInviteToken, hashInviteToken, INVITE_EXPIRY_MS } from "@/lib/invite-token";
 import { deleteHouseholdData } from "@/lib/household-lifecycle";
 import { requireHousehold } from "@/lib/require-household";
@@ -107,4 +107,28 @@ export async function deleteHouseholdAction(formData: FormData) {
 
   await deleteHouseholdData(db, householdId);
   redirect("/onboarding");
+}
+
+const MAX_ALLOWANCE = 100_000_000;
+
+// 월 용돈 한도 저장. 본인 프로필(people.id = 내 personId)만 바꿀 수 있고, 빈 값은 한도 해제다.
+// 오류는 danger-zone의 error와 섞이지 않게 allowanceError로 돌려보낸다.
+export async function setAllowanceAction(formData: FormData) {
+  const { householdId, personId } = await requireHousehold();
+  const back = "/finance/spending/settings?tab=members";
+  const fail = (message: string): never => redirect(`${back}&allowanceError=${encodeURIComponent(message)}`);
+
+  if (!personId) fail("내 프로필과 연결되지 않은 계정이라 한도를 저장할 수 없어요.");
+  const raw = String(formData.get("allowance") ?? "").replaceAll(",", "").trim();
+  const value = raw === "" ? null : Number(raw);
+  if (value !== null && (!Number.isInteger(value) || value < 0 || value > MAX_ALLOWANCE)) {
+    fail("한도는 0원 이상 1억 원 이하의 정수로 입력해주세요.");
+  }
+
+  await getDb()
+    .update(people)
+    .set({ monthlyAllowance: value, updatedAt: new Date() })
+    .where(and(eq(people.id, personId as string), eq(people.householdId, householdId)));
+
+  redirect(back);
 }

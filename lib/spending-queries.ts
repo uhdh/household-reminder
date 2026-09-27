@@ -29,6 +29,16 @@ export async function getHouseholdPeople(householdId: string): Promise<{ id: str
   return db.select({ id: people.id, displayName: people.displayName }).from(people).where(eq(people.householdId, householdId));
 }
 
+/** 사람별 월 용돈 한도(원). 한도를 안 정한 사람은 null. 월별 화면·설정에서만 읽는다. */
+export async function getPersonAllowances(householdId: string): Promise<Map<string, number | null>> {
+  const db = getDb();
+  const rows = await db
+    .select({ id: people.id, monthlyAllowance: people.monthlyAllowance })
+    .from(people)
+    .where(eq(people.householdId, householdId));
+  return new Map(rows.map((r) => [r.id, r.monthlyAllowance ?? null]));
+}
+
 type UploadMeta = { id: string; uploadedAt: Date };
 
 /**
@@ -327,6 +337,44 @@ export function unmappedTransferExclusion(rows: { included: boolean; txnType: st
 } {
   const excluded = rows.filter((t) => t.included && !countsInTotals(t));
   return { count: excluded.length, total: excluded.reduce((sum, t) => sum + Math.abs(toNum(t.amount)), 0) };
+}
+
+export interface BeneficiarySpendingRow {
+  id: string;
+  label: string;
+  spent: number;
+  allowance: number | null;
+  /** 한도를 넘긴 금액. 한도가 없거나 이하이면 0. */
+  over: number;
+}
+export interface BeneficiarySpending {
+  rows: BeneficiarySpendingRow[];
+  joint: number;
+}
+
+/**
+ * 한 달치 거래를 사용 대상(beneficiary)별 "개인 지출"로 합산한다. 월별 합계와 같은 기준(집계에 잡히는
+ * 지출만: countsInTotals + flowLabel="지출")이라 환불·집계 제외·미분류 이체는 빠진다. 파트너의 비공개
+ * 거래도 합계에는 포함한다(마스킹 행도 amount/beneficiary는 유지). people 목록에 없는 옛 사용 대상은 무시한다.
+ */
+export function summarizeBeneficiarySpending(
+  monthTx: Txn[],
+  peopleList: { id: string; displayName: string }[],
+  allowances: Map<string, number | null>
+): BeneficiarySpending {
+  const spentBy = new Map<string, number>();
+  for (const t of monthTx) {
+    if (!countsInTotals(t) || flowLabel(t) !== "지출") continue;
+    spentBy.set(t.beneficiary, (spentBy.get(t.beneficiary) ?? 0) + Math.abs(toNum(t.amount)));
+  }
+  return {
+    rows: peopleList.map((p) => {
+      const spent = spentBy.get(p.id) ?? 0;
+      const allowance = allowances.get(p.id) ?? null;
+      return { id: p.id, label: p.displayName, spent, allowance, over: allowance !== null && spent > allowance ? spent - allowance : 0 };
+    }),
+    joint: spentBy.get("joint") ?? 0,
+  };
 }
 
 export type PersonSplit = Record<string, number>;
