@@ -334,4 +334,78 @@ describe("uploadAction - 가맹점 기억(merchant memory)", () => {
     // 고치지 않은 같은 가맹점 거래는 자동 분류 그대로(잠금 안 됨)
     expect(rows.find((t) => t.txnDate === "2026-09-07")!.categoryLocked).toBe(false);
   });
+
+  test("재업로드해도 나만 보기 표시는 유지되고, 분류를 안 고친 행은 잠기지 않는다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(people).values([{ id: "husband", householdId: HOUSEHOLD_ID, displayName: "지훈" }]);
+    const { uploadAction } = await import("./actions");
+    const txns = [
+      { txnDate: "2026-09-06", txnTime: "12:30:00", txnType: "지출", category: "식비", subcategory: "한식", description: "선물 가게", amount: -8000, paymentMethod: "체크카드" },
+      { txnDate: "2026-09-07", txnTime: "09:00:00", txnType: "지출", category: "식비", subcategory: "한식", description: "동네 김밥", amount: -5000, paymentMethod: "체크카드" },
+    ];
+    const upload = async () => {
+      mockParseUploadFile.mockResolvedValue({ customerName: null, periodStart: "2026-09-01", periodEnd: "2026-09-30", assetItems: [], transactions: txns });
+      await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "가계부.xlsx"))));
+    };
+
+    await upload();
+    const first = (await db.select().from(transactions)).find((t) => t.txnDate === "2026-09-06")!;
+    await db.update(transactions).set({ isPrivate: true }).where(eq(transactions.id, first.id)); // 분류는 안 고침
+
+    await upload();
+    const rows = await db.select().from(transactions);
+    expect(rows).toHaveLength(2);
+    const kept = rows.find((t) => t.txnDate === "2026-09-06")!;
+    expect(kept.isPrivate).toBe(true);
+    expect(kept.categoryLocked).toBe(false); // 비공개만 복원 - 자동 분류 재계산은 계속 적용
+    expect(rows.find((t) => t.txnDate === "2026-09-07")!.isPrivate).toBe(false);
+  });
+
+  test("파트너가 자기 파일을 올려도 내 나만 보기 거래는 지워지거나 바뀌지 않는다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(people).values([
+      { id: "husband", householdId: HOUSEHOLD_ID, displayName: "지훈" },
+      { id: "wife", householdId: HOUSEHOLD_ID, displayName: "수아" },
+    ]);
+    const { uploadAction } = await import("./actions");
+    const period = { customerName: null, periodStart: "2026-09-01", periodEnd: "2026-09-30", assetItems: [] };
+
+    mockParseUploadFile.mockResolvedValue({ ...period, transactions: [{ txnDate: "2026-09-06", txnTime: null, txnType: "지출", category: "쇼핑", subcategory: "선물", description: "선물", amount: -30000, paymentMethod: "카드" }] });
+    await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "h.xlsx"), "husband")));
+    const mine = (await db.select().from(transactions))[0];
+    await db.update(transactions).set({ isPrivate: true }).where(eq(transactions.id, mine.id));
+
+    mockParseUploadFile.mockResolvedValue({ ...period, transactions: [{ txnDate: "2026-09-06", txnTime: null, txnType: "지출", category: "식비", subcategory: "한식", description: "점심", amount: -9000, paymentMethod: "카드" }] });
+    await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "w.xlsx"), "wife")));
+
+    const rows = await db.select().from(transactions);
+    expect(rows).toHaveLength(2);
+    const husbandRow = rows.find((t) => t.personId === "husband")!;
+    expect(husbandRow.id).toBe(mine.id);
+    expect(husbandRow.isPrivate).toBe(true);
+  });
+
+  test("공동 계좌/카드 내역으로 올리면 새 거래의 사용 대상이 우리(joint)가 된다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(people).values([{ id: "husband", householdId: HOUSEHOLD_ID, displayName: "지훈" }]);
+    const { uploadAction } = await import("./actions");
+    mockParseUploadFile.mockResolvedValue({
+      customerName: null, periodStart: "2026-09-01", periodEnd: "2026-09-30", assetItems: [],
+      transactions: [{ txnDate: "2026-09-06", txnTime: null, txnType: "지출", category: "식비", subcategory: "한식", description: "마트", amount: -20000, paymentMethod: "공동카드" }],
+    });
+
+    const joint = uploadForm(new File(["dummy"], "joint.xlsx"));
+    joint.set("jointAccount", "on");
+    await expectRedirect(uploadAction(joint));
+    expect((await db.select().from(transactions))[0].beneficiary).toBe("joint");
+
+    await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "mine.xlsx")))); // 체크 안 함 = 업로더
+    expect((await db.select().from(transactions))[0].beneficiary).toBe("husband");
+  });
 });

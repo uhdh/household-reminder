@@ -34,6 +34,16 @@ export function UploadForm({
           ))}
         </div>
 
+        <label className="mb-4 flex items-start gap-2 text-sm text-fg-neutral">
+          <input type="checkbox" name="jointAccount" className="mt-1" />
+          <span>
+            이 파일은 공동 계좌/카드 내역이에요
+            <span className="block text-xs text-ink-muted">
+              체크하면 이 파일의 새 거래가 &quot;우리&quot; 지출로 기록돼서 개인 용돈 한도에 잡히지 않아요.
+            </span>
+          </span>
+        </label>
+
         <FormField label="엑셀 파일" className="mb-4">
           <TextInput
             type="file"

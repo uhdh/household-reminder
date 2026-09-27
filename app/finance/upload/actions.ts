@@ -51,6 +51,8 @@ export async function uploadAction(formData: FormData) {
     redirect("/finance/upload?error=" + encodeURIComponent("엑셀 파일을 선택해 주세요."));
   }
 
+  // 공동 계좌/카드 내역 파일이면 새 거래의 사용 대상 기본값을 업로더 대신 '우리'로 한다(개인 용돈 한도 왜곡 방지).
+  const defaultBeneficiary = formData.get("jointAccount") === "on" ? "joint" : personId;
   // 표시 이름은 온보딩/초대 수락 때 그 사람이 직접 정한 것을 그대로 쓴다(여기서 덮어쓰지 않는다).
   const displayName = householdPeople.find((p) => p.id === personId)?.displayName ?? personId;
   const db = getDb();
@@ -68,7 +70,7 @@ export async function uploadAction(formData: FormData) {
   }
 
   if (kind === "seoulpay") {
-    await handleSeoulPayUpload(db, householdId, personId, displayName, workBuffer);
+    await handleSeoulPayUpload(db, householdId, personId, displayName, workBuffer, defaultBeneficiary);
     return;
   }
 
@@ -167,8 +169,9 @@ export async function uploadAction(formData: FormData) {
         stdCategory: d.stdCategory,
         included: d.included,
         isInternalTransfer: d.isInternalTransfer,
-        beneficiary: d.beneficiary ?? personId,
+        beneficiary: d.beneficiary ?? defaultBeneficiary,
         categoryLocked: d.categoryLocked,
+        isPrivate: d.isPrivate,
       }))
     );
   }
@@ -197,7 +200,8 @@ async function handleSeoulPayUpload(
   householdId: string,
   personId: string,
   displayName: string,
-  buffer: ArrayBuffer
+  buffer: ArrayBuffer,
+  defaultBeneficiary: string
 ): Promise<void> {
   let parsed: ParsedSeoulPay;
   try {
@@ -266,8 +270,9 @@ async function handleSeoulPayUpload(
         stdCategory: d.stdCategory,
         included: d.included,
         isInternalTransfer: d.isInternalTransfer,
-        beneficiary: d.beneficiary ?? personId,
+        beneficiary: d.beneficiary ?? defaultBeneficiary,
         categoryLocked: d.categoryLocked,
+        isPrivate: d.isPrivate,
       }))
     );
   }
@@ -305,10 +310,12 @@ async function handleSeoulPayUpload(
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
 }
 
-// ── 다시 올릴 때 "직접 고친 분류" 되살리기 ──────────────────────────────
-// 기간 삭제 후 재삽입하면 사용자가 고친(잠긴) 분류가 사라지므로, 지우기 전에 기억해 두었다가 날짜·시간·
-// 타입·금액·메모가 똑같은 거래가 다시 들어오면 그 카테고리·사용 대상·잠금을 그대로 되살린다.
-type LockedSnapshot = Map<string, { stdCategory: string | null; beneficiary: string }[]>;
+// ── 다시 올릴 때 "직접 고친 분류"와 "나만 보기" 되살리기 ─────────────────────
+// 기간 삭제 후 재삽입하면 사용자가 고친(잠긴) 분류와 나만 보기 표시가 사라지므로, 지우기 전에 기억해
+// 두었다가 날짜·시간·타입·금액·메모가 똑같은 거래가 다시 들어오면 되살린다. 분류를 직접 고친(locked)
+// 행은 카테고리·사용 대상·잠금까지, 나만 보기만 켠 행은 비공개 표시만 되살린다(잠그지 않는다 -
+// 자동 분류 재계산은 계속 적용되어야 한다).
+type LockedSnapshot = Map<string, { stdCategory: string | null; beneficiary: string; locked: boolean; isPrivate: boolean }[]>;
 
 function restoreKey(t: { txnDate: string; txnTime: string | null; txnType: string; amount: number | string; description: string | null }): string {
   return `${t.txnDate}|${(t.txnTime ?? "").slice(0, 8)}|${t.txnType}|${Number(t.amount)}|${(t.description ?? "").trim()}`;
@@ -331,12 +338,14 @@ async function snapshotLockedRows(
       description: transactions.description,
       stdCategory: transactions.stdCategory,
       beneficiary: transactions.beneficiary,
+      categoryLocked: transactions.categoryLocked,
+      isPrivate: transactions.isPrivate,
     })
     .from(transactions)
     .where(and(
       eq(transactions.householdId, householdId),
       eq(transactions.personId, personId),
-      eq(transactions.categoryLocked, true),
+      or(eq(transactions.categoryLocked, true), eq(transactions.isPrivate, true)),
       gte(transactions.txnDate, periodStart),
       lte(transactions.txnDate, periodEnd),
       categoryCondition
@@ -345,7 +354,7 @@ async function snapshotLockedRows(
   for (const row of rows) {
     const key = restoreKey(row);
     const list = snapshot.get(key) ?? [];
-    list.push({ stdCategory: row.stdCategory, beneficiary: row.beneficiary });
+    list.push({ stdCategory: row.stdCategory, beneficiary: row.beneficiary, locked: row.categoryLocked, isPrivate: row.isPrivate });
     snapshot.set(key, list);
   }
   return snapshot;
@@ -355,14 +364,16 @@ function withRestoredLock(
   t: ParsedTransaction,
   d: DerivedResult,
   snapshot: LockedSnapshot
-): DerivedResult & { beneficiary: string | null; categoryLocked: boolean } {
+): DerivedResult & { beneficiary: string | null; categoryLocked: boolean; isPrivate: boolean } {
   const saved = snapshot.get(restoreKey(t))?.shift(); // 같은 키가 여러 건이면 하나씩 소진
-  if (!saved) return { ...d, beneficiary: null, categoryLocked: false };
+  if (!saved) return { ...d, beneficiary: null, categoryLocked: false, isPrivate: false };
+  if (!saved.locked) return { ...d, beneficiary: null, categoryLocked: false, isPrivate: saved.isPrivate };
   return {
     ...d,
     stdCategory: saved.stdCategory,
     included: saved.stdCategory !== "자산수정" && computeIncluded(t, isTransferCandidate(t), d.isInternalTransfer),
     beneficiary: saved.beneficiary,
     categoryLocked: true,
+    isPrivate: saved.isPrivate,
   };
 }
