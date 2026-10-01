@@ -18,7 +18,7 @@ export default async function OnboardingPage({
 
   return (
     <AppShell size="compact" className="font-office">
-      <PageHeader title="가계부 시작하기" description="가구를 새로 만들거나, 초대 링크로 합류할 수 있어요." />
+      <PageHeader className="mb-5" title="가계부 시작하기" description="새 가계부를 만들어 시작하세요. 배우자에게 초대 링크를 받았다면 그 링크를 열면 바로 합류돼요." />
 
       {invite && (
         <Card className="mb-4 p-4 shadow-none">

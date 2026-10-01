@@ -111,14 +111,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start lg:gap-10">
-      <nav className="flex max-w-full gap-1 overflow-x-auto [scrollbar-width:none] lg:flex-col [&::-webkit-scrollbar]:hidden" aria-label="설정 메뉴">
+      <nav className="flex max-w-full flex-wrap gap-1 lg:flex-col" aria-label="설정 메뉴">
         <h1 className="mb-4 hidden text-[28px] font-extrabold tracking-[-0.02em] text-ink lg:block">설정</h1>
         {SETTING_TABS.map((item) => (
           <Link
             key={item.id}
             href={`/finance/spending/settings?tab=${item.id}`}
             aria-current={activeTab === item.id ? "page" : undefined}
-            className={`flex h-11 shrink-0 items-center rounded-r3 px-4 text-[15px] transition-colors ${
+            className={`flex h-10 shrink-0 items-center rounded-r3 px-3 text-[14px] transition-colors lg:h-11 lg:px-4 lg:text-[15px] ${
               activeTab === item.id ? "bg-bg-neutral-weak font-bold text-ink" : "font-medium text-ink-muted hover:text-ink"
             }`}
           >
@@ -390,21 +390,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <table className="w-full text-[14px]">
               <thead>
                 <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
-                  <th className="px-3 py-3 font-semibold">카테고리</th>
-                  <th className="px-3 py-3 font-semibold">성격</th>
-                  <th className="px-3 py-3 text-right font-semibold">월 예산</th>
-                  <th className="px-3 py-3" />
+                  <th className="px-2 py-3 sm:px-3 font-semibold">카테고리</th>
+                  <th className="px-2 py-3 sm:px-3 font-semibold">성격</th>
+                  <th className="px-2 py-3 sm:px-3 text-right font-semibold">월 예산</th>
+                  <th className="px-2 py-3 sm:px-3" />
                 </tr>
               </thead>
               <tbody>
                 {sortedBudgets.map((b) => (
                   <tr key={b.id} className="border-b-[0.8px] border-hairline2 last:border-0">
-                    <td className="px-3 py-3 text-ink">{b.name}</td>
-                    <td className="px-3 py-3">
+                    <td className="whitespace-nowrap px-2 py-3 sm:px-3 text-ink">{b.name}</td>
+                    <td className="px-2 py-3 sm:px-3">
                       <SelectInput
                         name={`kind:${b.name}`}
                         defaultValue={b.kind}
-                        className="min-h-11 w-auto px-3 py-2"
+                        className="min-h-11 w-auto px-2 py-2 sm:px-3"
                       >
                         {KINDS.map((k) => (
                           <option key={k} value={k}>
@@ -413,22 +413,22 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                         ))}
                       </SelectInput>
                     </td>
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-2 py-3 sm:px-3 text-right">
                       <TextInput
                         type="number"
                         min={0}
                         step={1}
                         name={`budget:${b.name}`}
                         defaultValue={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : ""}
-                        className="min-h-11 w-28 px-3 py-2 text-right"
+                        className="min-h-11 w-24 px-2 py-2 text-right sm:w-28 sm:px-3"
                       />
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-2 py-3 sm:px-3">
                       <ActionButton
                         variant="ghost"
                         type="submit"
                         formAction={deleteBudgetCategoryAction.bind(null, b.name)}
-                        className="min-h-11 px-3 py-2 text-fg-critical"
+                        className="min-h-11 px-2 py-2 text-fg-critical sm:px-3"
                       >
                         삭제
                       </ActionButton>
@@ -484,7 +484,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                     {m.user?.name && <p className="truncate text-[12px] text-ink-muted">{m.user.email}</p>}
                   </div>
                   <span className="shrink-0 rounded-r2 bg-bg-neutral-weak px-2.5 py-1 text-[12px] font-semibold text-ink-muted">
-                    {m.role === "owner" ? "owner" : "member"}
+                    {m.role === "owner" ? "관리자" : "구성원"}
                   </span>
                 </li>
               ))}

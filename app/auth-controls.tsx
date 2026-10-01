@@ -20,7 +20,7 @@ export async function AuthControls() {
 
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <span className="seed-pill truncate" title={email}>
+      <span className="seed-pill hidden truncate sm:inline-flex" title={email}>
         {label}
       </span>
       <form

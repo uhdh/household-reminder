@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { AppShell, Card, PageHeader } from "@/components/ui";
 import { ActionButton, FeedbackMessage, FormField, TextInput } from "@/components/ui";
@@ -10,8 +11,10 @@ import { acceptInviteAction } from "./actions";
 function InviteMessage({ text }: { text: string }) {
   return (
     <AppShell size="compact" className="font-office">
-      <PageHeader title="초대 링크" description="" />
+      <PageHeader className="mb-5" title="초대 링크" />
       <FeedbackMessage tone="critical">{text}</FeedbackMessage>
+      <p className="mt-4 text-[14px] text-ink-muted">초대한 사람에게 새 링크를 요청하거나, 직접 새 가계부를 만들 수 있어요.</p>
+      <Link href="/onboarding" className="seed-button seed-button-secondary mt-4 inline-flex min-h-11 items-center px-5 py-2 text-[14px]">새 가계부 만들기</Link>
     </AppShell>
   );
 }
@@ -44,7 +47,7 @@ export default async function InvitePage({
 
   return (
     <AppShell size="compact" className="font-office">
-      <PageHeader title="초대 수락" description={`"${householdName}"에 합류해요.`} />
+      <PageHeader className="mb-5" title="초대 수락" description={`"${householdName}"에 합류해요.`} />
       {error && <FeedbackMessage tone="critical" className="mb-4">{error}</FeedbackMessage>}
       <Card className="p-5 shadow-none sm:p-7">
         <form action={acceptInviteAction} className="space-y-4">

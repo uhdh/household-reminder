@@ -16,9 +16,10 @@ export function UploadForm({
         <p className="mb-4 text-sm text-ink-muted">
           뱅크샐러드에서 내보낸 엑셀 파일(&apos;뱅샐현황&apos;, &apos;가계부
           내역&apos; 시트 포함)을 업로드하면 자산 현황과 거래 내역이
-          저장됩니다. 같은 보유자로 다시 업로드하면 이전 데이터는
-          비활성화되고 새 데이터가 최신 기준으로 반영됩니다. 서울페이
-          이용내역 엑셀도 이 화면에서 함께 올릴 수 있어요.
+          저장됩니다. 기간이 겹치는 파일을 다시 올려도 이미 올린 날짜의
+          거래와 직접 고친 분류는 그대로 두고, 새 날짜의 거래만 추가돼요.
+          자산 현황은 최신 파일 기준으로 바뀝니다. 서울페이 이용내역 엑셀도
+          이 화면에서 함께 올릴 수 있어요.
         </p>
 
         <p className="mb-2 text-sm font-medium text-fg-neutral">보유자</p>
@@ -39,7 +40,7 @@ export function UploadForm({
           <span>
             이 파일은 공동 계좌/카드 내역이에요
             <span className="block text-xs text-ink-muted">
-              체크하면 이 파일의 새 거래가 &quot;우리&quot; 지출로 기록돼서 개인 용돈 한도에 잡히지 않아요.
+              체크하면 이 파일의 새 거래가 사용 대상 &quot;우리&quot;(공동 지출)로 기록돼요.
             </span>
           </span>
         </label>

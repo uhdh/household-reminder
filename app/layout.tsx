@@ -35,7 +35,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-full flex flex-col">
         <HideOnHome>
         <header className="sticky top-0 z-50 w-full border-b border-stroke-neutral-muted bg-bg-layer-default/95 backdrop-blur">
-          <div className="flex flex-wrap items-center gap-x-10 px-4 sm:px-6 lg:px-12">
+          <div className="flex flex-wrap items-center gap-x-3 px-4 md:gap-x-10 sm:px-6 lg:px-12">
             <Link
               href="/"
               aria-label="가계부탁 홈으로 이동"

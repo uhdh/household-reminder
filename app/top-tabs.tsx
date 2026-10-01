@@ -20,6 +20,8 @@ const tabs = [
 
 export function TopTabs() {
   const pathname = usePathname();
+  // 가구가 없는 동안(온보딩·초대 수락)에는 탭을 눌러도 온보딩으로 되돌아오므로 숨긴다.
+  if (pathname.startsWith("/onboarding") || pathname.startsWith("/invite")) return null;
   return (
     <nav
       aria-label="주요 메뉴"
