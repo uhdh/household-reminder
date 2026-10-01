@@ -47,14 +47,18 @@ type UploadMeta = { id: string; uploadedAt: Date };
  * 쓰는 공통 로직 - 날짜 범위로 좁혀 가져와도 경쟁하는 두 행은 항상 같은 날짜(같은 쿼리 범위)에
  * 있으므로 결과가 전체를 불러와 필터링한 것과 같다.
  */
-function dedupeActiveRows<T extends { personId: string; txnDate: string; uploadId: string }>(
+function dedupeActiveRows<T extends { personId: string; txnDate: string; uploadId: string; category: string | null }>(
   rows: T[],
   uploadRows: UploadMeta[]
 ): T[] {
   const uploadById = new Map(uploadRows.map((upload) => [upload.id, upload]));
   const latestUploadByDate = new Map<string, string>();
+  // 수동 입력·서울페이는 업로드마다 최신 업로드로 옮겨 붙으므로 날짜 경쟁에 끼면 같은 날의 기존
+  // 뱅크샐러드 거래를 가려버린다. 이들은 항상 남기고, 경쟁은 뱅크샐러드 거래끼리만 한다.
+  const isSeparateSource = (row: T) => row.category === "직접 입력" || row.category === "서울페이";
 
   for (const row of rows) {
+    if (isSeparateSource(row)) continue;
     const key = `${row.personId}|${row.txnDate}`;
     const currentId = latestUploadByDate.get(key);
     const candidate = uploadById.get(row.uploadId);
@@ -62,7 +66,7 @@ function dedupeActiveRows<T extends { personId: string; txnDate: string; uploadI
     if (!current || (candidate && candidate.uploadedAt > current.uploadedAt)) latestUploadByDate.set(key, row.uploadId);
   }
 
-  return rows.filter((row) => latestUploadByDate.get(`${row.personId}|${row.txnDate}`) === row.uploadId);
+  return rows.filter((row) => isSeparateSource(row) || latestUploadByDate.get(`${row.personId}|${row.txnDate}`) === row.uploadId);
 }
 
 /**

@@ -325,10 +325,12 @@ describe("uploadAction - 가맹점 기억(merchant memory)", () => {
     await db.update(transactions).set({ stdCategory: "선물", categoryLocked: true, beneficiary: "wife" }).where(eq(transactions.id, first.id));
 
     const message = await upload();
-    expect(message).toContain("직접 고친 분류 1건 유지");
+    expect(message).toContain("거래내역 0건 추가");
+    expect(message).toContain("이미 올린 기간 거래 2건은 기존 내역 유지");
     const rows = await db.select().from(transactions);
-    expect(rows).toHaveLength(2); // 중복 없이 교체
+    expect(rows).toHaveLength(2); // 겹치는 기간은 추가도 교체도 하지 않음
     const restored = rows.find((t) => t.txnDate === "2026-09-06")!;
+    expect(restored.id).toBe(first.id);
     expect(restored.stdCategory).toBe("선물");
     expect(restored.categoryLocked).toBe(true);
     expect(restored.beneficiary).toBe("wife");
@@ -363,8 +365,9 @@ describe("uploadAction - 가맹점 기억(merchant memory)", () => {
     const rows = await db.select().from(transactions);
     expect(rows).toHaveLength(2);
     const kept = rows.find((t) => t.txnDate === "2026-09-06")!;
+    expect(kept.id).toBe(first.id);
     expect(kept.isPrivate).toBe(true);
-    expect(kept.categoryLocked).toBe(false); // 비공개만 복원 - 자동 분류 재계산은 계속 적용
+    expect(kept.categoryLocked).toBe(false);
     expect(rows.find((t) => t.txnDate === "2026-09-07")!.isPrivate).toBe(false);
   });
 
@@ -410,13 +413,52 @@ describe("uploadAction - 가맹점 기억(merchant memory)", () => {
     await expectRedirect(uploadAction(joint));
     expect((await db.select().from(transactions))[0].beneficiary).toBe("joint");
 
+    mockParseUploadFile.mockResolvedValue({
+      customerName: null, periodStart: "2026-10-01", periodEnd: "2026-10-31", assetItems: [],
+      transactions: [{ txnDate: "2026-10-06", txnTime: null, txnType: "지출", category: "식비", subcategory: "한식", description: "마트", amount: -20000, paymentMethod: "체크카드" }],
+    });
     await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "mine.xlsx")))); // 체크 안 함 = 업로더
-    expect((await db.select().from(transactions))[0].beneficiary).toBe("husband");
+    const rows = await db.select().from(transactions);
+    expect(rows.find((t) => t.txnDate === "2026-09-06")!.beneficiary).toBe("joint");
+    expect(rows.find((t) => t.txnDate === "2026-10-06")!.beneficiary).toBe("husband");
+  });
+
+  test("8월·9월 1년치 파일을 이어 올리면 겹치는 기간은 기존 거래를 두고 새 날짜만 추가한다", async () => {
+    const db = drizzle();
+    setDbForTesting(db);
+    await createSchema(db);
+    await db.insert(people).values([{ id: "husband", householdId: HOUSEHOLD_ID, displayName: "지훈" }]);
+    const { uploadAction } = await import("./actions");
+    const txn = (txnDate: string, description: string) => ({ txnDate, txnTime: null, txnType: "지출", category: "식비", subcategory: "한식", description, amount: -9000, paymentMethod: "카드" });
+
+    mockParseUploadFile.mockResolvedValue({
+      customerName: null, periodStart: "2025-09-01", periodEnd: "2026-08-31", assetItems: [],
+      transactions: [txn("2025-09-10", "9월 점심"), txn("2026-08-20", "8월 점심")],
+    });
+    await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "8월.xlsx"))));
+    const augustRow = (await db.select().from(transactions)).find((t) => t.txnDate === "2026-08-20")!;
+    await db.update(transactions).set({ stdCategory: "선물", categoryLocked: true }).where(eq(transactions.id, augustRow.id));
+
+    // 9월 파일: 8월 거래 메모가 바뀌어 들어와도 겹치는 기간이라 무시되고, 9월 거래만 추가된다.
+    mockParseUploadFile.mockResolvedValue({
+      customerName: null, periodStart: "2025-10-01", periodEnd: "2026-09-30", assetItems: [],
+      transactions: [txn("2026-08-20", "8월 점심(수정됨)"), txn("2026-09-15", "9월 저녁")],
+    });
+    const message = decodeURIComponent((await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "9월.xlsx"))))).split("success=")[1]);
+    expect(message).toContain("거래내역 1건 추가");
+    expect(message).toContain("이미 올린 기간 거래 1건은 기존 내역 유지");
+
+    const rows = await db.select().from(transactions);
+    expect(rows.map((t) => t.txnDate).sort()).toEqual(["2025-09-10", "2026-08-20", "2026-09-15"]);
+    const kept = rows.find((t) => t.txnDate === "2026-08-20")!;
+    expect(kept.id).toBe(augustRow.id);
+    expect(kept.description).toBe("8월 점심");
+    expect(kept.stdCategory).toBe("선물");
   });
 });
 
-// 다른 사람을 보유자로 골라 올리면 그 사람의 기간 거래가 교체되므로, 그 기간에 그 사람의 나만 보기
-// 거래가 있으면 업로드를 거부한다(본인 업로드는 항상 허용).
+// 뱅크샐러드 업로드는 이미 올린 기간을 교체하지 않으므로 다른 사람 몫으로 올려도 그 사람의 나만 보기
+// 거래는 지워지지 않는다. 서울페이는 여전히 기간 교체라 남의 나만 보기 거래가 있으면 거부한다.
 describe("uploadAction - 다른 사람 대신 올릴 때 나만 보기 보호", () => {
   afterEach(() => {
     setDbForTesting(null);
@@ -454,43 +496,28 @@ describe("uploadAction - 다른 사람 대신 올릴 때 나만 보기 보호", 
   }
 
   for (const viewer of ["wife", null]) {
-    test(`조회자(${viewer ?? "연결 안 됨"})가 남편 몫으로 올리면, 남편의 나만 보기 거래가 있는 기간은 거부한다`, async () => {
+    test(`조회자(${viewer ?? "연결 안 됨"})가 남편 몫으로 올려도 남편의 나만 보기 거래는 그대로이고 새 날짜만 추가된다`, async () => {
       const { db, priv } = await seed();
       mockBankPeriod();
       const { uploadAction } = await import("./actions");
       viewAs(viewer);
       const url = await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "h.xlsx"), "husband")));
-      expect(url).toContain("/finance/upload?error=");
-      expect(decodeURIComponent(url)).toContain("나만 보기");
+      expect(url).toContain("success=");
 
       const rows = await db.select().from(transactions);
-      expect(rows).toEqual([priv]); // 그대로, 새 거래도 없음
-      const uploadRows = await db.select().from(uploads);
-      expect(uploadRows).toHaveLength(1);
-      expect(uploadRows[0].isActive).toBe(true);
+      expect(rows).toHaveLength(2);
+      expect(rows.find((t) => t.id === priv.id)).toEqual(priv);
     });
   }
 
-  test("기간 안에 남편의 나만 보기 거래가 없으면 아내가 남편 몫으로 올려도 된다", async () => {
-    const { db } = await seed({ txnDate: "2026-08-20" }); // 교체 기간 밖
+  test("이미 올린 날짜에 나만 보기 거래가 있으면 같은 거래가 다시 들어와도 건드리지 않는다", async () => {
+    const { db, priv } = await seed({ txnDate: "2026-09-10", txnTime: null, description: "점심", amount: "-9000", category: "식비", subcategory: "한식" });
     mockBankPeriod();
     const { uploadAction } = await import("./actions");
     viewAs("wife");
     const url = await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "h.xlsx"), "husband")));
     expect(url).toContain("success=");
-    expect(await db.select().from(transactions)).toHaveLength(2);
-  });
-
-  test("본인 몫으로 올리면 기간에 나만 보기 거래가 있어도 막지 않는다", async () => {
-    const { db } = await seed({ txnDate: "2026-09-10", txnTime: null, description: "점심", amount: "-9000", category: "식비", subcategory: "한식" });
-    mockBankPeriod();
-    const { uploadAction } = await import("./actions");
-    viewAs("husband");
-    const url = await expectRedirect(uploadAction(uploadForm(new File(["dummy"], "h.xlsx"), "husband")));
-    expect(url).toContain("success=");
-    const rows = await db.select().from(transactions);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].isPrivate).toBe(true);
+    expect(await db.select().from(transactions)).toEqual([priv]);
   });
 
   test("서울페이 파일도 조회자가 아닌 사람의 나만 보기 서울페이 거래가 기간에 있으면 거부한다", async () => {

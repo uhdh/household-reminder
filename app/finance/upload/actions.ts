@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
-import { and, eq, gte, isNull, lte, notInArray, or, type SQL } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, max, min, notInArray, or, type SQL } from "drizzle-orm";
 import { getDb, type AppDb } from "@/lib/db";
 import { assetItems, transactions, uploads } from "@/lib/finance-db";
 import {
@@ -25,7 +25,7 @@ import { applyHouseholdTransferPairs } from "@/lib/household-transfer-pairs";
 // 거래 내역이 많은 파일은 한 번에 insert하면 "value too large to transmit" 오류가 난다.
 const INSERT_CHUNK_SIZE = 200;
 
-// 재업로드 기간 삭제·재연결에서 항상 보존해야 하는 카테고리: 수동 입력과 서울페이는 뱅크샐러드
+// 뱅크샐러드 거래가 아닌 별도 출처의 카테고리: 수동 입력과 서울페이는 뱅크샐러드
 // 엑셀 재업로드로 지워지면 안 되는 별도 출처의 거래다.
 const PRESERVED_CATEGORIES = ["직접 입력", "서울페이"];
 
@@ -82,19 +82,15 @@ export async function uploadAction(formData: FormData) {
     redirect("/finance/upload?error=" + encodeURIComponent(message));
   }
 
-  if (parsed.periodStart && parsed.periodEnd) {
-    await rejectIfOthersPrivateInPeriod(db, householdId, personId, viewerPersonId, parsed.periodStart, parsed.periodEnd);
-  }
-
   const uploadId = randomUUID();
 
-  // 분류 이력과 "직접 고친 분류"는 기존 기간 거래를 지우기 전에 읽어 둔다(다시 올리는 기간의 이력도 쓰기 위해).
+  // 누적 업로드: 이 사람의 이전 뱅크샐러드 업로드가 이미 다룬 날짜는 기존 거래를 그대로 두고(교체하지 않음),
+  // 처음 들어오는 날짜의 거래만 추가한다. 새 업로드 행을 넣기 전에 읽어야 이번 파일 기간이 섞이지 않는다.
+  const coveredRanges = await loadCoveredRanges(db, householdId, personId);
+  const newTransactions = parsed.transactions.filter((t) => !isCovered(t.txnDate, coveredRanges));
+  const skippedCount = parsed.transactions.length - newTransactions.length;
+
   const context = await loadCategoryDerivationContext(db, householdId);
-  const lockedSnapshot: LockedSnapshot =
-    parsed.periodStart && parsed.periodEnd
-      ? await snapshotLockedRows(db, householdId, personId, parsed.periodStart, parsed.periodEnd,
-          or(isNull(transactions.category), notInArray(transactions.category, PRESERVED_CATEGORIES)))
-      : new Map();
 
   await db
     .update(uploads)
@@ -109,16 +105,6 @@ export async function uploadAction(formData: FormData) {
     periodEnd: parsed.periodEnd,
     isActive: true,
   });
-
-  if (parsed.periodStart && parsed.periodEnd) {
-    await db.delete(transactions).where(and(
-      eq(transactions.householdId, householdId),
-      eq(transactions.personId, personId),
-      gte(transactions.txnDate, parsed.periodStart),
-      lte(transactions.txnDate, parsed.periodEnd),
-      or(isNull(transactions.category), notInArray(transactions.category, PRESERVED_CATEGORIES))
-    ));
-  }
 
   await db
     .update(transactions)
@@ -148,13 +134,12 @@ export async function uploadAction(formData: FormData) {
     );
   }
 
-  const derived = deriveTransactionFields(parsed.transactions, context.mappingIndex, context.ruleIndex, context.keywordRules, {
+  const derived = deriveTransactionFields(newTransactions, context.mappingIndex, context.ruleIndex, context.keywordRules, {
     history: context.history,
     historyFirst: true,
   });
-  const transactionsWithDerived = parsed.transactions.map((t, i) => ({ t, d: withRestoredLock(t, derived[i], lockedSnapshot) }));
+  const transactionsWithDerived = newTransactions.map((t, i) => ({ t, d: derived[i] }));
   const classifiedCount = transactionsWithDerived.filter(({ d }) => d.stdCategory !== null).length;
-  const restoredCount = transactionsWithDerived.filter(({ d }) => d.categoryLocked).length;
 
   for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {
     await db.insert(transactions).values(
@@ -173,9 +158,7 @@ export async function uploadAction(formData: FormData) {
         stdCategory: d.stdCategory,
         included: d.included,
         isInternalTransfer: d.isInternalTransfer,
-        beneficiary: d.beneficiary ?? defaultBeneficiary,
-        categoryLocked: d.categoryLocked,
-        isPrivate: d.isPrivate,
+        beneficiary: defaultBeneficiary,
       }))
     );
   }
@@ -189,8 +172,8 @@ export async function uploadAction(formData: FormData) {
   const exclusionSuffix = excludedCount > 0 ? `, 서울페이 상품권 구매 출금 ${excludedCount}건 집계 제외` : "";
   const classifiedSuffix = classifiedCount > 0 ? `, 자동 분류 ${classifiedCount}건` : "";
   const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
-  const restoredSuffix = restoredCount > 0 ? `, 직접 고친 분류 ${restoredCount}건 유지` : "";
-  const summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${parsed.transactions.length}건 저장 완료${exclusionSuffix}${classifiedSuffix}${restoredSuffix}${pairSuffix}`;
+  const skippedSuffix = skippedCount > 0 ? `, 이미 올린 기간 거래 ${skippedCount}건은 기존 내역 유지` : "";
+  const summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${newTransactions.length}건 추가${skippedSuffix}${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
 }
 
@@ -318,8 +301,37 @@ async function handleSeoulPayUpload(
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
 }
 
+type DateRange = { start: string; end: string };
+
 /**
- * 다른 사람을 보유자로 골라 올리면 그 사람의 기간 거래가 지워지고 교체된다. 그 기간에 그 사람이
+ * 이 사람의 뱅크샐러드 업로드들이 이미 다룬 날짜 구간. 업로드에 기록된 조회 기간을 쓰고, 기간이 없는
+ * 옛 업로드는 그 업로드에 남은 뱅크샐러드 거래의 최소~최대 날짜로 대신한다(수동 입력·서울페이는 제외).
+ */
+async function loadCoveredRanges(db: AppDb, householdId: string, personId: string): Promise<DateRange[]> {
+  const [uploadPeriods, txnSpans] = await Promise.all([
+    db
+      .select({ start: uploads.periodStart, end: uploads.periodEnd })
+      .from(uploads)
+      .where(and(eq(uploads.householdId, householdId), eq(uploads.personId, personId))),
+    db
+      .select({ start: min(transactions.txnDate), end: max(transactions.txnDate) })
+      .from(transactions)
+      .where(and(
+        eq(transactions.householdId, householdId),
+        eq(transactions.personId, personId),
+        or(isNull(transactions.category), notInArray(transactions.category, PRESERVED_CATEGORIES))
+      ))
+      .groupBy(transactions.uploadId),
+  ]);
+  return [...uploadPeriods, ...txnSpans].filter((r): r is DateRange => r.start != null && r.end != null);
+}
+
+function isCovered(date: string, ranges: DateRange[]): boolean {
+  return ranges.some((r) => r.start <= date && date <= r.end);
+}
+
+/**
+ * 서울페이 파일을 다른 사람 몫으로 올리면 그 사람의 기간 서울페이 거래가 지워지고 교체된다. 그 기간에 그 사람이
  * "나만 보기"로 표시한 거래가 하나라도 있으면(조회자가 연결 전이어도) 아무것도 쓰기 전에 거부한다 -
  * 본인 몫 업로드는 막지 않는다. 기간 밖 비공개 행은 applyVoucherPurchaseExclusion이 여전히 건드릴 수 있다.
  */
