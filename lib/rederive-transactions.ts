@@ -77,6 +77,7 @@ export async function loadCategoryDerivationContext(
         category: transactions.category,
         subcategory: transactions.subcategory,
         stdCategory: transactions.stdCategory,
+        categoryLocked: transactions.categoryLocked,
       })
       .from(transactions)
       .where(historyWhere),

@@ -77,14 +77,21 @@ export function buildMappingIndex(mappings: CategoryMapping[]): Map<string, stri
  *   2) 같은 뱅크샐러드 (타입, 대분류, 소분류)                 — 뱅크샐러드 분류가 보통 어디로 갔나
  *   3) 같은 (타입, 대분류)
  *   4) 같은 가맹점
- * 각 단계는 과거 분포의 최다 카테고리를 쓴다. 이체는 쓰지 않는다(이체 분류는 집계 제외 판정과 얽혀
- * 있어 과거 이력으로 추측하면 "저축 이체 → 월급" 같은 오류가 재발한다).
+ * 각 단계는 과거 분포의 최다 카테고리를 쓴다. 단, 뱅크샐러드 소분류가 비어 있으면(미분류 - 예: 소분류 없는
+ * 분류 체계를 쓰는 계정) 분류 조합이 거의 정보를 주지 않으므로 4) 같은 가맹점을 2)보다 먼저 본다
+ * (예: "주거/통신 > 미분류"인 아파트관리비가 다른 주거/통신 거래가 아니라 과거 관리비를 따르도록).
+ *
+ * 이체는 대분류 기준으로 추측하지 않는다(이체 분류는 집계 제외 판정과 얽혀 있어 "저축 이체 → 월급" 같은
+ * 오류가 재발한다). 대신 사용자가 직접 고친(category_locked) 이체만 같은 가맹점(적요) 기준으로 학습한다 -
+ * 뱅크샐러드가 대분류를 비워 둔 "이체 > 미분류"를 한 번 고치면 다음 업로드부터 같은 적요가 따라오게.
  */
 export type HistoryIndex = {
   byMerchantCombo: Map<string, string>;
   byCombo: Map<string, string>;
   byCategory: Map<string, string>;
   byMerchant: Map<string, string>;
+  /** 사용자가 직접 고친 이체의 가맹점(적요) → 카테고리. 자산수정(집계 제외)도 사용자 선택이므로 학습한다. */
+  transferByMerchant: Map<string, string>;
 };
 
 export type HistorySourceRow = {
@@ -93,6 +100,7 @@ export type HistorySourceRow = {
   category: string | null;
   subcategory: string | null;
   stdCategory: string | null;
+  categoryLocked?: boolean;
 };
 
 const HISTORY_TXN_TYPES = new Set(["수입", "지출"]);
@@ -121,6 +129,7 @@ export function buildHistoryIndex(rows: HistorySourceRow[]): HistoryIndex {
     byCombo: new Map<string, Map<string, number>>(),
     byCategory: new Map<string, Map<string, number>>(),
     byMerchant: new Map<string, Map<string, number>>(),
+    transferByMerchant: new Map<string, Map<string, number>>(),
   };
   const bump = (map: Map<string, Map<string, number>>, key: string, category: string) => {
     const byCategory = map.get(key) ?? new Map<string, number>();
@@ -128,6 +137,13 @@ export function buildHistoryIndex(rows: HistorySourceRow[]): HistoryIndex {
     map.set(key, byCategory);
   };
   for (const row of rows) {
+    if (row.txnType === "이체") {
+      const merchant = suggestKeywordFromDescription(row.description);
+      if (row.categoryLocked && merchant && row.stdCategory && row.stdCategory !== "미분류") {
+        bump(tallies.transferByMerchant, merchant, row.stdCategory);
+      }
+      continue;
+    }
     if (!row.stdCategory || HISTORY_IGNORED_CATEGORIES.has(row.stdCategory)) continue;
     if (!HISTORY_TXN_TYPES.has(row.txnType)) continue;
     if (isVoucherPurchaseRecord(row)) continue;
@@ -153,18 +169,22 @@ export function buildHistoryIndex(rows: HistorySourceRow[]): HistoryIndex {
     byCombo: resolve(tallies.byCombo),
     byCategory: resolve(tallies.byCategory),
     byMerchant: resolve(tallies.byMerchant),
+    transferByMerchant: resolve(tallies.transferByMerchant),
   };
 }
 
 export function predictFromHistory(txn: ParsedTransaction, history: HistoryIndex): string | null {
-  if (!HISTORY_TXN_TYPES.has(txn.txnType)) return null;
   const merchant = suggestKeywordFromDescription(txn.description);
+  if (txn.txnType === "이체") return (merchant ? history.transferByMerchant.get(merchant) : undefined) ?? null;
+  if (!HISTORY_TXN_TYPES.has(txn.txnType)) return null;
   const combo = comboKey(txn);
+  const byMerchantCombo = merchant ? history.byMerchantCombo.get(`${merchant}|${combo}`) : undefined;
+  const byMerchant = merchant ? history.byMerchant.get(`${merchant}|${txn.txnType}`) : undefined;
+  const byCombo = history.byCombo.get(combo) ?? history.byCategory.get(`${txn.txnType}|${txn.category ?? "미분류"}`);
+  const subcategoryMissing = (txn.subcategory ?? "미분류") === "미분류";
   return (
-    (merchant ? history.byMerchantCombo.get(`${merchant}|${combo}`) : undefined) ??
-    history.byCombo.get(combo) ??
-    history.byCategory.get(`${txn.txnType}|${txn.category ?? "미분류"}`) ??
-    (merchant ? history.byMerchant.get(`${merchant}|${txn.txnType}`) : undefined) ??
+    byMerchantCombo ??
+    (subcategoryMissing ? (byMerchant ?? byCombo) : (byCombo ?? byMerchant)) ??
     null
   );
 }

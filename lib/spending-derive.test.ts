@@ -146,6 +146,21 @@ describe("mapStdCategory", () => {
     const transfer = transaction({ txnType: "이체", category: "저축", subcategory: "미분류", description: "적금" });
     expect(mapStdCategory(transfer, new Map(), new Map(), [], { history, historyFirst: true })).toBeNull();
   });
+
+  test("이체는 사용자가 직접 고친 같은 적요만 따른다(대분류·자동 분류로는 추측하지 않음)", () => {
+    const history = buildHistoryIndex([
+      historyRow({ txnType: "이체", category: "저축", subcategory: "미분류", description: "서울우유1", stdCategory: "월급", categoryLocked: true }),
+      historyRow({ txnType: "이체", category: "미분류", subcategory: "미분류", description: "웰컴저축은행", stdCategory: "자산수정", categoryLocked: true }),
+      historyRow({ txnType: "이체", category: "미분류", subcategory: "미분류", description: "자동분류", stdCategory: "월급", categoryLocked: false }),
+    ]);
+    const salary = transaction({ txnType: "이체", category: "저축", subcategory: "미분류", description: "서울우유1" });
+    expect(mapStdCategory(salary, new Map(), new Map(), [], { history, historyFirst: true })).toBe("월급");
+    const welcome = transaction({ txnType: "이체", category: "미분류", subcategory: "미분류", description: "웰컴저축은행" });
+    expect(mapStdCategory(welcome, new Map(), new Map(), [], { history, historyFirst: true })).toBe("자산수정");
+    // 직접 고치지 않은 이체, 처음 보는 적요는 추측하지 않는다
+    expect(mapStdCategory(transaction({ txnType: "이체", category: "미분류", subcategory: "미분류", description: "자동분류" }), new Map(), new Map(), [], { history, historyFirst: true })).toBeNull();
+    expect(mapStdCategory(transaction({ txnType: "이체", category: "저축", subcategory: "미분류", description: "처음적요" }), new Map(), new Map(), [], { history, historyFirst: true })).toBeNull();
+  });
 });
 
 function historyRow(overrides: Partial<HistorySourceRow>): HistorySourceRow {
@@ -173,6 +188,16 @@ describe("predictFromHistory (가맹점+분류 → 분류 → 대분류 → 가�
   test("분류 조합도 처음이면 대분류 기준, 그것도 없으면 가맹점 기준", () => {
     expect(predictFromHistory(transaction({ txnType: "지출", category: "식비", subcategory: "한식", description: "처음가게" }), history)).toBe("식비");
     expect(predictFromHistory(transaction({ txnType: "지출", category: "새분류", subcategory: "미분류", description: "김밥집" }), history)).toBe("식비");
+  });
+
+  test("소분류가 비어 있으면(미분류) 분류 조합보다 같은 가맹점을 먼저 본다", () => {
+    const h = buildHistoryIndex([
+      historyRow({ description: "아파트관리비", category: "주거/통신", subcategory: "관리비", stdCategory: "관리비" }),
+      historyRow({ description: "SK텔레콤", category: "주거/통신", subcategory: "미분류", stdCategory: "주거/통신" }),
+    ]);
+    expect(predictFromHistory(transaction({ txnType: "지출", category: "주거/통신", subcategory: "미분류", description: "아파트관리비" }), h)).toBe("관리비");
+    // 처음 보는 가맹점은 여전히 분류 조합 기준
+    expect(predictFromHistory(transaction({ txnType: "지출", category: "주거/통신", subcategory: "미분류", description: "KT" }), h)).toBe("주거/통신");
   });
 
   test("자산수정·미분류·서울페이 구매 장부는 학습하지 않는다", () => {
