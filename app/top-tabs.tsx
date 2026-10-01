@@ -25,7 +25,7 @@ export function TopTabs() {
       aria-label="주요 메뉴"
       className="order-3 w-full overflow-x-auto border-t border-stroke-neutral-muted [scrollbar-width:none] md:order-2 md:w-auto md:flex-1 md:border-t-0 [&::-webkit-scrollbar]:hidden"
     >
-      <div className="flex w-max min-w-full gap-6 md:gap-7">
+      <div className="flex w-max min-w-full justify-between gap-3 md:justify-start md:gap-7">
         {tabs.map(({ label, href, Icon, active }) => {
           const isActive = active(pathname);
           return (
@@ -39,7 +39,7 @@ export function TopTabs() {
                   : "border-transparent font-medium text-fg-neutral-muted hover:text-fg-neutral"
               }`}
             >
-              <Icon size={18} aria-hidden="true" />
+              <Icon size={18} aria-hidden="true" className="hidden sm:block" />
               {label}
             </Link>
           );

@@ -1,7 +1,6 @@
 // 나만 보기 조회 계층 검증(PGlite): 파트너 시점 마스킹, 소유자 시점, 연결 없음(fail-closed),
 // 범위 조회, 가맹점 이력 제외, 마스킹 후에도 합계가 유지되는지.
 import { drizzle } from "drizzle-orm/pglite";
-import { sql } from "drizzle-orm";
 import { afterEach, describe, expect, test } from "vitest";
 import { setDbForTesting } from "@/lib/db";
 import { createPrivateSchema, H, ID_PRIV_H, ID_PRIV_W, ID_PUB, seedPrivateHousehold } from "@/lib/spending-private-fixtures";

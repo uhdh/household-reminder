@@ -67,7 +67,7 @@ export function topNWithOther(entries: [string, number][], n: number, otherLabel
   if (existingIndex >= 0) {
     const merged = [...top];
     merged[existingIndex] = [otherLabel, merged[existingIndex][1] + otherTotal];
-    return merged;
+    return merged.sort((a, b) => b[1] - a[1]); // 합친 뒤 커졌을 수 있으니 범례 순서를 다시 맞춘다
   }
   return [...top, [otherLabel, otherTotal]];
 }

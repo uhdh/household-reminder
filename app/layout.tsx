@@ -14,6 +14,12 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "가계부탁",
   description: "각자 올리면 알아서 합쳐지는 부부 자산·가계부·투자 자동화 서비스",
+  openGraph: {
+    title: "가계부탁",
+    description: "각자 올리면 알아서 합쳐지는 부부 자산·가계부·투자 자동화 서비스",
+    locale: "ko_KR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -13,7 +13,8 @@ export function getDb(): AppDb {
   if (testOverride) return testOverride;
 
   if (!dbInstance) {
-    const url = process.env.DATABASE_URL;
+    // 환경변수에 앞뒤 공백이 섞이면 neon()이 연결 문자열 전체를 오류 메시지(로그)에 담아 던지므로 다듬어 쓴다.
+    const url = process.env.DATABASE_URL?.trim();
     if (!url) throw new Error("DATABASE_URL is not set");
     dbInstance = drizzleNeon({ client: neon(url) });
   }

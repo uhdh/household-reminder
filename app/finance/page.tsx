@@ -445,13 +445,13 @@ function InvestmentPnlCard({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
+        <table className="w-full whitespace-nowrap text-[13px]">
           <thead>
             <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
               <th className="w-8 py-2 pr-2 text-[11px] font-semibold">보유</th>
               <th className="py-2 pr-3 text-[11px] font-semibold">종목</th>
-              <th className="py-2 pr-3 text-right text-[11px] font-semibold">투자원금</th>
-              <th className="py-2 pr-3 text-right text-[11px] font-semibold">평가금액</th>
+              <th className="hidden py-2 pr-3 text-right text-[11px] font-semibold sm:table-cell">투자원금</th>
+              <th className="hidden py-2 pr-3 text-right text-[11px] font-semibold sm:table-cell">평가금액</th>
               <th className="py-2 pr-3 text-right text-[11px] font-semibold">손익금액</th>
               <th className="py-2 pl-3 text-right text-[11px] font-semibold">수익률</th>
             </tr>
@@ -460,9 +460,9 @@ function InvestmentPnlCard({
             {items.map((i) => (
               <tr key={i.id} className="border-b-[0.8px] border-hairline2 last:border-0">
                 <td className={`py-2 pr-2 font-semibold ${i.personLabel === "남편" ? "text-husband" : i.personLabel === "아내" ? "text-wife" : "text-ink-muted"}`}>{i.personLabel}</td>
-                <td className="py-2 pr-3 text-ink">{i.productName}</td>
-                <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{formatManwon(i.costBasis)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums text-ink">{formatManwon(i.value)}</td>
+                <td className="whitespace-normal py-2 pr-3 text-ink">{i.productName}</td>
+                <td className="hidden py-2 pr-3 text-right tabular-nums text-ink-muted sm:table-cell">{formatManwon(i.costBasis)}</td>
+                <td className="hidden py-2 pr-3 text-right tabular-nums text-ink sm:table-cell">{formatManwon(i.value)}</td>
                 <td className="py-2 pr-3 text-right font-semibold tabular-nums">
                   <GainText amount={i.gain}>
                     {i.gain >= 0 ? "+" : ""}
