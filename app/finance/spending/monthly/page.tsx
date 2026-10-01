@@ -11,12 +11,10 @@ import {
   flowLabel,
   getActiveTransactionsInRange,
   getLatestActivePeriod,
-  getPersonAllowances,
   hasAnyTransaction,
   isPersonId,
   monthKeyOf,
   shiftMonth,
-  summarizeBeneficiarySpending,
   summarizeMonthlyTransactions,
   toNum,
   UNMAPPED_CATEGORY,
@@ -28,10 +26,10 @@ import { SummaryCard } from "@/app/finance/_components/summary-card";
 import { CategoryPie } from "./chart";
 import { PersonFilter } from "../person-filter";
 import { BudgetSectionHeader, CategoryRow } from "./category-row";
+import { CategoryOptionsProvider } from "../category-select";
 import { DemoBanner } from "@/app/finance/_components/demo-banner";
 import { FinanceEmptyState, PeriodEmptyNote } from "@/app/finance/_components/empty-state";
 import { MonthlyNavigator } from "./monthly-navigator";
-import { BeneficiaryCard } from "./beneficiary-card";
 
 export const dynamic = "force-dynamic";
 
@@ -110,13 +108,6 @@ export default async function MonthlyPage({
   const budgetByName = new Map(budgetRows.map((b) => [b.name, b]));
   const sortedBudgets = [...budgetRows].sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder));
 
-  // 개인 지출 현황: 사람 필터(payer)와 무관하게 이번 달 가구 전체로 계산한다.
-  const peopleList = personIds.map((id) => ({ id, displayName: displayNameByPerson.get(id) ?? id }));
-  const allowances = await getPersonAllowances(householdId);
-  const beneficiarySummary = summarizeBeneficiarySpending(rangeTx.filter((t) => monthKeyOf(t.txnDate) === month), peopleList, allowances);
-  // 1인 가구는 한도를 정한 경우에만 카드가 의미 있다.
-  const showBeneficiaryCard = peopleList.length >= 2 || beneficiarySummary.rows.some((r) => r.allowance !== null);
-
   function kindOf(stdCategory: string | null, flow: "입금" | "지출"): string {
     const b = stdCategory ? budgetByName.get(stdCategory) : undefined;
     if (b) return b.kind;
@@ -159,6 +150,10 @@ export default async function MonthlyPage({
   const unmappedTotal = Array.from(categoryTotals.entries())
     .filter(([name]) => !knownNames.has(name))
     .reduce((s, [, v]) => s + v, 0);
+  // 예산 목록에서 펼친 거래의 카테고리를 바로 바꿀 수 있게 한다(샘플 데이터는 읽기 전용).
+  const categoryOptions = sortedBudgets.map((b) => ({ name: b.name, kind: b.kind }));
+  const returnTo = `/finance/spending/monthly?${new URLSearchParams({ month, ...(personFilter !== "all" ? { person: personFilter } : {}) })}`;
+  const categoryEditFor = (category: string) => (readOnly ? undefined : { value: category === UNMAPPED ? null : category, returnTo });
   const transactionsFor = (category: string) => monthTx
     .filter((transaction) => flowLabel(transaction) === "지출" && (transaction.stdCategory ?? UNMAPPED) === category)
     .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)))
@@ -216,11 +211,13 @@ export default async function MonthlyPage({
           <SummaryCard label="당월 저축" value={summary.balance} format="compactKrw" />
           {comparison && <DeltaLine kind="balance" delta={comparison.balanceDelta} />}
         </div>
-        <SummaryCard
-          label="저축률"
-          value={summary.savingsRate}
-          format="signedPct"
-        />
+        <div>
+          <SummaryCard
+            label="저축률"
+            value={summary.savingsRate}
+            format="signedPct"
+          />
+        </div>
       </div>
 
       {comparison && comparison.totalExpenseDelta !== 0 && (
@@ -230,8 +227,6 @@ export default async function MonthlyPage({
             ` 가장 많이 늘어난 건 ${comparison.topIncreaseCategory.name}(+${formatCompactKRW(comparison.topIncreaseCategory.delta)})`}
         </p>
       )}
-
-      {showBeneficiaryCard && <BeneficiaryCard month={month} summary={beneficiarySummary} />}
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <CompositionCard
@@ -255,6 +250,7 @@ export default async function MonthlyPage({
         <CategoryPie title="변동비" data={variablePieData} amountFormat="manwon" showTotal />
       </div>
 
+      <CategoryOptionsProvider options={categoryOptions}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="seed-card overflow-hidden shadow-none">
           <ul className="text-[13px]">
@@ -271,6 +267,7 @@ export default async function MonthlyPage({
                 budget={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : null}
                 actual={categoryTotals.get(b.name) ?? 0}
                 transactions={transactionsFor(b.name)}
+                categoryEdit={categoryEditFor(b.name)}
               />
             ))}
           </ul>
@@ -290,6 +287,7 @@ export default async function MonthlyPage({
                 budget={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : null}
                 actual={categoryTotals.get(b.name) ?? 0}
                 transactions={transactionsFor(b.name)}
+                categoryEdit={categoryEditFor(b.name)}
               />
             ))}
             {unmappedTotal > 0 && (
@@ -298,11 +296,13 @@ export default async function MonthlyPage({
                 budget={null}
                 actual={unmappedTotal}
                 transactions={transactionsFor(UNMAPPED)}
+                categoryEdit={categoryEditFor(UNMAPPED)}
               />
             )}
           </ul>
         </div>
       </div>
+      </CategoryOptionsProvider>
       </>
       )}
     </div>

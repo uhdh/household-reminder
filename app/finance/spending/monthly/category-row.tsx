@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatKRW } from "@/lib/finance-format";
 import { CategoryIcon } from "@/app/finance/spending/category-icon";
+import { CategorySelect } from "@/app/finance/spending/category-select";
 
 export type CategoryTransaction = {
   id: string;
@@ -90,11 +91,14 @@ export function CategoryRow({
   budget,
   actual,
   transactions,
+  categoryEdit,
 }: {
   name: string;
   budget: number | null;
   actual: number;
   transactions: CategoryTransaction[];
+  /** 있으면 펼친 거래마다 카테고리 변경 칩을 보여준다(옵션은 CategoryOptionsProvider로 받는다). */
+  categoryEdit?: { value: string | null; returnTo: string };
 }) {
   const [expanded, setExpanded] = useState(false);
   if (actual === 0 && budget === null) return null;
@@ -131,7 +135,10 @@ export function CategoryRow({
         <ul className="mx-4 mb-3 divide-y divide-stroke-neutral-muted/60 border-t border-stroke-neutral-muted/60 text-[13px] sm:mx-6">
           {transactions.length > 0 ? transactions.map((transaction) => (
             <li key={transaction.id} className="flex items-center justify-between gap-3 py-2">
-              <span className="min-w-0 truncate text-ink-muted">{transaction.masked ? "비공개 거래" : transaction.description || "메모 없음"}</span>
+              <span className="min-w-0 flex-1 truncate text-ink-muted">{transaction.masked ? "비공개 거래" : transaction.description || "메모 없음"}</span>
+              {categoryEdit && !transaction.masked && (
+                <CategorySelect txnId={transaction.id} value={categoryEdit.value} returnTo={categoryEdit.returnTo} description={transaction.description} />
+              )}
               {transaction.amount !== null && <span className="shrink-0 font-semibold tabular-nums text-ink">{formatKRW(transaction.amount)}</span>}
             </li>
           )) : <li className="py-2 text-ink-muted">내역 없음</li>}

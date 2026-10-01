@@ -1,6 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { CategoryRow } from "./category-row";
+
+vi.mock("next/navigation", () => ({ redirect: vi.fn(), useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock("@/app/finance/spending/actions", () => ({
+  updateTransactionCategoryAction: vi.fn(),
+  updateTransactionsCategoryAction: vi.fn(),
+  createKeywordRuleAndApplyAction: vi.fn(),
+}));
 
 describe("CategoryRow", () => {
   test("카테고리를 펼치면 결제자 요약 대신 거래 메모와 금액을 보여준다", async () => {
@@ -49,5 +56,28 @@ describe("CategoryRow", () => {
     expect(screen.queryByText("메모 없음")).toBeNull();
     // 카테고리 합계(헤더)의 50,000원은 1곳에만 보이고, 개별 행에는 금액이 없다.
     expect(screen.getAllByText("50,000원")).toHaveLength(1);
+  });
+
+  test("categoryEdit가 있으면 공개 거래에만 카테고리 변경 칩을 보여준다", async () => {
+    const { user } = await import("@testing-library/user-event").then((module) => ({ user: module.default.setup() }));
+
+    render(
+      <ul>
+        <CategoryRow
+          name="주거/통신"
+          budget={null}
+          actual={397_810}
+          transactions={[
+            { id: "tx-1", description: "아파트관리비", amount: 347_810 },
+            { id: "tx-2", description: null, amount: null, masked: true },
+          ]}
+          categoryEdit={{ value: "주거/통신", returnTo: "/finance/spending/monthly?month=2026-09" }}
+        />
+      </ul>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /주거\/통신/ }));
+
+    expect(screen.getAllByRole("button", { name: /카테고리 변경, 현재 주거\/통신/ })).toHaveLength(1);
   });
 });

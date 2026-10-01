@@ -418,7 +418,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                       <TextInput
                         type="number"
                         min={0}
-                        step={1000}
+                        step={1}
                         name={`budget:${b.name}`}
                         defaultValue={b.monthlyBudget !== null ? toNum(b.monthlyBudget) : ""}
                         className="min-h-11 w-28 px-3 py-2 text-right"
@@ -462,7 +462,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <TextInput
             type="number"
             min={0}
-            step={1000}
+            step={1}
             name="monthlyBudget"
             placeholder="월 예산(선택)"
             className="min-h-11 w-32 px-3 py-2"
