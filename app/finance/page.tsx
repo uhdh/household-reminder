@@ -2,13 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { allocationTargets, assetItems, uploads } from "@/lib/finance-db";
+import { assetItems, uploads } from "@/lib/finance-db";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
 import { buildCategoryColorMap, formatManwon, formatSignedPct, heatmapReturnColor, toNumber } from "@/lib/finance-format";
 import { AnimatedNumber } from "./_components/animated-number";
 import { SummaryCard } from "./_components/summary-card";
 import { DashboardCharts } from "./_components/charts";
-import { TargetAllocationCard } from "./_components/target-allocation";
 import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
 import { AppShell } from "@/components/ui";
 import { FinanceEmptyState } from "./_components/empty-state";
@@ -56,9 +55,8 @@ export default async function DashboardPage({
   const { householdId, readOnly } = await resolveFinanceViewer();
   const db = getDb();
 
-  const [activeUploads, allocationTargetRows, householdPeople] = await Promise.all([
+  const [activeUploads, householdPeople] = await Promise.all([
     db.select().from(uploads).where(and(eq(uploads.householdId, householdId), eq(uploads.isActive, true))),
-    db.select().from(allocationTargets).where(eq(allocationTargets.householdId, householdId)),
     getHouseholdPeople(householdId),
   ]);
   const personIds = householdPeople.map((p) => p.id);
@@ -81,10 +79,6 @@ export default async function DashboardPage({
     }
     redirect("/finance/upload");
   }
-
-  const targetPctByCategory = new Map(
-    allocationTargetRows.map((r) => [r.category, toNumber(r.targetPct)])
-  );
 
   const activeUploadIds = activeUploads.map((u) => u.id);
   const peopleWithData = new Set(activeUploads.map((u) => u.personId));
@@ -143,15 +137,6 @@ export default async function DashboardPage({
     fill: colorByCategory[name],
   }));
 
-  const allocationRows = assetCategoryOrder.map((name) => {
-    const currentPct = totalAsset > 0 ? ((assetCategoryTotals.get(name) ?? 0) / totalAsset) * 100 : 0;
-    return {
-      category: name,
-      fill: colorByCategory[name],
-      currentPct,
-      targetPct: targetPctByCategory.get(name) ?? currentPct,
-    };
-  });
 
   const TREEMAP_MAX_ITEMS = 20;
   // 현금/예적금 계좌는 계좌별로 쪼개지 않고 카테고리 단위로 합산해서 히트맵 한 칸으로 보여준다
@@ -300,10 +285,6 @@ export default async function DashboardPage({
               sectorComposition={sectorComposition}
             />
 
-            <div className="mt-4">
-              <TargetAllocationCard rows={allocationRows} totalAsset={totalAsset} personFilter={personFilter} readOnly={readOnly} />
-            </div>
-
             {investmentItems.length > 0 && (
               <InvestmentPnlCard
                 items={investmentItems}
@@ -335,8 +316,8 @@ function HeroRow({
     return (
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
         <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="순자산" value={totalNet} format="manwon" />
-        <SummaryCard label="총자산" value={totalAsset} format="manwon" />
-        <SummaryCard label="총부채" value={totalDebt} format="manwon" />
+        <SummaryCard className="flex flex-col justify-center" label="총자산" value={totalAsset} format="manwon" />
+        <SummaryCard className="flex flex-col justify-center" label="총부채" value={totalDebt} format="manwon" />
       </div>
     );
   }
@@ -347,8 +328,9 @@ function HeroRow({
     return (
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
         <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="우리집 자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]} />
-        <SummaryCard label={`${first.label} 순자산`} value={first.net} format="manwon" />
-        <SummaryCard label={`${second.label} 순자산`} value={second.net} format="manwon" />
+        {[first, second].map((s) => (
+          <SummaryCard key={s.personId} className="flex flex-col justify-center" label={`${s.label} 순자산`} value={s.net} format="manwon" breakdown={[{ label: "자산", value: s.totalAsset }, { label: "부채", value: s.totalDebt }]} />
+        ))}
       </div>
     );
   }
@@ -364,7 +346,7 @@ function HeroRow({
         breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]}
       />
       {summary.map((s) => (
-        <SummaryCard key={s.personId} label={`${s.label} 순자산`} value={s.net} format="manwon" />
+        <SummaryCard key={s.personId} className="flex flex-col justify-center" label={`${s.label} 순자산`} value={s.net} format="manwon" breakdown={[{ label: "자산", value: s.totalAsset }, { label: "부채", value: s.totalDebt }]} />
       ))}
     </div>
   );

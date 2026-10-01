@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CategoryIcon } from "./category-icon";
 import { CategoryPicker, type CategoryOption } from "./category-picker";
 
 const UNCLASSIFIED = "미분류";
 
 // 세부 내역 필터의 카테고리 선택. 거래 분류와 같은 CategoryPicker를 쓰고, 선택값은 GET 폼의
-// hidden input(name="category")으로 넘긴다. "all" = 전체.
+// hidden input(name="category")으로 넘기고, 고르는 즉시 폼을 제출해 바로 적용한다. "all" = 전체.
 export function CategoryFilter({
   defaultValue,
   options,
@@ -19,15 +19,23 @@ export function CategoryFilter({
 }) {
   const [value, setValue] = useState(defaultValue);
   const selected = value === "all" ? null : value;
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function select(next: string) {
+    setValue(next);
+    if (!inputRef.current) return;
+    inputRef.current.value = next; // 상태 반영 전에 제출하므로 값을 직접 넣는다
+    inputRef.current.form?.requestSubmit();
+  }
 
   return (
     <>
-      <input type="hidden" name="category" value={value} />
+      <input ref={inputRef} type="hidden" name="category" value={value} readOnly />
       <CategoryPicker
         value={selected}
         options={[{ name: UNCLASSIFIED, kind: "분류 안 됨" }, ...options]}
         frequentCategories={frequentCategories}
-        onSelect={(name) => setValue(name ?? "all")}
+        onSelect={(name) => select(name ?? "all")}
         ariaLabel="카테고리 필터"
         clearLabel="전체 카테고리 보기"
         showExclude={false}

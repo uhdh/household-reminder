@@ -23,7 +23,7 @@ import {
   type PersonId,
 } from "@/lib/spending-queries";
 import { formatKRW } from "@/lib/finance-format";
-import { ActionButton, SelectInput, TextInput } from "@/components/ui";
+import { SelectInput, TextInput } from "@/components/ui";
 import { BeneficiarySelect } from "./beneficiary-select";
 import { CategoryMergeToast, CategoryOptionsProvider, CategorySelect } from "./category-select";
 import {
@@ -38,6 +38,7 @@ import {
 } from "./category-suggest";
 import { PersonFilter } from "./person-filter";
 import { CategoryFilter } from "./category-filter";
+import { FilterForm } from "./filter-form";
 import { MonthlyNavigator } from "./monthly/monthly-navigator";
 import { ManualTransactionForm } from "./manual-transaction-form";
 import { rowMatchesCategory, rowMatchesQuery } from "@/lib/spending-private";
@@ -328,7 +329,7 @@ export default async function SpendingPage({
 
       {!isHouseholdEmpty && (
       <>
-      <form method="get" className="seed-card mb-4 flex flex-wrap items-end gap-3 p-4 shadow-none sm:p-5">
+      <FilterForm className="seed-card mb-4 flex flex-wrap items-end gap-3 p-4 shadow-none sm:p-5">
         <input type="hidden" name="month" value={month} />
         {personFilter !== "all" && <input type="hidden" name="person" value={personFilter} />}
         <label className="min-w-24 flex-1 text-[12px] font-medium text-ink-muted sm:flex-none">
@@ -359,9 +360,8 @@ export default async function SpendingPage({
         </div>
         <label className="min-w-44 flex-[2] text-[12px] font-medium text-ink-muted">
           검색
-          <TextInput name="q" defaultValue={query} placeholder="메모·결제수단·원본 분류" className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]" />
+          <TextInput name="q" defaultValue={query} placeholder="메모·결제수단·원본 분류 (Enter)" className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]" />
         </label>
-        <ActionButton type="submit" className="min-h-11 px-5 py-2 text-[14px]">적용</ActionButton>
         <Link href={hrefFor(month, personFilter, false)} className="seed-button seed-button-secondary min-h-11 px-4 py-2 text-[14px]">초기화</Link>
         <a
           href={exportHref}
@@ -375,7 +375,7 @@ export default async function SpendingPage({
           엑셀 다운로드
         </a>
         <span className="ml-auto pb-3 text-[13px] text-ink-muted">{filtered.length}건</span>
-      </form>
+      </FilterForm>
 
       {hiddenByFilterCount > 0 && (
         <p className="mb-3 text-[12px] text-ink-muted">비공개 거래 {hiddenByFilterCount}건은 분류·검색 조건에 걸리지 않아 목록에서 빠져 있어요. 합계에는 포함돼요.</p>

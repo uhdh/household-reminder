@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { budgetCategories, categoryKeywordRules, categoryMappings, categoryRules, households, householdInvites, householdMembers, users } from "@/lib/finance-db";
 import { formatKRW } from "@/lib/finance-format";
-import { getActiveTransactions, getHouseholdPeople, getPersonAllowances, toNum } from "@/lib/spending-queries";
+import { getActiveTransactions, getHouseholdPeople, toNum } from "@/lib/spending-queries";
 import { requireHouseholdOrOnboard } from "@/lib/require-household";
 import { ActionButton, SelectInput, TextInput } from "@/components/ui";
 import {
@@ -17,7 +17,7 @@ import {
   upsertCategoryMappingAction,
   upsertCategoryRuleAction,
 } from "./actions";
-import { cancelInviteAction, setAllowanceAction } from "./members-actions";
+import { cancelInviteAction } from "./members-actions";
 import { CreateInviteForm } from "./create-invite-form";
 import { DeleteHouseholdForm, LeaveHouseholdForm } from "./danger-zone";
 import { RederiveCard } from "./rederive-card";
@@ -52,8 +52,8 @@ function guessStdCategory(rawCategory: string, rawSubcategory: string, knownName
   return knownNames.has("기타") ? "기타" : (knownNames.values().next().value ?? "기타");
 }
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string; allowanceError?: string }> }) {
-  const { tab, error, success, allowanceError } = await searchParams;
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string}> }) {
+  const { tab, error, success } = await searchParams;
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
   const { householdId, role, personId } = await requireHouseholdOrOnboard();
   const db = getDb();
@@ -76,7 +76,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     .map((m) => ({ ...m, user: userById.get(m.userId) }))
     .sort((a, b) => (a.role === b.role ? 0 : a.role === "owner" ? -1 : 1));
   const activeInvites = invites.filter((i) => !i.usedAt && i.expiresAt > new Date());
-  const allowances = activeTab === "members" ? await getPersonAllowances(householdId) : new Map<string, number | null>();
 
   const sortedBudgets = [...budgets].sort((a, b) => toNum(a.sortOrder) - toNum(b.sortOrder));
   const categoryOptions = sortedBudgets.map((b) => ({ name: b.name, kind: b.kind }));
@@ -492,33 +491,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             </ul>
 
             {role === "owner" && <CreateInviteForm />}
-          </div>
-
-          <div className="seed-card p-5 shadow-none sm:p-7">
-            <h2 className="mb-1 text-[18px] font-extrabold text-ink">월 용돈 한도</h2>
-            <p className="mb-4 text-[13px] text-ink-muted">
-              사용 대상이 본인인 지출의 월 한도예요. 비워 두면 한도 없이 지출만 보여줘요. 한도는 본인 것만 바꿀 수 있어요.
-            </p>
-            {allowanceError && <div className="mb-3 rounded-r2 bg-bg-critical-weak px-3 py-2 text-[12px] text-fg-critical">{allowanceError}</div>}
-            <ul className="divide-y divide-hairline2 text-[14px]">
-              {householdPeople.map((p) => {
-                const allowance = allowances.get(p.id) ?? null;
-                return (
-                  <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
-                    <span className="font-semibold text-ink">{p.displayName}</span>
-                    {p.id === personId ? (
-                      <form action={setAllowanceAction} className="flex items-center gap-2">
-                        <TextInput type="number" name="allowance" aria-label="월 용돈 한도(원)" min={0} max={100000000} step={1} defaultValue={allowance ?? ""} placeholder="한도 없음" className="min-h-11 w-32 px-3 py-2 text-right" />
-                        <ActionButton type="submit" className="min-h-11 px-4 py-2">저장</ActionButton>
-                      </form>
-                    ) : (
-                      <span className="text-ink-muted">{allowance !== null ? formatKRW(allowance) : "설정 안 함"}</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {!personId && <p className="mt-3 text-[12px] text-ink-muted">이 계정은 아직 가구 구성원 프로필과 연결되지 않아 한도를 입력할 수 없어요.</p>}
           </div>
 
           {role === "owner" && activeInvites.length > 0 && (

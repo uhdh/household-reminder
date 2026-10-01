@@ -68,7 +68,7 @@ export async function upsertCategoryMappingAction(formData: FormData) {
     await rederiveAndPairHousehold(db, householdId, personId, mappingCandidateFilter(txnType, rawCategory, rawSubcategory));
   }
 
-  redirect("/finance/spending/settings");
+  redirect("/finance/spending/settings?tab=mappings");
 }
 
 export async function deleteCategoryMappingAction(formData: FormData) {
@@ -85,7 +85,7 @@ export async function deleteCategoryMappingAction(formData: FormData) {
     // 삭제된 매핑이 적용되던 거래도, 남은 규칙 우선순위대로 다시 계산한다(전에는 그대로 남아있었음).
     if (mapping) await rederiveAndPairHousehold(db, householdId, personId, mappingCandidateFilter(mapping.txnType, mapping.rawCategory, mapping.rawSubcategory));
   }
-  redirect("/finance/spending/settings");
+  redirect("/finance/spending/settings?tab=mappings");
 }
 
 export async function upsertCategoryRuleAction(formData: FormData) {
@@ -225,7 +225,7 @@ export async function updateBudgetCategoriesAction(formData: FormData) {
       .where(and(eq(budgetCategories.name, name), eq(budgetCategories.householdId, householdId)));
   }
 
-  redirect("/finance/spending/settings");
+  redirect("/finance/spending/settings?tab=categories");
 }
 
 export async function addBudgetCategoryAction(formData: FormData) {
@@ -246,7 +246,7 @@ export async function addBudgetCategoryAction(formData: FormData) {
       .onConflictDoNothing({ target: [budgetCategories.householdId, budgetCategories.name] });
   }
 
-  redirect("/finance/spending/settings");
+  redirect("/finance/spending/settings?tab=categories");
 }
 
 export async function deleteBudgetCategoryAction(name: string) {
@@ -255,5 +255,5 @@ export async function deleteBudgetCategoryAction(name: string) {
     const db = getDb();
     await db.delete(budgetCategories).where(and(eq(budgetCategories.name, name), eq(budgetCategories.householdId, householdId)));
   }
-  redirect("/finance/spending/settings");
+  redirect("/finance/spending/settings?tab=categories");
 }

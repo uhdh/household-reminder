@@ -166,7 +166,14 @@ export default async function YearlyPage({
       .sort((a, b) => b.total - a.total);
     const top = ranked.slice(0, 5).map((item) => ({ name: item.name, dataKey: `${prefix}:${item.name}`, sourceNames: [item.name] }));
     const otherNames = ranked.slice(5).map((item) => item.name);
-    return otherNames.length > 0 ? [...top, { name: "기타", dataKey: `${prefix}:other`, sourceNames: otherNames }] : top;
+    if (otherNames.length === 0) return top;
+    // 상위 5개에 실제 "기타" 카테고리가 있으면 나머지를 거기에 합쳐 범례에 "기타"가 두 번 나오지 않게 한다(topNWithOther와 같은 규칙).
+    const existing = top.find((item) => item.name === "기타");
+    if (existing) {
+      existing.sourceNames.push(...otherNames);
+      return top;
+    }
+    return [...top, { name: "기타", dataKey: `${prefix}:other`, sourceNames: otherNames }];
   };
   const fixedCategorySeries = buildCategorySeries(fixedRows, "fixed");
   const variableCategorySeries = buildCategorySeries(variableRows, "variable");

@@ -6,7 +6,6 @@ import {
   excludedReasonLabel,
   flowLabel,
   isExcludedFromTotals,
-  summarizeBeneficiarySpending,
   summarizeMonthlyTransactions,
   unmappedTransferExclusion,
   type Txn,
@@ -201,59 +200,3 @@ describe("isExcludedFromTotals / excludedReasonLabel (세부 내역 '집계 제�
   });
 });
 
-describe("summarizeBeneficiarySpending", () => {
-  const people = [
-    { id: "husband", displayName: "남편" },
-    { id: "wife", displayName: "아내" },
-  ];
-  const noAllowance = new Map<string, number | null>();
-
-  test("사용 대상별 지출을 합산하고 공동은 따로 낸다", () => {
-    const result = summarizeBeneficiarySpending(
-      [
-        makeTxn({ beneficiary: "husband", amount: "-30000" }),
-        makeTxn({ beneficiary: "husband", amount: "-20000" }),
-        makeTxn({ beneficiary: "wife", amount: "-10000" }),
-        makeTxn({ beneficiary: "joint", amount: "-70000" }),
-      ],
-      people,
-      noAllowance
-    );
-    expect(result.rows.map((r) => [r.id, r.spent])).toEqual([["husband", 50000], ["wife", 10000]]);
-    expect(result.joint).toBe(70000);
-  });
-
-  test("환불(입금)·집계 제외·미분류 이체·알 수 없는 사용 대상은 뺀다", () => {
-    const result = summarizeBeneficiarySpending(
-      [
-        makeTxn({ beneficiary: "husband", amount: "-30000" }),
-        makeTxn({ beneficiary: "husband", amount: "5000", txnType: "지출" }), // 환불 = 입금
-        makeTxn({ beneficiary: "husband", amount: "-9999", included: false }),
-        makeTxn({ beneficiary: "husband", amount: "-8888", txnType: "이체", stdCategory: null }),
-        makeTxn({ beneficiary: "deleted-person", amount: "-7777" }),
-      ],
-      people,
-      noAllowance
-    );
-    expect(result.rows[0].spent).toBe(30000);
-    expect(result.joint).toBe(0);
-  });
-
-  test("한도가 있으면 초과 금액을 계산하고, 한도가 없거나 이하이면 0이다", () => {
-    const result = summarizeBeneficiarySpending(
-      [makeTxn({ beneficiary: "husband", amount: "-60000" }), makeTxn({ beneficiary: "wife", amount: "-10000" })],
-      people,
-      new Map([["husband", 50000], ["wife", null]])
-    );
-    expect(result.rows[0]).toMatchObject({ spent: 60000, allowance: 50000, over: 10000 });
-    expect(result.rows[1]).toMatchObject({ spent: 10000, allowance: null, over: 0 });
-  });
-
-  test("한도 0원이면 지출이 있는 순간 전부 초과이고, 1인·3인 가구도 사람 목록대로 나온다", () => {
-    const solo = summarizeBeneficiarySpending([makeTxn({ beneficiary: "me", amount: "-1000" })], [{ id: "me", displayName: "나" }], new Map([["me", 0]]));
-    expect(solo.rows).toHaveLength(1);
-    expect(solo.rows[0].over).toBe(1000);
-    const three = summarizeBeneficiarySpending([], [...people, { id: "kid", displayName: "아이" }], noAllowance);
-    expect(three.rows).toHaveLength(3);
-  });
-});

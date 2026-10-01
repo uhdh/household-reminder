@@ -53,9 +53,9 @@ export function YearlyView({
   const fixedTotal = data.reduce((sum, item) => sum + item.fixedExpense, 0);
   const variableTotal = data.reduce((sum, item) => sum + item.variableExpense, 0);
   const expenseTotal = fixedTotal + variableTotal;
-  const variableRatio = expenseTotal > 0 ? (variableTotal / expenseTotal) * 100 : 0;
   const incomeTotal = data.reduce((sum, item) => sum + item.income, 0);
-  const savingsRate = incomeTotal > 0 ? ((incomeTotal - expenseTotal) / incomeTotal) * 100 : 0;
+  const savingsTotal = incomeTotal - expenseTotal;
+  const savingsRate = incomeTotal > 0 ? (savingsTotal / incomeTotal) * 100 : 0;
 
   return (
     <section>
@@ -84,19 +84,19 @@ export function YearlyView({
         <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <div className="seed-card p-5 shadow-none">
-            <p className="text-[13px] font-medium text-ink-muted">연간 고정비</p>
-            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{fixedTotal.toLocaleString("ko-KR")}만원</p>
+            <p className="text-[13px] font-medium text-ink-muted">연간 수입</p>
+            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{incomeTotal.toLocaleString("ko-KR")}만원</p>
           </div>
           <div className="seed-card p-5 shadow-none">
-            <p className="text-[13px] font-medium text-ink-muted">연간 변동비</p>
-            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{variableTotal.toLocaleString("ko-KR")}만원</p>
+            <p className="text-[13px] font-medium text-ink-muted">연간 지출</p>
+            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{expenseTotal.toLocaleString("ko-KR")}만원</p>
           </div>
           <div className="seed-card p-5 shadow-none">
-            <p className="text-[13px] font-medium text-ink-muted">변동비 비중</p>
-            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{variableRatio.toFixed(1)}%</p>
+            <p className="text-[13px] font-medium text-ink-muted">연간 저축</p>
+            <p className="mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums text-ink">{savingsTotal.toLocaleString("ko-KR")}만원</p>
           </div>
           <div className="seed-card p-5 shadow-none">
-            <p className="text-[13px] font-medium text-ink-muted">연간 저축률</p>
+            <p className="text-[13px] font-medium text-ink-muted">저축률</p>
             <p className={`mt-1.5 text-[26px] font-extrabold tracking-[-0.02em] tabular-nums ${savingsRate >= 0 ? "text-fg-positive" : "text-fg-critical"}`}>
               {savingsRate >= 0 ? "+" : ""}{savingsRate.toFixed(1)}%
             </p>
