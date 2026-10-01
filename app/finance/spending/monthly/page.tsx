@@ -155,12 +155,13 @@ export default async function MonthlyPage({
   const returnTo = `/finance/spending/monthly?${new URLSearchParams({ month, ...(personFilter !== "all" ? { person: personFilter } : {}) })}`;
   const categoryEditFor = (category: string) => (readOnly ? undefined : { value: category === UNMAPPED ? null : category, returnTo });
   const transactionsFor = (category: string) => monthTx
-    .filter((transaction) => flowLabel(transaction) === "지출" && (transaction.stdCategory ?? UNMAPPED) === category)
+    // "미분류" 행 합계(unmappedTotal)는 예산 목록에 없는 카테고리도 포함하므로, 펼친 내역도 같은 기준으로 고른다.
+    .filter((transaction) => flowLabel(transaction) === "지출" && (transaction.stdCategory && knownNames.has(transaction.stdCategory) ? transaction.stdCategory : UNMAPPED) === category)
     .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)))
     .map((transaction) =>
       transaction.masked
         ? { id: transaction.id, description: null, amount: null, masked: true }
-        : { id: transaction.id, description: transaction.description, amount: Math.abs(toNum(transaction.amount)), masked: false }
+        : { id: transaction.id, description: transaction.description, amount: Math.abs(toNum(transaction.amount)), masked: false, stdCategory: transaction.stdCategory }
     );
 
   return (

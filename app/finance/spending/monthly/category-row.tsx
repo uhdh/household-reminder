@@ -11,6 +11,8 @@ export type CategoryTransaction = {
   /** 파트너의 비공개 거래는 금액을 아예 내려보내지 않는다(null). */
   amount: number | null;
   masked?: boolean;
+  /** 거래의 실제 카테고리. "미분류" 행에는 예산 목록에 없는 카테고리 거래도 섞이므로 칩에 이 값을 보여준다. */
+  stdCategory?: string | null;
 };
 
 function usagePctOf(actual: number, budget: number | null): number | null {
@@ -137,7 +139,7 @@ export function CategoryRow({
             <li key={transaction.id} className="flex items-center justify-between gap-3 py-2">
               <span className="min-w-0 flex-1 truncate text-ink-muted">{transaction.masked ? "비공개 거래" : transaction.description || "메모 없음"}</span>
               {categoryEdit && !transaction.masked && (
-                <CategorySelect txnId={transaction.id} value={categoryEdit.value} returnTo={categoryEdit.returnTo} description={transaction.description} />
+                <CategorySelect txnId={transaction.id} value={transaction.stdCategory !== undefined ? transaction.stdCategory : categoryEdit.value} returnTo={categoryEdit.returnTo} description={transaction.description} />
               )}
               {transaction.amount !== null && <span className="shrink-0 font-semibold tabular-nums text-ink">{formatKRW(transaction.amount)}</span>}
             </li>

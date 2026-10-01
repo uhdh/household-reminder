@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { CategoryIcon } from "./category-icon";
 import { buildFlatOptionOrder, displayCategoryLabel } from "./category-suggest";
@@ -64,6 +64,25 @@ export function CategoryPicker({
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // 데스크톱(sm 이상) 팝오버는 카드의 overflow-hidden·표의 가로 스크롤 영역에 잘리지 않도록 화면 기준(fixed)으로
+  // 띄우고, 아래 공간이 모자라면 위로 연다. autoOpen 경로도 같이 처리하려고 열릴 때 DOM 위치를 직접 잡는다.
+  // 모바일은 하단 시트(클래스로 고정)라 건드리지 않는다.
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!open || !dialog || !rect || !window.matchMedia("(min-width: 640px)").matches) return;
+    const width = 288; // sm:w-72
+    const margin = 8;
+    const below = window.innerHeight - rect.bottom - margin;
+    const above = rect.top - margin;
+    const openUp = below < 320 && above > below;
+    dialog.style.left = `${Math.min(Math.max(rect.left, margin), window.innerWidth - width - margin)}px`;
+    dialog.style.top = openUp ? "" : `${rect.bottom + 4}px`;
+    dialog.style.bottom = openUp ? `${window.innerHeight - rect.top + 4}px` : "";
+    dialog.style.maxHeight = `${Math.min(384, (openUp ? above : below) - 4)}px`;
+  }, [open]);
 
   const gridOptions = useMemo(() => options.filter((o) => o.name !== EXCLUDE_VALUE), [options]);
   const grouped = useMemo(() => groupByKind(gridOptions), [gridOptions]);
@@ -82,11 +101,20 @@ export function CategoryPicker({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
+    // fixed 위치는 페이지 스크롤·창 크기 변경을 따라가지 않으므로 그때는 닫는다(팝오버 안쪽 스크롤은 제외).
+    function handleScroll(event: Event) {
+      if (dialogRef.current?.contains(event.target as Node)) return;
+      if (window.matchMedia("(min-width: 640px)").matches) setOpen(false);
+    }
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleScroll);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleScroll);
     };
   }, [open]);
 
@@ -152,6 +180,7 @@ export function CategoryPicker({
     <div ref={containerRef} className={`relative ${className}`}>
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => {
           setOpen((v) => !v);
           setActiveIndex(0);
@@ -174,10 +203,11 @@ export function CategoryPicker({
         <>
           <div className="fixed inset-0 z-40 bg-black/40 sm:hidden" onClick={() => setOpen(false)} />
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-label={ariaLabel}
-            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col gap-3 overflow-auto rounded-t-r5 bg-bg-layer-floating p-4 text-left shadow-2xl sm:absolute sm:inset-auto sm:left-0 sm:top-full sm:mt-1 sm:max-h-96 sm:w-72 sm:rounded-r3 sm:border sm:border-hairline sm:p-3"
+            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col gap-3 overflow-auto rounded-t-r5 bg-bg-layer-floating p-4 text-left shadow-2xl sm:inset-auto sm:max-h-96 sm:w-72 sm:rounded-r3 sm:border sm:border-hairline sm:p-3"
           >
             <input
               ref={searchRef}
