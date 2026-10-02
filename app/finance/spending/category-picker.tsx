@@ -72,7 +72,7 @@ export function CategoryPicker({
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     const rect = triggerRef.current?.getBoundingClientRect();
-    if (!open || !dialog || !rect || !window.matchMedia("(min-width: 640px)").matches) return;
+    if (!open || !dialog || !rect || !window.matchMedia?.("(min-width: 640px)").matches) return;
     const width = 288; // sm:w-72
     const margin = 8;
     const below = window.innerHeight - rect.bottom - margin;
@@ -104,7 +104,7 @@ export function CategoryPicker({
     // fixed 위치는 페이지 스크롤·창 크기 변경을 따라가지 않으므로 그때는 닫는다(팝오버 안쪽 스크롤은 제외).
     function handleScroll(event: Event) {
       if (dialogRef.current?.contains(event.target as Node)) return;
-      if (window.matchMedia("(min-width: 640px)").matches) setOpen(false);
+      if (window.matchMedia?.("(min-width: 640px)").matches) setOpen(false);
     }
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
