@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { setDbForTesting } from "@/lib/db";
 import {
   allocationTargets,
+  depositRates,
   assetItems,
   budgetCategories,
   categoryKeywordRules,
@@ -158,6 +159,7 @@ describe("leaveHouseholdAction / deleteHouseholdAction (위험 구역)", () => {
       )
     `);
     await db.execute(sql`CREATE TABLE allocation_targets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL REFERENCES households(id), category text NOT NULL, target_pct numeric NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(household_id, category))`);
+    await db.execute(sql`CREATE TABLE deposit_rates (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL REFERENCES households(id), person_id text NOT NULL, product_name text NOT NULL, rate_pct numeric NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(household_id, person_id, product_name))`);
     await db.execute(sql`CREATE TABLE category_mappings (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL REFERENCES households(id), txn_type text NOT NULL, raw_category text NOT NULL, raw_subcategory text NOT NULL, std_category text NOT NULL, UNIQUE(household_id, txn_type, raw_category, raw_subcategory))`);
     await db.execute(sql`CREATE TABLE category_rules (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL REFERENCES households(id), txn_type text NOT NULL, payment_method text NOT NULL, std_category text NOT NULL, UNIQUE(household_id, txn_type, payment_method))`);
     await db.execute(sql`CREATE TABLE category_keyword_rules (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), household_id uuid NOT NULL REFERENCES households(id), txn_type text NOT NULL, keyword text NOT NULL, std_category text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(household_id, keyword))`);
@@ -171,6 +173,7 @@ describe("leaveHouseholdAction / deleteHouseholdAction (위험 구역)", () => {
       db.select().from(assetItems).where(eq(assetItems.householdId, householdId)),
       db.select().from(uploads).where(eq(uploads.householdId, householdId)),
       db.select().from(allocationTargets).where(eq(allocationTargets.householdId, householdId)),
+      db.select().from(depositRates).where(eq(depositRates.householdId, householdId)),
       db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
       db.select().from(categoryRules).where(eq(categoryRules.householdId, householdId)),
       db.select().from(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId)),
@@ -202,6 +205,7 @@ describe("leaveHouseholdAction / deleteHouseholdAction (위험 구역)", () => {
     });
     await db.insert(assetItems).values({ householdId: household.id, uploadId: upload.id, personId: `${household.id}-p1`, side: "asset", category: "예금", amount: "10000" });
     await db.insert(allocationTargets).values({ householdId: household.id, category: "예금", targetPct: "50" });
+    await db.insert(depositRates).values({ householdId: household.id, personId: "p", productName: "정기예금", ratePct: "3.5" });
     await db.insert(categoryMappings).values({ householdId: household.id, txnType: "지출", rawCategory: "식비", rawSubcategory: "한식", stdCategory: "식비" });
     await db.insert(categoryRules).values({ householdId: household.id, txnType: "지출", paymentMethod: "카드", stdCategory: "식비" });
     await db.insert(categoryKeywordRules).values({ householdId: household.id, txnType: "지출", keyword: "코스트코", stdCategory: "식비" });

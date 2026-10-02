@@ -2,12 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assetItems, uploads } from "@/lib/finance-db";
+import { assetItems, depositRates, uploads } from "@/lib/finance-db";
+import { annualInterest } from "@/lib/deposit-rate";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
 import { buildCategoryColorMap, formatManwon, formatSignedPct, heatmapReturnColor, toNumber } from "@/lib/finance-format";
 import { AnimatedNumber } from "./_components/animated-number";
 import { SummaryCard } from "./_components/summary-card";
-import { DashboardCharts } from "./_components/charts";
+import { DashboardCharts, type CashAccount } from "./_components/charts";
+import { DepositRateInput } from "./_components/deposit-rate-input";
 import { normalizeInvestmentProductName } from "@/lib/finance-parse/investment-utils";
 import { AppShell } from "@/components/ui";
 import { FinanceEmptyState } from "./_components/empty-state";
@@ -89,6 +91,18 @@ export default async function DashboardPage({
     : [];
 
   const assets = rawAssets.filter((item) => !isExcludedItem(item));
+  // deposit_rates 마이그레이션(scripts/migrate-deposit-rates.ts) 전에 배포돼도 자산 화면이 깨지지 않게, 테이블이
+  // 없을 때(42P01)만 "금리 없음"으로 본다. 다른 오류는 그대로 던진다.
+  const rateRows = await db
+    .select()
+    .from(depositRates)
+    .where(eq(depositRates.householdId, householdId))
+    .catch((error: unknown) => {
+      const code = (error as { code?: string; cause?: { code?: string } }).code ?? (error as { cause?: { code?: string } }).cause?.code;
+      if (code === "42P01") return [];
+      throw error;
+    });
+  const rateByAccount = new Map(rateRows.map((r) => [`${r.personId}|${r.productName}`, toNumber(r.ratePct)]));
 
   const summary = householdPeople.map(({ id: personId }) => {
     const items = assets.filter((a) => a.personId === personId);
@@ -176,6 +190,31 @@ export default async function DashboardPage({
       sharePct: totalAsset > 0 ? (item.value / totalAsset) * 100 : 0,
     });
   }
+  // 히트맵에서 한 칸으로 묶은 현금·예적금의 계좌별 목록(칸을 누르면 펼침)과 투자 손익 카드의 계좌별 금액·금리.
+  const cashAccountByKey = new Map<string, CashAccount>();
+  for (const item of filteredAssets) {
+    if (item.side !== "asset") continue;
+    const amount = toNumber(item.amount);
+    if (amount <= 0) continue;
+    const category = isCashLikeAsset(item) ? "현금" : displayAssetCategory(item.category);
+    if (!TREEMAP_AGGREGATED_CATEGORIES.has(category)) continue;
+    const productName = item.productName || item.category;
+    const key = `${item.personId}|${productName}`;
+    const existing = cashAccountByKey.get(key);
+    cashAccountByKey.set(key, {
+      key,
+      personId: item.personId,
+      personLabel: displayNameByPerson.get(item.personId) ?? item.personId,
+      productName,
+      category,
+      amount: (existing?.amount ?? 0) + amount,
+      ratePct: rateByAccount.get(key) ?? null,
+    });
+  }
+  const cashAccounts = Array.from(cashAccountByKey.values()).sort((a, b) =>
+    a.category === b.category ? b.amount - a.amount : a.category === "예적금" ? -1 : 1
+  );
+
   const rawTreemapItems = [
     ...Array.from(treemapAggregatedTotals.entries()).map(([name, value]) => ({
       name,
@@ -283,14 +322,18 @@ export default async function DashboardPage({
               assetComposition={assetComposition}
               treemapData={treemapData}
               sectorComposition={sectorComposition}
+              cashAccounts={cashAccounts}
             />
 
-            {investmentItems.length > 0 && (
+            {(investmentItems.length > 0 || cashAccounts.length > 0) && (
               <InvestmentPnlCard
                 items={investmentItems}
                 totals={investmentTotals}
                 totalGain={investmentTotalGain}
                 totalGainPct={investmentTotalGainPct}
+                cashAccounts={cashAccounts}
+                readOnly={readOnly}
+                returnTo={personFilter === "all" ? "/finance" : `/finance?person=${encodeURIComponent(personFilter)}`}
               />
             )}
           </>
@@ -400,19 +443,27 @@ function InvestmentPnlCard({
   totals,
   totalGain,
   totalGainPct,
+  cashAccounts,
+  readOnly,
+  returnTo,
 }: {
   items: InvestmentItem[];
   totals: { costBasis: number; value: number };
   totalGain: number;
   totalGainPct: number;
+  cashAccounts: CashAccount[];
+  readOnly: boolean;
+  returnTo: string;
 }) {
   return (
     <div className="seed-card mt-4 p-5 shadow-none sm:p-7">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-[18px] font-extrabold text-ink">투자 손익 현황</h2>
-        <span className="text-[12px] text-ink-muted">{items.length}개 종목 매칭</span>
+        {items.length > 0 && <span className="text-[12px] text-ink-muted">{items.length}개 종목 매칭</span>}
       </div>
 
+      {items.length > 0 && (
+      <>
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-r3 bg-bg-neutral-weak p-4">
           <p className="text-[13px] text-ink-muted">투자원금</p>
@@ -477,6 +528,64 @@ function InvestmentPnlCard({
           </tbody>
         </table>
       </div>
+      </>
+      )}
+
+      {cashAccounts.length > 0 && <CashAccountsSection accounts={cashAccounts} readOnly={readOnly} returnTo={returnTo} withDivider={items.length > 0} />}
+    </div>
+  );
+}
+
+// 현금·예적금 계좌별 금액과 연 금리(직접 입력), 연 예상 이자(세전·단리).
+function CashAccountsSection({ accounts, readOnly, returnTo, withDivider }: { accounts: CashAccount[]; readOnly: boolean; returnTo: string; withDivider: boolean }) {
+  const total = accounts.reduce((sum, a) => sum + a.amount, 0);
+  const interestTotal = accounts.reduce((sum, a) => sum + (annualInterest(a.amount, a.ratePct) ?? 0), 0);
+  return (
+    <div className={withDivider ? "mt-6 border-t-[0.8px] border-hairline pt-6" : ""}>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[16px] font-extrabold text-ink">현금 · 예적금</h3>
+        <span className="text-[13px] text-ink-muted">
+          합계 <span className="font-bold tabular-nums text-ink">{formatManwon(total)}</span>
+          {interestTotal > 0 && <> · 연 예상 이자 <span className="font-bold tabular-nums text-ink">{formatManwon(interestTotal)}</span></>}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full whitespace-nowrap text-[13px]">
+          <thead>
+            <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
+              <th className="w-8 py-2 pr-2 text-[11px] font-semibold">보유</th>
+              <th className="py-2 pr-3 text-[11px] font-semibold">계좌</th>
+              <th className="py-2 pr-3 text-right text-[11px] font-semibold">금액</th>
+              <th className="py-2 pr-3 text-right text-[11px] font-semibold">연 금리</th>
+              <th className="hidden py-2 pl-3 text-right text-[11px] font-semibold sm:table-cell">연 예상 이자</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.map((a) => {
+              const interest = annualInterest(a.amount, a.ratePct);
+              return (
+                <tr key={a.key} className="border-b-[0.8px] border-hairline2 last:border-0">
+                  <td className={`py-2 pr-2 font-semibold ${a.personLabel === "남편" ? "text-husband" : a.personLabel === "아내" ? "text-wife" : "text-ink-muted"}`}>{a.personLabel}</td>
+                  <td className="whitespace-normal py-2 pr-3 text-ink">
+                    {a.productName}
+                    <span className="ml-1.5 text-[11px] text-ink-muted">{a.category}</span>
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-ink">{formatManwon(a.amount)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">
+                    {readOnly ? (
+                      <span className="text-ink-muted">{a.ratePct === null ? "-" : `${a.ratePct}%`}</span>
+                    ) : (
+                      <DepositRateInput personId={a.personId} productName={a.productName} ratePct={a.ratePct} returnTo={returnTo} />
+                    )}
+                  </td>
+                  <td className="hidden py-2 pl-3 text-right tabular-nums text-ink-muted sm:table-cell">{interest === null ? "-" : formatManwon(interest)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!readOnly && <p className="mt-2 text-[11px] text-ink-muted">금리는 직접 입력해요(Enter 또는 칸 밖을 누르면 저장). 연 예상 이자는 세전·단리 기준이에요.</p>}
     </div>
   );
 }

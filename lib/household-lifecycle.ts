@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { AppDb } from "@/lib/db";
 import {
   allocationTargets,
+  depositRates,
   assetItems,
   budgetCategories,
   categoryKeywordRules,
@@ -29,6 +30,7 @@ export async function deleteHouseholdData(db: AppDb, householdId: string): Promi
   await db.delete(assetItems).where(eq(assetItems.householdId, householdId));
   await db.delete(uploads).where(eq(uploads.householdId, householdId));
   await db.delete(allocationTargets).where(eq(allocationTargets.householdId, householdId));
+  await db.delete(depositRates).where(eq(depositRates.householdId, householdId));
   await db.delete(categoryMappings).where(eq(categoryMappings.householdId, householdId));
   await db.delete(categoryRules).where(eq(categoryRules.householdId, householdId));
   await db.delete(categoryKeywordRules).where(eq(categoryKeywordRules.householdId, householdId));

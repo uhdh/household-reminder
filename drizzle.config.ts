@@ -27,6 +27,7 @@ export default defineConfig({
     "uploads",
     "asset_items",
     "allocation_targets",
+    "deposit_rates",
     "transactions",
     "category_mappings",
     "category_rules",

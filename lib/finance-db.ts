@@ -87,6 +87,21 @@ export const assetItems = pgTable("asset_items", {
   sector: text("sector"),
 });
 
+// 현금·예적금 계좌별 연 금리(%). 뱅크샐러드 내보내기에는 금리가 없어 사용자가 직접 입력한다.
+// asset_items는 업로드마다 새로 만들어지므로 (가구, 보유자, 상품명)으로 묶어 업로드가 바뀌어도 유지한다.
+export const depositRates = pgTable(
+  "deposit_rates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    householdId: uuid("household_id").notNull().references(() => households.id),
+    personId: text("person_id").notNull(),
+    productName: text("product_name").notNull(),
+    ratePct: numeric("rate_pct", { precision: 6, scale: 3 }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.householdId, table.personId, table.productName)]
+);
+
 // 자산 카테고리별 목표 배분 비중(%). 사용자가 대시보드에서 직접 설정하며,
 // 뱅크샐러드 데이터와 무관하게 수기로 관리한다.
 export const allocationTargets = pgTable(

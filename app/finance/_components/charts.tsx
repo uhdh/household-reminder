@@ -1,11 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { ResponsiveContainer, Treemap } from "recharts";
-import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL, formatSignedPct, isLightColor } from "@/lib/finance-format";
+import { HEATMAP_GAIN, HEATMAP_LOSS, HEATMAP_NEUTRAL, formatManwon, formatSignedPct, isLightColor } from "@/lib/finance-format";
 import { CategoryPie } from "@/app/finance/spending/monthly/chart";
 
 type CategoryDatum = { name: string; value: number; fill: string };
 type TreemapDatum = { name: string; value: number; fill: string; returnPct: number | null; sharePct: number };
+/** 히트맵에서 한 칸으로 묶은 현금·예적금의 계좌 한 줄. */
+export type CashAccount = {
+  key: string;
+  personId: string;
+  personLabel: string;
+  productName: string;
+  category: string;
+  amount: number;
+  ratePct: number | null;
+};
 
 function AllocationCard({ title, data }: { title: string; data: CategoryDatum[] }) {
   return <CategoryPie title={title} data={data} amountFormat="manwon" />;
@@ -37,8 +48,9 @@ function truncateToWidth(text: string, availableWidth: number): string {
   return `${text.slice(0, maxChars - 1)}…`;
 }
 
-function HeatmapCell(props: unknown) {
-  const { x, y, width, height, name, fill, returnPct, sharePct, index } = props as {
+// recharts가 칸 좌표·데이터를 덧붙여 복제하므로, 직접 넘기는 건 선택 콜백뿐이다.
+function HeatmapCell(props: { onSelect?: (name: string) => void; selectable?: Set<string> }) {
+  const { x, y, width, height, name, fill, returnPct, sharePct, index, onSelect, selectable } = props as {
     x: number;
     y: number;
     width: number;
@@ -48,6 +60,8 @@ function HeatmapCell(props: unknown) {
     returnPct?: number | null;
     sharePct: number;
     index: number;
+    onSelect?: (name: string) => void;
+    selectable?: Set<string>;
   };
   // recharts also invokes content for the synthetic root node, which has no fill/name of its own.
   if (!fill || !name) {
@@ -62,8 +76,9 @@ function HeatmapCell(props: unknown) {
   const shareLabel = `${sharePct.toFixed(0)}%`;
   const showLabel = width > 32 && height > 18 && label.length > 0;
   const showValue = showLabel && height > 30 && width > 35;
+  const handleSelect = onSelect && selectable?.has(name) ? () => onSelect(name) : undefined;
   return (
-    <g>
+    <g onClick={handleSelect} style={handleSelect ? { cursor: "pointer" } : undefined}>
       <rect
         x={x}
         y={y}
@@ -106,7 +121,14 @@ function HeatmapLegend() {
   );
 }
 
-function HeatmapCard({ data }: { data: TreemapDatum[] }) {
+function HeatmapCard({ data, cashAccounts }: { data: TreemapDatum[]; cashAccounts: CashAccount[] }) {
+  // 묶음 칸(현금·예적금)을 누르면 아래에 계좌 목록을 펼친다. 같은 칸을 다시 누르면 접는다.
+  const [selected, setSelected] = useState<string | null>(null);
+  const groups = new Map<string, CashAccount[]>();
+  for (const account of cashAccounts) groups.set(account.category, [...(groups.get(account.category) ?? []), account]);
+  const selectable = new Set(groups.keys());
+  const toggle = (name: string) => setSelected((current) => (current === name ? null : name));
+  const selectedAccounts = selected ? groups.get(selected) ?? [] : [];
   return (
     <div className="seed-card p-5 shadow-none sm:p-7">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -125,10 +147,41 @@ function HeatmapCard({ data }: { data: TreemapDatum[] }) {
             dataKey="value"
             aspectRatio={4 / 3}
             stroke="var(--finance-canvas)"
-            content={<HeatmapCell />}
+            content={<HeatmapCell onSelect={toggle} selectable={selectable} />}
             isAnimationActive={false}
           />
         </ResponsiveContainer>
+      )}
+      {groups.size > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {Array.from(groups.entries()).map(([name, accounts]) => (
+            <button
+              key={name}
+              type="button"
+              aria-expanded={selected === name}
+              onClick={() => toggle(name)}
+              className={`rounded-r2 px-3 py-1.5 text-[12px] font-semibold ${selected === name ? "bg-bg-brand-weak text-fg-brand" : "bg-bg-neutral-weak text-ink-muted hover:text-ink"}`}
+            >
+              {name} 계좌 {accounts.length}개 {selected === name ? "접기" : "보기"}
+            </button>
+          ))}
+        </div>
+      )}
+      {selected && selectedAccounts.length > 0 && (
+        <ul className="mt-3 divide-y divide-hairline2 rounded-r3 bg-bg-neutral-weak px-4 text-[13px]">
+          {selectedAccounts.map((account) => (
+            <li key={account.key} className="flex items-center justify-between gap-3 py-2.5">
+              <span className="min-w-0 truncate text-ink">
+                <span className="mr-2 font-semibold text-ink-muted">{account.personLabel}</span>
+                {account.productName}
+              </span>
+              <span className="shrink-0 font-bold tabular-nums text-ink">
+                {formatManwon(account.amount)}
+                {account.ratePct !== null && <span className="ml-1.5 text-[11px] font-medium text-ink-muted">연 {account.ratePct}%</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -138,15 +191,17 @@ export function DashboardCharts({
   assetComposition,
   treemapData,
   sectorComposition,
+  cashAccounts = [],
 }: {
   assetComposition: CategoryDatum[];
   treemapData: TreemapDatum[];
   sectorComposition: CategoryDatum[];
+  cashAccounts?: CashAccount[];
 }) {
   return (
     <div className="mt-3 flex flex-col gap-3">
       <AllocationCharts assetComposition={assetComposition} sectorComposition={sectorComposition} />
-      <HeatmapCard data={treemapData} />
+      <HeatmapCard data={treemapData} cashAccounts={cashAccounts} />
     </div>
   );
 }
