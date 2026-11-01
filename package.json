@@ -15,6 +15,7 @@
     "@seed-design/css": "^2.4.2",
     "@seed-design/react": "^2.2.2",
     "@seed-design/tailwind4-theme": "^2.3.0",
+    "@zip.js/zip.js": "^2.24.0",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
@@ -24,6 +25,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.10.1",
+    "resend": "^6.34.1",
     "server-only": "^0.0.1"
   },
   "devDependencies": {

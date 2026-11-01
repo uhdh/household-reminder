@@ -7,6 +7,7 @@ import { AuthControls } from "./auth-controls";
 import { ThemeToggle } from "./theme-toggle";
 import { TopTabs } from "./top-tabs";
 import { HideOnHome } from "./hide-on-home";
+import { AppExperience } from "./app-experience";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
+        <AppExperience>
         <HideOnHome>
         <header className="sticky top-0 z-50 w-full border-b border-stroke-neutral-muted bg-bg-layer-default/95 backdrop-blur">
           <div className="flex flex-wrap items-center gap-x-3 px-4 md:gap-x-10 sm:px-6 lg:px-12">
@@ -53,6 +55,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </header>
         </HideOnHome>
         {children}
+        </AppExperience>
       </body>
     </html>
   );

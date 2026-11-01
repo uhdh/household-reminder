@@ -1,10 +1,10 @@
-import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { StartView } from "./start-view";
+import { HomeEntry } from "./home-entry";
 
-// 로그인 사용자는 바로 가계부로(가구가 없으면 /finance가 온보딩으로 보낸다), 비로그인 방문자에게만 소개 페이지.
+// 웹 방문자에게만 소개를 보여주고, 설치한 앱은 로그인 또는 월별 가계부로 바로 진입한다.
 export default async function Page() {
   const session = await auth();
-  if (session?.user?.email) redirect("/finance");
-  return <StartView />;
+  const signedIn = Boolean(session?.user?.email);
+  return <HomeEntry signedIn={signedIn}>{!signedIn && <StartView />}</HomeEntry>;
 }

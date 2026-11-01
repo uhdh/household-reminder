@@ -22,6 +22,8 @@ import { CreateInviteForm } from "./create-invite-form";
 import { DeleteHouseholdForm, LeaveHouseholdForm } from "./danger-zone";
 import { RederiveCard } from "./rederive-card";
 import { UploadForm } from "@/app/finance/upload/upload-form";
+import { EmailInbox } from "@/app/finance/upload/email-inbox";
+import { getImportInbox } from "@/lib/import-email";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +57,9 @@ function guessStdCategory(rawCategory: string, rawSubcategory: string, knownName
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string; error?: string; success?: string}> }) {
   const { tab, error, success } = await searchParams;
   const activeTab = SETTING_TABS.some((item) => item.id === tab) ? tab! : "upload";
-  const { householdId, role, personId } = await requireHouseholdOrOnboard();
+  const context = await requireHouseholdOrOnboard();
+  const { householdId, role, personId } = context;
+  const inbox = activeTab === "upload" && personId ? await getImportInbox(context) : null;
   const db = getDb();
   const [mappings, rules, keywordRules, budgets, { transactions: allTx }, memberRows, invites, householdPeople, [household]] = await Promise.all([
     db.select().from(categoryMappings).where(eq(categoryMappings.householdId, householdId)),
@@ -129,7 +133,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <div className="min-w-0 space-y-6">
 
-      {activeTab === "upload" && <UploadForm error={error} success={success} people={householdPeople} />}
+      {activeTab === "upload" && <>
+        {inbox && <EmailInbox address={inbox.address} emails={inbox.emails.map((email) => ({ ...email, receivedAt: email.receivedAt.toISOString() }))} />}
+        <UploadForm error={error} success={success} people={householdPeople} />
+      </>}
 
       {activeTab === "unmapped" && (
         <div className="space-y-6">

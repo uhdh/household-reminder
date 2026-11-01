@@ -30,6 +30,7 @@ import { CategoryOptionsProvider } from "../category-select";
 import { DemoBanner } from "@/app/finance/_components/demo-banner";
 import { FinanceEmptyState, PeriodEmptyNote } from "@/app/finance/_components/empty-state";
 import { MonthlyNavigator } from "./monthly-navigator";
+import { AppMonthlyOverview, MonthlyAnalysis } from "./app-monthly-overview";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +147,22 @@ export default async function MonthlyPage({
   const variableRows = sortedBudgets.filter((b) => b.kind === "변동비");
   const fixedBudgetTotal = fixedRows.reduce((sum, budget) => sum + (budget.monthlyBudget === null ? 0 : toNum(budget.monthlyBudget)), 0);
   const variableBudgetTotal = variableRows.reduce((sum, budget) => sum + (budget.monthlyBudget === null ? 0 : toNum(budget.monthlyBudget)), 0);
+  const householdSummary = personFilter === "all" ? summary : summarizeMonthlyTransactions(
+    includedTx.filter((transaction) => monthKeyOf(transaction.txnDate) === month), kindOf, personIds,
+  );
+  // 일부 카테고리만 예산이 있으면 총액을 남은 예산으로 오인하지 않도록 설정을 안내한다.
+  const hasCompleteBudget = fixedRows.length + variableRows.length > 0
+    && [...fixedRows, ...variableRows].every((row) => row.monthlyBudget !== null)
+    && ![...householdSummary.categoryTotals].some(([name, amount]) => amount > 0 && !budgetByName.has(name));
+  const recent = [...periodTxAll]
+    .sort((a, b) => b.txnDate.localeCompare(a.txnDate) || (b.txnTime ?? "").localeCompare(a.txnTime ?? ""))
+    .slice(0, 5)
+    .map((transaction) => ({
+      id: transaction.id,
+      date: transaction.txnDate,
+      description: transaction.masked ? "비공개 거래" : transaction.description || "메모 없음",
+      amount: transaction.masked ? null : toNum(transaction.amount),
+    }));
   const knownNames = new Set(sortedBudgets.map((b) => b.name));
   const unmappedTotal = Array.from(categoryTotals.entries())
     .filter(([name]) => !knownNames.has(name))
@@ -175,6 +192,15 @@ export default async function MonthlyPage({
         <PersonFilter pathname="/finance/spending/monthly" periodKey="month" periodValue={month} selected={personFilter} displayNameByPerson={displayNameByPerson} />
       </div>
 
+      {emptyState !== "onboarding" && <AppMonthlyOverview
+        month={month}
+        totalExpense={summary.totalExpense}
+        budgetRemaining={hasCompleteBudget ? fixedBudgetTotal + variableBudgetTotal - householdSummary.totalExpense : null}
+        recent={recent}
+        readOnly={readOnly}
+        personFilter={personFilter}
+      />}
+
       {emptyState === "onboarding" ? (
         readOnly ? (
           <FinanceEmptyState
@@ -189,7 +215,7 @@ export default async function MonthlyPage({
       ) : emptyState === "period" ? (
         <PeriodEmptyNote label="이 달" />
       ) : (
-      <>
+      <MonthlyAnalysis>
       {exclusion.count > 0 && (
         <div className="mb-4 rounded-r3 bg-bg-warning-weak px-4 py-2.5 text-[13px] text-ink-muted">
           분류 안 된 이체 {exclusion.count}건 · {formatKRW(exclusion.total)}은 집계에서 뺐어요 →{" "}
@@ -304,7 +330,7 @@ export default async function MonthlyPage({
         </div>
       </div>
       </CategoryOptionsProvider>
-      </>
+      </MonthlyAnalysis>
       )}
     </div>
   );

@@ -80,6 +80,11 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+html[data-experience="app"] .web-only { display: none; }
+@media (display-mode: standalone) {
+  .web-only { display: none; }
+}
+
 @layer components {
   .seed-page {
     min-height: 100%;

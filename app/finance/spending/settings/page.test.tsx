@@ -42,7 +42,7 @@ describe("SettingsPage", () => {
   test("파일 업로드 탭에서 바로 업로드할 수 있다", async () => {
     render(await SettingsPage({ searchParams: Promise.resolve({ tab: "upload" }) }));
 
-    expect(screen.getByLabelText("엑셀 파일")).toBeTruthy();
+    expect(screen.getByLabelText("엑셀 또는 ZIP 파일")).toBeTruthy();
     expect(screen.getByRole("button", { name: "업로드" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "뱅크샐러드 엑셀 파일 다운받는 방법" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "업로드 화면 열기" })).toBeNull();

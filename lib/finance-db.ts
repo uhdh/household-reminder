@@ -52,6 +52,19 @@ export const householdInvites = pgTable("household_invites", {
   usedBy: uuid("used_by").references(() => users.id),
 });
 
+export const importMailboxes = pgTable("import_mailboxes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  memberId: uuid("member_id").notNull().unique().references(() => householdMembers.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+});
+
+export const importEmails = pgTable("import_emails", {
+  id: uuid("id").primaryKey(), // Resend email_id: webhook 재전송을 중복 저장하지 않는다.
+  mailboxId: uuid("mailbox_id").notNull().references(() => importMailboxes.id, { onDelete: "cascade" }),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  status: text("status").notNull().default("pending"), // pending / importing / imported / failed
+});
+
 export const people = pgTable("people", {
   id: text("id").primaryKey(), // 'husband' | 'wife'(기존 가구), 새 가구는 uuid 문자열
   householdId: uuid("household_id").notNull().references(() => households.id),

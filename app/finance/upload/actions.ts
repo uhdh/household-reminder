@@ -14,7 +14,8 @@ import {
   type ParsedUpload,
 } from "@/lib/finance-parse";
 import { computeIncluded, deriveTransactionFields, isTransferCandidate, type DerivedResult } from "@/lib/spending-derive";
-import { requireHousehold } from "@/lib/require-household";
+import { claimImportEmail, finishImportEmail, getOwnedEmailFile } from "@/lib/import-email";
+import { requireHousehold, type HouseholdContext } from "@/lib/require-household";
 import { getHouseholdPeople, isPersonId } from "@/lib/spending-queries";
 import { getOrCreateActiveUploadId } from "@/lib/manual-upload";
 import { applyVoucherPurchaseExclusion } from "@/lib/voucher-exclusion";
@@ -36,11 +37,26 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export async function uploadAction(formData: FormData) {
-  const { householdId, personId: viewerPersonId } = await requireHousehold();
+  const context = await requireHousehold();
+  const emailId = String(formData.get("emailId") ?? "");
+  let file = formData.get("file");
+  if (emailId) {
+    try {
+      if (!context.personId) throw new Error("본인 프로필을 먼저 연결해 주세요.");
+      file = await getOwnedEmailFile(context, emailId);
+    } catch {
+      redirect("/finance/upload?error=" + encodeURIComponent("메일 자료를 가져오지 못했습니다. 수신함에서 상태를 확인하고 다시 보내 주세요."));
+    }
+    formData.set("personId", context.personId!);
+  }
+  await importFile(formData, context, file, emailId);
+}
+
+async function importFile(formData: FormData, context: HouseholdContext, file: FormDataEntryValue | null, emailId: string) {
+  const { householdId, personId: viewerPersonId } = context;
   const personId = String(formData.get("personId") ?? "");
-  const file = formData.get("file");
   // 비어있으면 undefined로 - decryptWorkbookBuffer는 빈 문자열도 "비밀번호 없음"으로 취급해야 한다.
-  const filePassword = String(formData.get("filePassword") ?? "").trim() || undefined;
+  const filePassword = String(formData.get("filePassword") ?? "") || undefined;
 
   const householdPeople = await getHouseholdPeople(householdId);
   const knownIds = householdPeople.map((p) => p.id);
@@ -69,6 +85,7 @@ export async function uploadAction(formData: FormData) {
     redirect("/finance/upload?error=" + encodeURIComponent(message));
   }
 
+  if (kind === "seoulpay" && emailId) redirect("/finance/upload?error=" + encodeURIComponent("메일 가져오기는 뱅크샐러드 자료만 지원합니다."));
   if (kind === "seoulpay") {
     await handleSeoulPayUpload(db, householdId, personId, viewerPersonId, displayName, workBuffer, defaultBeneficiary);
     return;
@@ -82,98 +99,106 @@ export async function uploadAction(formData: FormData) {
     redirect("/finance/upload?error=" + encodeURIComponent(message));
   }
 
-  const uploadId = randomUUID();
+  if (emailId) await claimImportEmail(context, emailId);
+  let summary: string;
+  try {
+    const uploadId = randomUUID();
 
-  // 누적 업로드: 이 사람의 이전 뱅크샐러드 업로드가 이미 다룬 날짜는 기존 거래를 그대로 두고(교체하지 않음),
-  // 처음 들어오는 날짜의 거래만 추가한다. 새 업로드 행을 넣기 전에 읽어야 이번 파일 기간이 섞이지 않는다.
-  const coveredRanges = await loadCoveredRanges(db, householdId, personId);
-  const newTransactions = parsed.transactions.filter((t) => !isCovered(t.txnDate, coveredRanges));
-  const skippedCount = parsed.transactions.length - newTransactions.length;
+    // 누적 업로드: 이 사람의 이전 뱅크샐러드 업로드가 이미 다룬 날짜는 기존 거래를 그대로 두고(교체하지 않음),
+    // 처음 들어오는 날짜의 거래만 추가한다. 새 업로드 행을 넣기 전에 읽어야 이번 파일 기간이 섞이지 않는다.
+    const coveredRanges = await loadCoveredRanges(db, householdId, personId);
+    const newTransactions = parsed.transactions.filter((t) => !isCovered(t.txnDate, coveredRanges));
+    const skippedCount = parsed.transactions.length - newTransactions.length;
 
-  const context = await loadCategoryDerivationContext(db, householdId);
+    const context = await loadCategoryDerivationContext(db, householdId);
 
-  await db
-    .update(uploads)
-    .set({ isActive: false })
-    .where(and(eq(uploads.householdId, householdId), eq(uploads.personId, personId), eq(uploads.isActive, true)));
-  await db.insert(uploads).values({
-    id: uploadId,
-    householdId,
-    personId,
-    sourceFilename: file.name,
-    periodStart: parsed.periodStart,
-    periodEnd: parsed.periodEnd,
-    isActive: true,
-  });
+    await db
+      .update(uploads)
+      .set({ isActive: false })
+      .where(and(eq(uploads.householdId, householdId), eq(uploads.personId, personId), eq(uploads.isActive, true)));
+    await db.insert(uploads).values({
+      id: uploadId,
+      householdId,
+      personId,
+      sourceFilename: file.name,
+      periodStart: parsed.periodStart,
+      periodEnd: parsed.periodEnd,
+      isActive: true,
+    });
 
-  await db
-    .update(transactions)
-    .set({ uploadId })
-    .where(and(
-      eq(transactions.householdId, householdId),
-      eq(transactions.personId, personId),
-      or(
-        and(eq(transactions.category, "직접 입력"), eq(transactions.subcategory, "직접 입력")),
-        eq(transactions.category, "서울페이")
-      )
-    ));
+    await db
+      .update(transactions)
+      .set({ uploadId })
+      .where(and(
+        eq(transactions.householdId, householdId),
+        eq(transactions.personId, personId),
+        or(
+          and(eq(transactions.category, "직접 입력"), eq(transactions.subcategory, "직접 입력")),
+          eq(transactions.category, "서울페이")
+        )
+      ));
 
-  for (const rows of chunk(parsed.assetItems, INSERT_CHUNK_SIZE)) {
-    await db.insert(assetItems).values(
-      rows.map((item) => ({
-        householdId,
-        uploadId,
-        personId,
-        side: item.side,
-        category: item.category,
-        productName: item.productName,
-        amount: item.amount.toString(),
-        costBasis: item.costBasis == null ? null : item.costBasis.toString(),
-        sector: item.sector,
-      }))
-    );
+    for (const rows of chunk(parsed.assetItems, INSERT_CHUNK_SIZE)) {
+      await db.insert(assetItems).values(
+        rows.map((item) => ({
+          householdId,
+          uploadId,
+          personId,
+          side: item.side,
+          category: item.category,
+          productName: item.productName,
+          amount: item.amount.toString(),
+          costBasis: item.costBasis == null ? null : item.costBasis.toString(),
+          sector: item.sector,
+        }))
+      );
+    }
+
+    const derived = deriveTransactionFields(newTransactions, context.mappingIndex, context.ruleIndex, context.keywordRules, {
+      history: context.history,
+      historyFirst: true,
+    });
+    const transactionsWithDerived = newTransactions.map((t, i) => ({ t, d: derived[i] }));
+    const classifiedCount = transactionsWithDerived.filter(({ d }) => d.stdCategory !== null).length;
+
+    for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {
+      await db.insert(transactions).values(
+        rows.map(({ t, d }) => ({
+          householdId,
+          uploadId,
+          personId,
+          txnDate: t.txnDate,
+          txnTime: t.txnTime,
+          txnType: t.txnType,
+          category: t.category,
+          subcategory: t.subcategory,
+          description: t.description,
+          amount: t.amount.toString(),
+          paymentMethod: t.paymentMethod,
+          stdCategory: d.stdCategory,
+          included: d.included,
+          isInternalTransfer: d.isInternalTransfer,
+          beneficiary: defaultBeneficiary,
+        }))
+      );
+    }
+
+    // 뱅크샐러드 재업로드로 새 카드결제 출금 거래가 다시 들어왔을 수 있으니, 이미 서울페이 구매로
+    // 잠긴 적 없는 것들에 대해 매칭을 다시 시도한다(applyVoucherPurchaseExclusion은 멱등).
+    const { excludedCount } = await applyVoucherPurchaseExclusion(db, householdId, personId);
+    // 가구 단위 계좌이동 짝짓기(배우자 간 이체 등)는 rederive 성격의 std_category/included 재계산이
+    // 끝난 뒤에 실행해야 한다(household-transfer-pairs.ts 순서 계약 참고).
+    const { pairs } = await applyHouseholdTransferPairs(db, householdId);
+    const exclusionSuffix = excludedCount > 0 ? `, 서울페이 상품권 구매 출금 ${excludedCount}건 집계 제외` : "";
+    const classifiedSuffix = classifiedCount > 0 ? `, 자동 분류 ${classifiedCount}건` : "";
+    const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
+    const skippedSuffix = skippedCount > 0 ? `, 이미 올린 기간 거래 ${skippedCount}건은 기존 내역 유지` : "";
+    summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${newTransactions.length}건 추가${skippedSuffix}${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
+    if (emailId) await finishImportEmail(emailId, "imported");
+  } catch (error) {
+    if (emailId) await finishImportEmail(emailId, "failed");
+    throw error;
   }
-
-  const derived = deriveTransactionFields(newTransactions, context.mappingIndex, context.ruleIndex, context.keywordRules, {
-    history: context.history,
-    historyFirst: true,
-  });
-  const transactionsWithDerived = newTransactions.map((t, i) => ({ t, d: derived[i] }));
-  const classifiedCount = transactionsWithDerived.filter(({ d }) => d.stdCategory !== null).length;
-
-  for (const rows of chunk(transactionsWithDerived, INSERT_CHUNK_SIZE)) {
-    await db.insert(transactions).values(
-      rows.map(({ t, d }) => ({
-        householdId,
-        uploadId,
-        personId,
-        txnDate: t.txnDate,
-        txnTime: t.txnTime,
-        txnType: t.txnType,
-        category: t.category,
-        subcategory: t.subcategory,
-        description: t.description,
-        amount: t.amount.toString(),
-        paymentMethod: t.paymentMethod,
-        stdCategory: d.stdCategory,
-        included: d.included,
-        isInternalTransfer: d.isInternalTransfer,
-        beneficiary: defaultBeneficiary,
-      }))
-    );
-  }
-
-  // 뱅크샐러드 재업로드로 새 카드결제 출금 거래가 다시 들어왔을 수 있으니, 이미 서울페이 구매로
-  // 잠긴 적 없는 것들에 대해 매칭을 다시 시도한다(applyVoucherPurchaseExclusion은 멱등).
-  const { excludedCount } = await applyVoucherPurchaseExclusion(db, householdId, personId);
-  // 가구 단위 계좌이동 짝짓기(배우자 간 이체 등)는 rederive 성격의 std_category/included 재계산이
-  // 끝난 뒤에 실행해야 한다(household-transfer-pairs.ts 순서 계약 참고).
-  const { pairs } = await applyHouseholdTransferPairs(db, householdId);
-  const exclusionSuffix = excludedCount > 0 ? `, 서울페이 상품권 구매 출금 ${excludedCount}건 집계 제외` : "";
-  const classifiedSuffix = classifiedCount > 0 ? `, 자동 분류 ${classifiedCount}건` : "";
-  const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
-  const skippedSuffix = skippedCount > 0 ? `, 이미 올린 기간 거래 ${skippedCount}건은 기존 내역 유지` : "";
-  const summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${newTransactions.length}건 추가${skippedSuffix}${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
   redirect("/finance/upload?success=" + encodeURIComponent(summary));
 }
 

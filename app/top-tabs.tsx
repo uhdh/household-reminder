@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAppExperience } from "./app-experience";
 import {
   IconBarchartSquareLine,
   IconCalendarLine,
@@ -20,15 +21,19 @@ const tabs = [
 
 export function TopTabs() {
   const pathname = usePathname();
+  const isApp = useAppExperience();
   // 가구가 없는 동안(온보딩·초대 수락)에는 탭을 눌러도 온보딩으로 되돌아오므로 숨긴다.
-  if (pathname.startsWith("/onboarding") || pathname.startsWith("/invite")) return null;
+  if (pathname.startsWith("/onboarding") || pathname.startsWith("/invite") || (isApp && pathname === "/login")) return null;
+  const visibleTabs = isApp
+    ? [{ ...tabs[1], label: "홈" }, tabs[0], tabs[2], tabs[3], tabs[4]]
+    : tabs;
   return (
     <nav
       aria-label="주요 메뉴"
       className="order-3 w-full overflow-x-auto border-t border-stroke-neutral-muted [scrollbar-width:none] md:order-2 md:w-auto md:flex-1 md:border-t-0 [&::-webkit-scrollbar]:hidden"
     >
       <div className="flex w-max min-w-full justify-between gap-3 md:justify-start md:gap-7">
-        {tabs.map(({ label, href, Icon, active }) => {
+        {visibleTabs.map(({ label, href, Icon, active }) => {
           const isActive = active(pathname);
           return (
             <Link

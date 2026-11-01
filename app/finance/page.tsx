@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { assetItems, depositRates, uploads } from "@/lib/finance-db";
@@ -79,7 +78,11 @@ export default async function DashboardPage({
         </AppShell>
       );
     }
-    redirect("/finance/upload");
+    return (
+      <AppShell size="wide" className="font-office text-ink">
+        <FinanceEmptyState secondaryHref="/finance/spending?manual=1#manual-entry" secondaryLabel="직접 입력하기" />
+      </AppShell>
+    );
   }
 
   const activeUploadIds = activeUploads.map((u) => u.id);

@@ -4,6 +4,7 @@ import { classifyInvestmentSector } from "./investment-sector";
 import { parseTransactions } from "./ledger";
 import { normalizeInvestmentProductName } from "./investment-utils";
 import { decryptWorkbookBuffer } from "./crypto";
+import { unwrapExportZip } from "./zip";
 import { isSeoulPayWorkbook } from "./seoulpay";
 import type { ParsedUpload } from "./types";
 
@@ -97,7 +98,7 @@ export async function detectUploadFileKind(
   buffer: ArrayBuffer,
   password?: string
 ): Promise<{ kind: "seoulpay" | "banksalad"; buffer: ArrayBuffer }> {
-  const decrypted = await decryptWorkbookBuffer(buffer, password);
+  const decrypted = await decryptWorkbookBuffer(await unwrapExportZip(buffer, password), password);
   try {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(decrypted);
