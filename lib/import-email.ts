@@ -21,7 +21,7 @@ async function mailbox(context: HouseholdContext, create = false) {
   const [member] = await db.select().from(householdMembers).where(and(
     eq(householdMembers.userId, context.userId), eq(householdMembers.householdId, context.householdId),
   )).limit(1);
-  if (!member || !member.personId) throw new Error("설정에서 본인 프로필을 먼저 연결해 주세요.");
+  if (!member) throw new Error("가구 구성원을 확인하지 못했습니다.");
   if (create) await db.insert(importMailboxes).values({ memberId: member.id, token: randomBytes(24).toString("hex") }).onConflictDoNothing();
   const [box] = await db.select().from(importMailboxes).where(eq(importMailboxes.memberId, member.id)).limit(1);
   return box;

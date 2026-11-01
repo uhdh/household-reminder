@@ -16,6 +16,7 @@ test("비밀번호로 자료 확인 후에만 반영 버튼을 표시하고 비�
   await user.click(screen.getByRole("button", { name: "자료 확인하기" }));
   expect(preview).toHaveBeenCalledWith("mail", " example ");
   expect(await screen.findByRole("button", { name: "가계부에 반영하기" })).toBeTruthy();
+  expect(screen.getByLabelText("내역의 보유자")).toHaveProperty("required", true);
   await user.type(screen.getByLabelText("압축 비밀번호"), "changed");
   expect(screen.queryByRole("button", { name: "가계부에 반영하기" })).toBeNull();
 });

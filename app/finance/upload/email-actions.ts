@@ -10,7 +10,7 @@ export async function createAddressAction(formData: FormData) {
   const context = await requireHousehold();
   if (formData.get("emailImportConsent") !== "on") redirect("/finance/upload?error=" + encodeURIComponent("메일 자료 처리 안내를 확인해 주세요."));
   try { await createImportAddress(context); }
-  catch { redirect("/finance/upload?error=" + encodeURIComponent("주소를 발급하지 못했습니다. 본인 프로필 연결과 서비스 설정을 확인해 주세요.")); }
+  catch { redirect("/finance/upload?error=" + encodeURIComponent("주소를 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.")); }
   revalidatePath("/finance/upload");
   revalidatePath("/finance/spending/settings");
 }

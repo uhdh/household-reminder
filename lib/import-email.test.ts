@@ -26,6 +26,8 @@ test("개인 주소 분리·실제 수신대상 검증·웹훅 중복·타인 �
     const address = (await getImportInbox(a))!.address!;
     expect(address).not.toBe((await getImportInbox(b))!.address);
     expect(address).toMatch(/^u_[a-f0-9]{48}@test.resend.app$/);
+    await db.execute(sql`UPDATE household_members SET person_id = NULL WHERE id = ${user1}`);
+    expect((await getImportInbox({ ...a, personId: null }))!.address).toBe(address);
     const id = "00000000-0000-4000-8000-000000000004";
     let recipients = [address];
     const fetchMock = vi.fn(async (url: string | URL) => {

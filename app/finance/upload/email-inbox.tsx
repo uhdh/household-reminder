@@ -12,7 +12,9 @@ function Submit({ children }: { children: React.ReactNode }) {
   return <ActionButton type="submit" disabled={pending}>{pending ? "처리 중…" : children}</ActionButton>;
 }
 
-function EmailImport({ id }: { id: string }) {
+type ImportOwner = { people?: { id: string; displayName: string }[]; personId?: string | null };
+
+function EmailImport({ id, people = [], personId }: { id: string } & ImportOwner) {
   const [password, setPassword] = useState("");
   const [summary, setSummary] = useState("");
   const [error, setError] = useState("");
@@ -39,14 +41,20 @@ function EmailImport({ id }: { id: string }) {
     {error && <p role="alert" className="text-sm">{error}</p>}
     {summary && <>
       <p role="status" className="text-sm">{summary}</p>
-      <p className="text-xs text-ink-muted">본인 프로필로 가져옵니다. 이미 올린 기간의 거래는 기존 내역을 유지해요. 반영 후에는 가구의 공유 설정이 적용돼요.</p>
+      {!personId && <label className="block text-sm">내역의 보유자
+        <select name="personId" required defaultValue="" className="mt-2 block w-full rounded border bg-bg-neutral px-3 py-2">
+          <option value="" disabled>자료의 보유자를 선택해 주세요</option>
+          {people.map((person) => <option key={person.id} value={person.id}>{person.displayName}</option>)}
+        </select>
+      </label>}
+      <p className="text-xs text-ink-muted">{personId ? "본인 프로필로 가져옵니다. " : "선택한 보유자의 내역으로 가져옵니다. "}이미 올린 기간의 거래는 기존 내역을 유지해요. 반영 후에는 가구의 공유 설정이 적용돼요.</p>
       <label className="flex gap-2 text-sm"><input type="checkbox" name="jointAccount" />공동 계좌·카드 내역이에요</label>
       <Submit>가계부에 반영하기</Submit>
     </>}
   </form>;
 }
 
-export function EmailInbox({ address, emails }: { address: string | null; emails: { id: string; receivedAt: string; status: string }[] }) {
+export function EmailInbox({ address, emails, people, personId }: { address: string | null; emails: { id: string; receivedAt: string; status: string }[] } & ImportOwner) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   return <section className="seed-card mb-5 p-5" aria-labelledby="email-import-title">
@@ -70,7 +78,7 @@ export function EmailInbox({ address, emails }: { address: string | null; emails
       <ul className="divide-y divide-stroke-neutral-muted">
         {emails.map((email) => <li key={email.id} className="py-4">
           <p className="text-sm font-semibold">{new Date(email.receivedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} 도착</p>
-          {email.status === "pending" ? <EmailImport id={email.id} /> : <p className="mt-2 text-sm">{email.status === "imported" ? "반영 완료" : email.status === "importing" ? "반영 중입니다. 잠시 후 다시 확인해 주세요." : "반영 중 오류가 발생했습니다. 기존 내역을 확인한 뒤 다시 보내 주세요."}</p>}
+          {email.status === "pending" ? <EmailImport id={email.id} people={people} personId={personId} /> : <p className="mt-2 text-sm">{email.status === "imported" ? "반영 완료" : email.status === "importing" ? "반영 중입니다. 잠시 후 다시 확인해 주세요." : "반영 중 오류가 발생했습니다. 기존 내역을 확인한 뒤 다시 보내 주세요."}</p>}
         </li>)}
       </ul>
       <p className="mt-3 text-xs text-ink-muted">최근 7일 자료 중 최대 20개를 표시해요. 첨부가 만료되면 다시 보내 주세요.</p>

@@ -42,12 +42,11 @@ export async function uploadAction(formData: FormData) {
   let file = formData.get("file");
   if (emailId) {
     try {
-      if (!context.personId) throw new Error("본인 프로필을 먼저 연결해 주세요.");
       file = await getOwnedEmailFile(context, emailId);
     } catch {
       redirect("/finance/upload?error=" + encodeURIComponent("메일 자료를 가져오지 못했습니다. 수신함에서 상태를 확인하고 다시 보내 주세요."));
     }
-    formData.set("personId", context.personId!);
+    if (context.personId) formData.set("personId", context.personId);
   }
   await importFile(formData, context, file, emailId);
 }

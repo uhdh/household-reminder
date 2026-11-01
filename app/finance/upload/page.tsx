@@ -15,7 +15,7 @@ export default async function UploadPage({
   const context = await requireHouseholdOrOnboard();
   const { householdId } = context;
   const people = await getHouseholdPeople(householdId);
-  const inbox = context.personId ? await getImportInbox(context) : null;
+  const inbox = await getImportInbox(context);
 
   return (
     <AppShell size="compact" className="font-office">
@@ -28,7 +28,7 @@ export default async function UploadPage({
             </Link>
           </div>} />
 
-        {inbox && <EmailInbox address={inbox.address} emails={inbox.emails.map((email) => ({ ...email, receivedAt: email.receivedAt.toISOString() }))} />}
+        {inbox && <EmailInbox address={inbox.address} people={people} personId={context.personId} emails={inbox.emails.map((email) => ({ ...email, receivedAt: email.receivedAt.toISOString() }))} />}
         <UploadForm error={error} success={success} people={people} />
     </AppShell>
   );
