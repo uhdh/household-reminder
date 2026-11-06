@@ -7,3 +7,4 @@ build/
 *.aab
 *.idsig
 local.properties
+upload_certificate.pem
