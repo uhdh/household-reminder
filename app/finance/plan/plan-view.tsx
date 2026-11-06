@@ -38,6 +38,13 @@ function formatEok(won: number): string {
   return `${sign}${eok.toLocaleString("ko-KR")}억${rest ? ` ${rest.toLocaleString("ko-KR")}만` : ""}원`;
 }
 
+/** 15.3억 / 4,954만 (큰 숫자를 짧게) */
+function shortEok(won: number): string {
+  const eok = won / 100_000_000;
+  if (Math.abs(eok) >= 1) return `${Number(eok.toFixed(Math.abs(eok) >= 100 ? 0 : 1)).toLocaleString("ko-KR")}억`;
+  return `${Math.round(won / 10_000).toLocaleString("ko-KR")}만`;
+}
+
 function axisEok(won: number): string {
   const eok = won / 100_000_000;
   return Math.abs(eok) >= 1 ? `${Number(eok.toFixed(1))}억` : `${Math.round(won / 10_000).toLocaleString("ko-KR")}만`;
@@ -132,6 +139,7 @@ export function PlanView({
   const [saveMessage, setSaveMessage] = useState<string | null>(savedAt ? `${new Date(savedAt).toLocaleDateString("ko-KR")}에 저장한 계획이에요` : null);
   const [saving, startSaving] = useTransition();
   const [view, setView] = useState<"real" | "nominal">("real");
+  const [selYear, setSelYear] = useState(30);
   const dirty = JSON.stringify(s) !== savedJson;
   const patch = (p: Partial<PlanSettings>) => setS((prev) => ({ ...prev, ...p }));
   const patchRet = (p: Partial<PlanSettings["retirement"]>) => setS((prev) => ({ ...prev, retirement: { ...prev.retirement, ...p } }));
@@ -187,7 +195,6 @@ export function PlanView({
   const retireNeed = (annualSpend * 100) / ret.withdrawalPct;
   const retireReadyYear = ret.enabled ? yearsToReach(noRetire, retireNeed) : null;
   const depleteYear = ret.enabled && retireOffset !== null ? points.find((p) => p.year > retireOffset && p.nominal < 0)?.year ?? null : null;
-  const atRetire = retireOffset !== null ? points[Math.min(retireOffset, points.length - 1)] : null;
 
   const payoffs = debts.map((d) => ({ ...d, year: points.find((p) => p.paidOff.includes(d.key))?.year ?? null, monthlyMan: loanOf(d.key).monthlyMan }));
 
@@ -212,75 +219,223 @@ export function PlanView({
     });
   }
 
-  const ageAt = (year: number) => (ret.enabled ? ` · ${ret.currentAge + year}세` : "");
+  const ageAt = (year: number) => (ret.enabled ? `${ret.currentAge + year}세` : null);
+  const yearChoices = [
+    ...MILESTONES.filter((y) => y <= horizon).map((y) => ({ year: y, label: `${y}년 뒤` })),
+    ...(retireOffset !== null && retireOffset > 0 && retireOffset <= horizon ? [{ year: retireOffset, label: "은퇴할 때" }] : []),
+  ];
+  const sel = points[Math.min(selYear, points.length - 1)];
+  const selValue = pick(sel);
+  const selPrincipal = Math.max(0, deflate(sel.principal, sel.year));
+  const selGrowth = Math.max(0, selValue - selPrincipal);
+  const growthShare = selValue > 0 ? Math.min(100, (selGrowth / selValue) * 100) : 0;
+  const monthlySavingMan = Math.round(savingMan / 12);
+  const sliderMax = Math.max(500, Math.ceil((Math.max(monthlySavingMan, measuredSavingMan / 12) * 2) / 50) * 50);
+  const loanEnd = payoffs.filter((p) => p.year !== null).sort((a, b) => b.year! - a.year!)[0];
+
+  const tiles = [
+    goal > 0 && {
+      icon: "🎯",
+      label: `목표 ${s.goalEok}억`,
+      value: goalYear === null ? "어려워요" : goalYear === 0 ? "달성!" : `${thisYear + goalYear}년`,
+      sub: goalYear ? `${goalYear}년 뒤${ageAt(goalYear) ? ` · ${ageAt(goalYear)}` : ""}` : goalYear === null ? `${horizon}년 안에 못 닿아요` : "",
+      tone: goalYear === null ? "text-fg-critical" : "text-ink",
+    },
+    ret.enabled && {
+      icon: "🏖️",
+      label: "은퇴 자금 마련",
+      value: retireReadyYear === null ? "어려워요" : `${ret.currentAge + retireReadyYear}세`,
+      sub: depleteYear === null ? `${ret.retireAge}세 은퇴해도 ${ret.currentAge + horizon}세까지 OK` : `${ret.currentAge + depleteYear}세쯤 바닥나요`,
+      tone: depleteYear === null && retireReadyYear !== null ? "text-ink" : "text-fg-critical",
+    },
+    loanEnd && { icon: "🏠", label: "대출 다 갚는 해", value: `${thisYear + loanEnd.year!}년`, sub: loanEnd.name, tone: "text-ink" },
+    lastCmp && {
+      icon: lastCmp.actual >= lastCmp.plan ? "📈" : "📉",
+      label: "계획보다",
+      value: `${lastCmp.actual >= lastCmp.plan ? "+" : "-"}${shortEok(Math.abs(lastCmp.actual - lastCmp.plan))}`,
+      sub: lastCmp.actual >= lastCmp.plan ? "앞서고 있어요" : "뒤처져 있어요",
+      tone: lastCmp.actual >= lastCmp.plan ? "text-fg-positive" : "text-fg-critical",
+    },
+  ].filter(Boolean) as { icon: string; label: string; value: string; sub: string; tone: string }[];
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">미래 계획</h1>
-          <p className="mt-1 text-[14px] text-ink-muted">지금 자산과 저축 흐름에 큰 지출·대출·은퇴까지 넣어 앞으로의 자산을 그려봐요.</p>
-        </div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[24px] font-extrabold tracking-[-0.02em] text-ink sm:text-[28px]">미래 계획</h1>
         {!readOnly && (
           <div className="flex items-center gap-3">
-            <span role="status" className="text-[12px] text-ink-muted">{dirty ? "저장하지 않은 변경이 있어요" : saveMessage}</span>
+            <span role="status" className="text-[12px] text-ink-muted">{dirty ? "바꾼 내용이 있어요" : saveMessage}</span>
             <button type="button" onClick={save} disabled={!dirty || saving} className="rounded-r2 bg-bg-brand-solid px-4 py-2 text-[13px] font-bold text-static-white disabled:opacity-40">
-              {saving ? "저장 중…" : "계획 저장"}
+              {saving ? "저장 중…" : "저장"}
             </button>
           </div>
         )}
       </div>
 
-      <section className="seed-card mb-4 p-4 shadow-none sm:p-5" aria-label="출발점">
-        <div className="grid grid-cols-3 divide-x-[0.8px] divide-hairline">
-          {[
-            { label: "지금 순자산", value: formatEok(netWorth), tone: "text-ink" },
-            { label: "1년 저축", value: formatEok(measuredSaving), tone: measuredSaving < 0 ? "text-fg-critical" : "text-ink" },
-            { label: "저축률", value: savingRate === null ? "-" : `${savingRate.toFixed(0)}%`, tone: "text-ink" },
-          ].map((x) => (
-            <div key={x.label} className="min-w-0 px-2 first:pl-0 last:pr-0 sm:px-5">
-              <p className="text-[12px] text-ink-muted sm:text-[13px]">{x.label}</p>
-              <p className={`mt-0.5 text-[15px] font-extrabold tabular-nums sm:text-[22px] ${x.tone}`}>{x.value}</p>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <section className="seed-card p-5 shadow-none sm:p-7" aria-labelledby="plan-answer">
+            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="언제를 볼까요">
+              {yearChoices.map((c) => (
+                <button key={c.label} type="button" role="tab" aria-selected={selYear === c.year} onClick={() => setSelYear(c.year)} className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold ${selYear === c.year ? "bg-bg-brand-solid text-static-white" : "bg-bg-neutral-weak text-ink-muted hover:text-ink"}`}>
+                  {c.label}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="mt-3 border-t-[0.8px] border-hairline pt-2.5 text-[12px] text-ink-muted">
-          {monthCount > 0
-            ? `최근 ${monthCount}개월 수입 ${formatEok(annualIncome)} - 지출 ${formatEok(annualExpense)}${monthCount < 12 ? "(1년으로 환산)" : ""} 기준이에요. 순자산은 금융자산 ${formatEok(grossAssets)}${realEstateIn > 0 ? ` + 부동산 ${formatEok(realEstateIn)}` : ""} - 부채 ${formatEok(debtTotal)}예요.`
-            : "아직 거래 내역이 없어서 연 저축액을 직접 넣어 주세요."}
-        </p>
-      </section>
+            <p id="plan-answer" className="mt-4 text-[15px] text-ink-muted">
+              {thisYear + sel.year}년{ageAt(sel.year) ? ` · ${ageAt(sel.year)}` : ""}, 우리집 자산은
+            </p>
+            <p className={`mt-1 text-[40px] font-extrabold leading-tight tracking-[-0.03em] tabular-nums sm:text-[52px] ${selValue < 0 ? "text-fg-critical" : "text-ink"}`}>
+              {shortEok(selValue)}
+            </p>
+            <p className="mt-1 text-[13px] text-ink-muted">
+              지금 {shortEok(netWorth)}{netWorth > 0 && selValue > netWorth ? ` → ${(selValue / netWorth).toFixed(1)}배` : ""} · 수익률이 ±2%p 다르면 {shortEok(pick(low[sel.year]))}~{shortEok(pick(high[sel.year]))}
+            </p>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[340px_1fr]">
-        <section className="seed-card order-2 flex flex-col gap-3 p-5 shadow-none lg:order-1" aria-label="계획 가정">
-          <Group title="저축과 물가" summary={`연 ${savingMan.toLocaleString("ko-KR")}만원`} defaultOpen>
-            <NumberField
-              label="연 저축액"
-              hint={s.savingMan === null ? "실제 기록" : <button type="button" className="underline" onClick={() => patch({ savingMan: null })}>실제 기록({measuredSavingMan.toLocaleString("ko-KR")}만)으로</button>}
-              suffix="만원"
-              step={100}
-              value={savingMan}
-              onChange={(v) => patch({ savingMan: v })}
-            />
+            {selValue > 0 && (
+              <div className="mt-4">
+                <div className="flex h-3 overflow-hidden rounded-full bg-bg-neutral-weak" aria-hidden>
+                  <div className="h-full bg-[var(--finance-ink-muted)] opacity-40" style={{ width: `${100 - growthShare}%` }} />
+                  <div className="h-full" style={{ width: `${growthShare}%`, backgroundColor: GREEN }} />
+                </div>
+                <div className="mt-1.5 flex justify-between text-[12px]">
+                  <span className="text-ink-muted">모은 돈 <b className="text-ink">{shortEok(selPrincipal)}</b></span>
+                  <span className="text-ink-muted">불어난 돈 <b className="text-fg-positive">{shortEok(selGrowth)}</b></span>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5">
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 10, right: 16, bottom: 0, left: 0 }}
+                  onClick={(e) => {
+                    const i = Number((e as { activeTooltipIndex?: number | string } | null)?.activeTooltipIndex);
+                    if (Number.isInteger(i)) setSelYear(i);
+                  }}
+                >
+                  <CartesianGrid vertical={false} stroke="var(--finance-hairline2)" />
+                  <XAxis dataKey="label" interval={horizon > 40 ? 9 : 4} axisLine={false} tickLine={false} tick={axisTick} />
+                  <YAxis tickFormatter={axisEok} axisLine={false} tickLine={false} width={44} tick={axisTick} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value, name) => [Array.isArray(value) ? `${shortEok(Number(value[0]))} ~ ${shortEok(Number(value[1]))}` : shortEok(Number(value)), name]}
+                    labelFormatter={(label) => `${label}년`}
+                  />
+                  <Area dataKey="range" name="범위" stroke="none" fill={GREEN} fillOpacity={0.12} isAnimationActive={false} />
+                  <Area dataKey="expected" name="예상 자산" stroke={GREEN} strokeWidth={2.5} fill={GREEN} fillOpacity={0.12} isAnimationActive={false} />
+                  <Line dataKey="principal" name="모은 돈" stroke="var(--finance-ink-muted)" strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+                  <ReferenceLine x={`${thisYear + sel.year}`} stroke="var(--finance-ink-muted)" strokeOpacity={0.6} />
+                  {goal > 0 && <ReferenceLine y={goal} stroke={GOLD} strokeDasharray="6 4" label={{ value: `🎯 ${s.goalEok}억`, position: "insideTopLeft", fontSize: 11, fill: GOLD }} />}
+                  {retireOffset !== null && retireOffset <= horizon && <ReferenceLine x={`${thisYear + retireOffset}`} stroke={GOLD} strokeOpacity={0.6} label={{ value: "🏖️", position: "insideTopRight", fontSize: 13 }} />}
+                  {s.events.map((e) => (
+                    <ReferenceLine key={e.id} x={`${e.year}`} stroke={e.amountMan < 0 ? "#f2783c" : GREEN} strokeOpacity={0.5} />
+                  ))}
+                </AreaChart>
+              </ResponsiveContainer>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] text-ink-muted">그래프를 누르면 그해를 볼 수 있어요 · 세금·수수료는 빼고 단순 계산</span>
+                <Toggle options={[{ value: "real", label: "지금 돈 가치" }, { value: "nominal", label: "그때 금액" }]} value={view} onChange={(v) => setView(v as "real" | "nominal")} />
+              </div>
+            </div>
+          </section>
+
+          {tiles.length > 0 && (
+            <div className={`grid grid-cols-2 gap-3 ${tiles.length >= 3 ? "sm:grid-cols-4" : ""}`}>
+              {tiles.map((t) => (
+                <div key={t.label} className="seed-card p-4 shadow-none">
+                  <p className="text-[12px] text-ink-muted"><span aria-hidden className="mr-1">{t.icon}</span>{t.label}</p>
+                  <p className={`mt-1 text-[20px] font-extrabold tabular-nums ${t.tone}`}>{t.value}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-ink-muted">{t.sub}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {comparison.length > 0 && (
+            <section className="seed-card p-5 shadow-none sm:p-6" aria-labelledby="plan-actual">
+              <h2 id="plan-actual" className="text-[16px] font-extrabold text-ink">실제 vs 계획</h2>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={comparison} margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
+                  <CartesianGrid vertical={false} stroke="var(--finance-hairline2)" />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={axisTick} />
+                  <YAxis tickFormatter={axisEok} axisLine={false} tickLine={false} width={44} tick={axisTick} domain={["auto", "auto"]} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(value, name) => [shortEok(Number(value)), name]} />
+                  <Line dataKey="plan" name="계획" stroke="var(--finance-ink-muted)" strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+                  <Line dataKey="actual" name="실제" stroke={GREEN} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </section>
+          )}
+        </div>
+
+        <aside className="flex flex-col gap-4">
+          <section className="seed-card flex flex-col gap-5 p-5 shadow-none" aria-label="바꿔 보기">
+            <h2 className="text-[16px] font-extrabold text-ink">바꿔 보세요</h2>
+            <div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] font-semibold text-ink">매달 저축</span>
+                <span className="text-[20px] font-extrabold tabular-nums text-ink">
+                  {monthlySavingMan.toLocaleString("ko-KR")}
+                  <span className="ml-0.5 text-[13px] font-semibold text-ink-muted">만원</span>
+                </span>
+              </div>
+              <input type="range" min={0} max={sliderMax} step={10} value={monthlySavingMan} onChange={(e) => patch({ savingMan: Number(e.target.value) * 12 })} aria-label="매달 저축" className="mt-2 w-full accent-[#2fbf8a]" />
+              <p className="mt-1 flex justify-between gap-2 text-[11px] text-ink-muted">
+                <span>{monthCount > 0 ? `실제 기록: 월 ${Math.round(measuredSavingMan / 12).toLocaleString("ko-KR")}만원${savingRate !== null ? ` (저축률 ${savingRate.toFixed(0)}%)` : ""}` : "거래 기록이 아직 없어요"}</span>
+                {s.savingMan !== null && monthCount > 0 && (
+                  <button type="button" className="shrink-0 font-semibold underline" onClick={() => patch({ savingMan: null })}>
+                    기록대로
+                  </button>
+                )}
+              </p>
+            </div>
+            <div>
+              <span className="text-[13px] font-semibold text-ink">투자 성향</span>
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                {SCENARIOS.map((x) => {
+                  const on = s.returnMode === "single" && s.returnPct === x.returnPct;
+                  return (
+                    <button key={x.label} type="button" onClick={() => patch({ returnMode: "single", returnPct: x.returnPct })} aria-pressed={on} className={`rounded-r2 px-2 py-2.5 text-center ${on ? "bg-bg-brand-weak text-fg-brand" : "bg-bg-neutral-weak text-ink-muted hover:text-ink"}`}>
+                      <span className="block text-[13px] font-bold">{x.label}</span>
+                      <span className="block text-[11px]">연 {x.returnPct}%</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] font-semibold text-ink">🎯 목표 자산</span>
+                <span className="text-[20px] font-extrabold tabular-nums text-ink">
+                  {s.goalEok}
+                  <span className="ml-0.5 text-[13px] font-semibold text-ink-muted">억</span>
+                </span>
+              </div>
+              <input type="range" min={0} max={50} step={1} value={s.goalEok} onChange={(e) => patch({ goalEok: Number(e.target.value) })} aria-label="목표 자산" className="mt-2 w-full accent-[#f0b429]" />
+            </div>
+          </section>
+
+          <details className="seed-card group p-5 shadow-none">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
+              <span className="text-[15px] font-extrabold text-ink">더 자세히 설정</span>
+              <span className="text-[12px] text-ink-muted">
+                은퇴 · 대출 · 큰 지출 · 부동산 <span aria-hidden className="inline-block transition-transform group-open:rotate-180">▾</span>
+              </span>
+            </summary>
+            <div className="mt-4 flex flex-col gap-3">
+          <Group title="물가·저축 증가" summary={`물가 ${s.inflationPct}% · 저축 +${s.savingGrowthPct}%/년`}>
             <div className="grid grid-cols-2 gap-2">
               <NumberField compact label="저축 증가율" suffix="%/년" step={0.5} value={s.savingGrowthPct} onChange={(v) => patch({ savingGrowthPct: v })} />
               <NumberField compact label="물가상승률" suffix="%/년" step={0.5} value={s.inflationPct} onChange={(v) => patch({ inflationPct: v })} />
             </div>
-            <NumberField label="목표 자산" hint="지금 돈 가치" suffix="억원" step={1} value={s.goalEok} onChange={(v) => patch({ goalEok: v })} />
           </Group>
 
-          <Group title="수익률" summary={`연 ${effectiveReturn.toFixed(1)}%`} defaultOpen>
+          <Group title="수익률 자세히" summary={`연 ${effectiveReturn.toFixed(1)}%`}>
             <Toggle options={[{ value: "single", label: "한 가지로" }, { value: "byClass", label: "자산별로" }]} value={s.returnMode} onChange={(v) => patch({ returnMode: v as PlanSettings["returnMode"] })} />
             {s.returnMode === "single" ? (
               <>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {SCENARIOS.map((x) => (
-                    <button key={x.label} type="button" onClick={() => patch({ returnPct: x.returnPct })} aria-pressed={s.returnPct === x.returnPct} className={`rounded-r2 px-2 py-2 text-center ${s.returnPct === x.returnPct ? "bg-bg-brand-weak text-fg-brand" : "bg-bg-neutral-weak text-ink-muted hover:text-ink"}`}>
-                      <span className="block text-[13px] font-bold">{x.label}</span>
-                      <span className="block text-[11px]">연 {x.returnPct}%</span>
-                    </button>
-                  ))}
-                </div>
                 <NumberField compact label="기대 수익률" hint="직접 입력" suffix="%/년" step={0.5} value={s.returnPct} onChange={(v) => patch({ returnPct: v })} />
               </>
             ) : (
@@ -306,7 +461,7 @@ export function PlanView({
                     onChange={(v) => patch({ classReturns: { ...s.classReturns, [k]: v } })}
                   />
                 ))}
-                <p className="text-[12px] text-ink-muted">지금 자산 비중으로 섞으면 연 {effectiveReturn.toFixed(2)}%예요. 새로 모으는 돈도 같은 비중으로 나눠 넣는다고 봐요.</p>
+                <p className="text-[12px] text-ink-muted">지금 자산 비중대로 섞으면 연 {effectiveReturn.toFixed(2)}%</p>
               </>
             )}
           </Group>
@@ -344,7 +499,6 @@ export function PlanView({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-ink-muted">금액은 지금 돈 가치로 넣어요. 그해 물가만큼 키워서 반영해요.</p>
           </Group>
 
           <Group title="은퇴" summary={ret.enabled ? `${ret.retireAge}세 · 월 ${ret.monthlySpendMan}만원` : "꺼짐"}>
@@ -385,141 +539,35 @@ export function PlanView({
                 </div>
               );
             })}
-            {debts.length > 0 && <p className="text-[11px] text-ink-muted">월 상환액은 이미 지출에 잡혀 있다고 봐요. 상환액을 비워 두면 잔액이 그대로 남아요.</p>}
           </Group>
 
-          <button type="button" onClick={() => setS(DEFAULT_PLAN_SETTINGS)} className="self-start pt-1 text-[12px] font-semibold text-ink-muted underline-offset-2 hover:text-ink hover:underline">
-            처음 값으로 되돌리기
-          </button>
-        </section>
-
-        <div className="order-1 flex min-w-0 flex-col gap-4 lg:order-2">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {MILESTONES.map((y) => {
-              const value = pick(points[y]);
-              const principal = deflate(points[y].principal, y);
-              return (
-                <div key={y} className="seed-card p-5 shadow-none">
-                  <p className="text-[13px] font-semibold text-ink-muted">
-                    {y}년 뒤 <span className="font-normal">· {thisYear + y}년{ageAt(y)}</span>
-                  </p>
-                  <p className={`mt-1 text-[22px] font-extrabold tabular-nums ${value < 0 ? "text-fg-critical" : "text-ink"}`}>{formatEok(value)}</p>
-                  <dl className="mt-2 space-y-0.5 text-[12px]">
-                    <div className="flex justify-between gap-2"><dt className="text-ink-muted">넣은 돈</dt><dd className="tabular-nums text-ink">{formatEok(principal)}</dd></div>
-                    <div className="flex justify-between gap-2"><dt className="text-ink-muted">불어난 돈</dt><dd className="font-semibold tabular-nums text-fg-positive">{formatEok(value - principal)}</dd></div>
-                  </dl>
-                  <p className="mt-2 border-t-[0.8px] border-hairline pt-2 text-[11px] text-ink-muted">
-                    수익률 ±2%면 {formatEok(pick(low[y]))} ~ {formatEok(pick(high[y]))}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-
-          <ul className="flex flex-col gap-2 text-[14px] text-ink">
-            {goal > 0 && (
-              <li className="rounded-r3 bg-bg-brand-weak px-4 py-3">
-                {goalYear === null ? <>이대로면 {horizon}년 안에 목표 <b>{s.goalEok}억</b>에 닿지 못해요.</> : goalYear === 0 ? <>이미 목표 <b>{s.goalEok}억</b>을 넘었어요.</> : <>목표 <b>{s.goalEok}억</b>은 <b>{goalYear}년 뒤({thisYear + goalYear}년{ageAt(goalYear)})</b>에 닿아요.</>}
-              </li>
-            )}
-            {ret.enabled && (
-              <li className="rounded-r3 bg-bg-neutral-weak px-4 py-3">
-                월 {ret.monthlySpendMan}만원으로 살려면 은퇴 자금 <b>{formatEok(retireNeed)}</b>(지금 돈 가치)이 필요해요.{" "}
-                {retireReadyYear === null ? "이대로면 그만큼 모으기 어려워요." : <>계속 모으면 <b>{ret.currentAge + retireReadyYear}세({thisYear + retireReadyYear}년)</b>에 마련돼요.</>}
-                {atRetire && <> {ret.retireAge}세 은퇴 때 예상 자산은 <b>{formatEok(atRetire.real)}</b>이고, </>}
-                {depleteYear === null ? <>{ret.currentAge + horizon}세까지 자산이 남아요.</> : <><b className="text-fg-critical">{ret.currentAge + depleteYear}세</b>쯤 바닥나요.</>}
-              </li>
-            )}
-            {payoffs.some((p) => p.year !== null) && (
-              <li className="rounded-r3 bg-bg-neutral-weak px-4 py-3">
-                {payoffs.filter((p) => p.year !== null).map((p) => `${p.name} ${thisYear + p.year!}년`).join(", ")}에 다 갚아요.
-              </li>
-            )}
-          </ul>
-
-          <section className="seed-card p-5 shadow-none sm:p-6" aria-labelledby="plan-chart">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 id="plan-chart" className="text-[16px] font-extrabold text-ink">{horizon}년 자산 흐름</h2>
-              <Toggle options={[{ value: "real", label: "지금 돈 가치" }, { value: "nominal", label: "그때 금액" }]} value={view} onChange={(v) => setView(v as "real" | "nominal")} />
+              <button type="button" onClick={() => setS(DEFAULT_PLAN_SETTINGS)} className="self-start pt-1 text-[12px] font-semibold text-ink-muted underline-offset-2 hover:text-ink hover:underline">
+                처음 값으로 되돌리기
+              </button>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
-                <CartesianGrid vertical={false} stroke="var(--finance-hairline2)" />
-                <XAxis dataKey="label" interval={4} axisLine={false} tickLine={false} tick={axisTick} />
-                <YAxis tickFormatter={axisEok} axisLine={false} tickLine={false} width={48} tick={axisTick} />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(value, name) => [Array.isArray(value) ? `${formatEok(Number(value[0]))} ~ ${formatEok(Number(value[1]))}` : formatEok(Number(value)), name]}
-                  labelFormatter={(label) => `${label}년`}
-                />
-                <Area dataKey="range" name="범위(수익률 ±2%)" stroke="none" fill={GREEN} fillOpacity={0.15} isAnimationActive={false} />
-                <Area dataKey="expected" name="예상 순자산" stroke={GREEN} strokeWidth={2.5} fill={GREEN} fillOpacity={0.12} isAnimationActive={false} />
-                <Line dataKey="principal" name="넣은 돈" stroke="var(--finance-ink-muted)" strokeDasharray="4 4" dot={false} isAnimationActive={false} />
-                {goal > 0 && <ReferenceLine y={goal} stroke={GOLD} strokeDasharray="6 4" label={{ value: `목표 ${s.goalEok}억`, position: "insideTopLeft", fontSize: 11, fill: GOLD }} />}
-                {retireOffset !== null && retireOffset <= horizon && <ReferenceLine x={`${thisYear + retireOffset}`} stroke="var(--finance-ink-muted)" label={{ value: "은퇴", position: "insideTopRight", fontSize: 11, fill: "var(--finance-ink-muted)" }} />}
-                {s.events.map((e) => (
-                  <ReferenceLine key={e.id} x={`${e.year}`} stroke={e.amountMan < 0 ? "#f2783c" : GREEN} strokeOpacity={0.5} />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-            <p className="mt-2 text-[11px] leading-5 text-ink-muted">
-              해마다 연말에 저축을 넣고 자산이 같은 수익률로 불어난다고 단순하게 계산했어요. 세금·수수료는 빠져 있어요. 세로선은 큰 지출(주황)·수입(초록)과 은퇴 시점이에요.
-            </p>
-          </section>
+          </details>
 
-          <section className="seed-card p-5 shadow-none sm:p-6" aria-labelledby="plan-actual">
-            <h2 id="plan-actual" className="text-[16px] font-extrabold text-ink">계획대로 가고 있나요?</h2>
-            {comparison.length === 0 ? (
-              <p className="mt-2 text-[13px] text-ink-muted">매달 파일을 올리면 실제 순자산이 쌓여서 계획과 나란히 보여드려요.</p>
-            ) : (
-              <>
-                {lastCmp && (
-                  <p className="mt-1 text-[13px] text-ink-muted">
-                    {history[0].month} 기록부터 같은 가정으로 키운 선과 비교하면, 지금{" "}
-                    <b className={lastCmp.actual >= lastCmp.plan ? "text-fg-positive" : "text-fg-critical"}>
-                      {formatEok(Math.abs(lastCmp.actual - lastCmp.plan))} {lastCmp.actual >= lastCmp.plan ? "앞서" : "뒤처져"}
-                    </b>{" "}
-                    있어요.
-                  </p>
-                )}
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={comparison} margin={{ top: 12, right: 20, bottom: 0, left: 0 }}>
-                    <CartesianGrid vertical={false} stroke="var(--finance-hairline2)" />
-                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={axisTick} />
-                    <YAxis tickFormatter={axisEok} axisLine={false} tickLine={false} width={48} tick={axisTick} domain={["auto", "auto"]} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(value, name) => [formatEok(Number(value)), name]} />
-                    <Line dataKey="plan" name="계획" stroke="var(--finance-ink-muted)" strokeDasharray="4 4" dot={false} isAnimationActive={false} />
-                    <Line dataKey="actual" name="실제" stroke={GREEN} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </>
-            )}
-          </section>
-
-          <section className="seed-card overflow-x-auto p-5 shadow-none sm:p-6" aria-labelledby="plan-table">
-            <h2 id="plan-table" className="mb-2 text-[16px] font-extrabold text-ink">5년마다 보기</h2>
-            <table className="w-full whitespace-nowrap text-[13px]">
-              <thead>
-                <tr className="border-b-[0.8px] border-hairline text-left text-[11px] text-ink-muted">
-                  <th className="py-2 pr-3 font-semibold">연도</th>
-                  <th className="py-2 pr-3 text-right font-semibold">순자산{view === "real" ? "(지금 가치)" : ""}</th>
-                  <th className="py-2 pr-3 text-right font-semibold">넣은 돈</th>
-                  <th className="py-2 text-right font-semibold">남은 대출</th>
-                </tr>
-              </thead>
+          <details className="seed-card group p-5 shadow-none">
+            <summary className="flex cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden">
+              <span className="text-[15px] font-extrabold text-ink">5년마다 표로 보기</span>
+              <span aria-hidden className="text-[12px] text-ink-muted transition-transform group-open:rotate-180">▾</span>
+            </summary>
+            <table className="mt-3 w-full text-[13px]">
               <tbody>
                 {points.filter((p) => p.year > 0 && p.year % 5 === 0).map((p) => (
                   <tr key={p.year} className="border-b-[0.8px] border-hairline2 last:border-0">
-                    <td className="py-2 pr-3 text-ink">{thisYear + p.year}년 <span className="text-ink-muted">({p.year}년 뒤{ageAt(p.year)})</span></td>
-                    <td className={`py-2 pr-3 text-right font-semibold tabular-nums ${pick(p) < 0 ? "text-fg-critical" : "text-ink"}`}>{formatEok(pick(p))}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-ink-muted">{formatEok(deflate(p.principal, p.year))}</td>
-                    <td className="py-2 text-right tabular-nums text-ink-muted">{p.debt > 0 ? formatEok(p.debt) : "-"}</td>
+                    <td className="py-2 pr-2 text-ink">
+                      {thisYear + p.year}
+                      <span className="ml-1 text-[11px] text-ink-muted">{ageAt(p.year) ?? `${p.year}년 뒤`}</span>
+                    </td>
+                    <td className={`py-2 text-right font-semibold tabular-nums ${pick(p) < 0 ? "text-fg-critical" : "text-ink"}`}>{shortEok(pick(p))}</td>
+                    <td className="py-2 pl-2 text-right text-[11px] tabular-nums text-ink-muted">{p.debt > 0 ? `대출 ${shortEok(p.debt)}` : ""}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </section>
-        </div>
+          </details>
+        </aside>
       </div>
     </div>
   );
