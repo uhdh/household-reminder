@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assetItems, depositRates, planSettings, uploads } from "@/lib/finance-db";
+import { assetItems, depositRates, planSettings, realAssets, uploads } from "@/lib/finance-db";
 import { toNumber } from "@/lib/finance-format";
 import { assetClassOf, isExcludedItem } from "@/lib/asset-scope";
 import { currentMonthStartKst } from "@/lib/completed-months";
 import { monthlyNetWorth } from "@/lib/net-worth-history";
+import { debtKey, summarizeRealEstate } from "@/lib/real-estate";
 import { DEFAULT_PLAN_SETTINGS, sanitizePlanSettings } from "@/lib/plan-settings";
 import { resolveFinanceViewer } from "@/lib/require-household";
 import { countsInTotals, flowLabel, getActiveTransactionsInRange, getHouseholdPeople, toNum } from "@/lib/spending-queries";
@@ -32,27 +33,35 @@ export default async function PlanPage() {
   const db = getDb();
 
   const monthStart = currentMonthStartKst();
-  const [allUploads, allItems, people, rateRows, savedRows, { transactions }] = await Promise.all([
+  const [allUploads, allItems, people, rateRows, savedRows, realRows, { transactions }] = await Promise.all([
     db.select().from(uploads).where(eq(uploads.householdId, householdId)),
     db.select().from(assetItems).where(eq(assetItems.householdId, householdId)),
     getHouseholdPeople(householdId),
     db.select().from(depositRates).where(eq(depositRates.householdId, householdId)).catch(emptyIfMissingTable<typeof depositRates.$inferSelect>),
     db.select().from(planSettings).where(eq(planSettings.householdId, householdId)).catch(emptyIfMissingTable<typeof planSettings.$inferSelect>),
+    db.select().from(realAssets).where(eq(realAssets.householdId, householdId)).catch(emptyIfMissingTable<typeof realAssets.$inferSelect>),
     getActiveTransactionsInRange(householdId, monthsBefore(monthStart, 12), monthStart, personId),
   ]);
+  // 지금 자산: 자산관리 화면과 같은 기준(활성 업로드, 제외 항목 빼고). 부동산과 집에 묶인 대출은 따로 넘긴다.
+  const activeIds = new Set(allUploads.filter((u) => u.isActive).map((u) => u.id));
+  const activeDebts = allItems
+    .filter((i) => activeIds.has(i.uploadId) && i.side === "debt")
+    .map((i) => ({ personId: i.personId, productName: i.productName, amount: toNumber(i.amount) }));
+  const realEstate = summarizeRealEstate(
+    realRows.map((r) => ({ id: r.id, name: r.name, value: toNumber(r.value), loanKeys: r.loanKeys ?? [] })),
+    activeDebts,
+    allItems.filter((i) => activeIds.has(i.uploadId) && i.side === "asset" && i.category === "부동산").reduce((s, i) => s + toNumber(i.amount), 0)
+  );
+  const isLinkedDebt = (i: (typeof allItems)[number]) => i.side === "debt" && realEstate.linked.has(debtKey(i));
   const items = allItems.filter((i) => !isExcludedItem(i));
   const signed = (i: (typeof items)[number]) => (i.side === "asset" ? 1 : -1) * toNumber(i.amount);
-
-  // 지금 자산: 자산관리 화면과 같은 기준(활성 업로드, 제외 항목 빼고).
-  const activeIds = new Set(allUploads.filter((u) => u.isActive).map((u) => u.id));
   const active = items.filter((i) => activeIds.has(i.uploadId));
   const label = new Map(people.map((p) => [p.id, p.displayName]));
   const classWeights = { cash: 0, deposit: 0, invest: 0, other: 0 };
   for (const i of active) if (i.side === "asset") classWeights[assetClassOf(i)] += toNumber(i.amount);
   const grossAssets = Object.values(classWeights).reduce((s, v) => s + v, 0);
-  const debts: PlanDebt[] = active
-    .filter((i) => i.side === "debt" && toNumber(i.amount) > 0)
-    .map((i) => ({ key: `${i.personId}|${i.productName}`, name: i.productName ?? "대출", personLabel: label.get(i.personId) ?? i.personId, balance: toNumber(i.amount) }));
+  const toPlanDebt = (i: (typeof items)[number]): PlanDebt => ({ key: debtKey(i), name: i.productName ?? "대출", personLabel: label.get(i.personId) ?? i.personId, balance: toNumber(i.amount), realEstate: isLinkedDebt(i) });
+  const debts: PlanDebt[] = active.filter((i) => i.side === "debt" && toNumber(i.amount) > 0).map(toPlanDebt);
 
   // 예적금 수익률 기본값: 입력해 둔 계좌 금리를 금액으로 가중 평균.
   const rateByKey = new Map(rateRows.map((r) => [`${r.personId}|${r.productName}`, toNumber(r.ratePct)]));
@@ -68,7 +77,7 @@ export default async function PlanPage() {
 
   // 실제 순자산 흐름: 업로드마다 남은 자산 스냅샷(올린 날짜 기준).
   const netByUpload = new Map<string, number>();
-  for (const i of items) netByUpload.set(i.uploadId, (netByUpload.get(i.uploadId) ?? 0) + signed(i));
+  for (const i of items) if (!isLinkedDebt(i)) netByUpload.set(i.uploadId, (netByUpload.get(i.uploadId) ?? 0) + signed(i));
   const history = monthlyNetWorth(
     allUploads
       .filter((u) => netByUpload.has(u.id))
@@ -98,6 +107,7 @@ export default async function PlanPage() {
         grossAssets={grossAssets}
         classWeights={classWeights}
         debts={debts}
+        realEstateValue={realEstate.value}
         annualIncome={annualize(income)}
         annualExpense={annualize(expense)}
         monthCount={monthCount}

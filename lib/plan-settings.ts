@@ -17,6 +17,9 @@ export type PlanSettings = {
   retirement: { enabled: boolean; currentAge: number; retireAge: number; monthlySpendMan: number; withdrawalPct: number };
   /** 키: `${personId}|${productName}` */
   loans: Record<string, PlanLoan>;
+  /** 부동산(시세와 묶인 대출)을 순자산에 넣을지, 넣으면 집값 상승률 */
+  includeRealEstate: boolean;
+  realEstateGrowthPct: number;
 };
 
 export const DEFAULT_PLAN_SETTINGS: PlanSettings = {
@@ -30,6 +33,8 @@ export const DEFAULT_PLAN_SETTINGS: PlanSettings = {
   events: [],
   retirement: { enabled: false, currentAge: 35, retireAge: 60, monthlySpendMan: 300, withdrawalPct: 4 },
   loans: {},
+  includeRealEstate: false,
+  realEstateGrowthPct: 2,
 };
 
 function num(v: unknown, fallback: number, min: number, max: number): number {
@@ -81,5 +86,7 @@ export function sanitizePlanSettings(input: unknown): PlanSettings {
       withdrawalPct: num(rt.withdrawalPct, d.retirement.withdrawalPct, 1, 10),
     },
     loans,
+    includeRealEstate: s.includeRealEstate === true,
+    realEstateGrowthPct: num(s.realEstateGrowthPct, d.realEstateGrowthPct, -20, 30),
   };
 }

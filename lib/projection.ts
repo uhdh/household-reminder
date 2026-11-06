@@ -15,6 +15,8 @@ export type ProjectionInput = {
   /** 이 해 다음부터 저축을 멈추고 annualSpend(지금 돈 가치)를 해마다 꺼내 쓴다 */
   retireAfterYear?: number | null;
   annualSpend?: number;
+  /** 수익률과 따로 불어나는 자산(부동산 등): 순자산에 더하되 저축·인출은 넣지 않는다 */
+  separateAssets?: { value: number; growthPct: number }[];
 };
 
 export type ProjectionPoint = {
@@ -42,8 +44,10 @@ export function projectNetWorth(input: ProjectionInput): ProjectionPoint[] {
   const debts = (input.debts ?? []).map((d) => ({ ...d, paid: d.balance <= 0 }));
   const debtTotal = () => debts.reduce((s, d) => s + d.balance, 0);
   // 상환액은 저축(annualSaving)과 별개로 지출에 이미 잡혀 있으므로 자산에서 빼지 않고 부채만 줄인다.
+  const separate = input.separateAssets ?? [];
+  const separateAt = (t: number) => separate.reduce((s, a) => s + a.value * (1 + a.growthPct / 100) ** t, 0);
   let assets = input.start;
-  let principal = input.start - debtTotal();
+  let principal = input.start + separateAt(0) - debtTotal();
   const points: ProjectionPoint[] = [{ year: 0, nominal: principal, real: principal, principal, debt: debtTotal(), paidOff: [] }];
   let freed = 0;
   for (let t = 1; t <= input.years; t++) {
@@ -68,7 +72,7 @@ export function projectNetWorth(input: ProjectionInput): ProjectionPoint[] {
         if (d.reinvest) freed += d.monthlyPayment * 12;
       }
     }
-    const nominal = assets - debtTotal();
+    const nominal = assets + separateAt(t) - debtTotal();
     points.push({ year: t, nominal, real: nominal / (1 + inf) ** t, principal, debt: debtTotal(), paidOff });
   }
   return points;

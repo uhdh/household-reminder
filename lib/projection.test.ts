@@ -48,6 +48,12 @@ describe("대출·이벤트·은퇴", () => {
     expect(p[3].nominal).toBeCloseTo(145 - 10 * 1.331);
   });
 
+  test("부동산은 따로 불어나고 넣은 돈에는 지금 시세만 잡힌다", () => {
+    const p = projectNetWorth({ ...base, start: 0, annualSaving: 0, years: 2, separateAssets: [{ value: 100, growthPct: 10 }] });
+    expect(p[2].nominal).toBeCloseTo(121);
+    expect(p[2].principal).toBe(100);
+  });
+
   test("자산 비중 가중 수익률", () => {
     expect(blendedReturnPct({ cash: 100, invest: 300 }, { cash: 1, invest: 9 })).toBeCloseTo(7);
   });

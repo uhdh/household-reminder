@@ -116,6 +116,17 @@ export const depositRates = pgTable(
   (table) => [unique().on(table.householdId, table.personId, table.productName)]
 );
 
+// 직접 입력하는 부동산(시세)과 그 집에 묶인 대출(asset_items 부채의 `${personId}|${productName}` 키 목록).
+// 금융자산 그래프와 따로 보여주고, 순자산은 "부동산 포함"으로 따로 계산한다.
+export const realAssets = pgTable("real_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  householdId: uuid("household_id").notNull().references(() => households.id),
+  name: text("name").notNull(),
+  value: numeric("value", { precision: 16, scale: 0 }).notNull(),
+  loanKeys: jsonb("loan_keys").$type<string[]>().notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // 미래 계획 화면의 가정값·이벤트·은퇴·대출 설정. 가구당 한 행(JSON). 형태는 lib/plan-settings.ts가 검증한다.
 export const planSettings = pgTable("plan_settings", {
   householdId: uuid("household_id").primaryKey().references(() => households.id),

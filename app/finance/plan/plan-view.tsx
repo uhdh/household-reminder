@@ -6,7 +6,7 @@ import { blendedReturnPct, projectNetWorth, yearsToReach, type ProjectionDebt } 
 import { DEFAULT_PLAN_SETTINGS, type AssetClass, type PlanEvent, type PlanSettings } from "@/lib/plan-settings";
 import { savePlanSettingsAction } from "./actions";
 
-export type PlanDebt = { key: string; name: string; personLabel: string; balance: number };
+export type PlanDebt = { key: string; name: string; personLabel: string; balance: number; realEstate: boolean };
 
 const MILESTONES = [10, 20, 30];
 const SCENARIOS = [
@@ -94,7 +94,8 @@ function Toggle({ options, value, onChange }: { options: { value: string; label:
 export function PlanView({
   grossAssets,
   classWeights,
-  debts,
+  debts: allDebts,
+  realEstateValue,
   annualIncome,
   annualExpense,
   monthCount,
@@ -107,6 +108,7 @@ export function PlanView({
   grossAssets: number;
   classWeights: Record<AssetClass, number>;
   debts: PlanDebt[];
+  realEstateValue: number;
   annualIncome: number;
   annualExpense: number;
   monthCount: number;
@@ -118,11 +120,14 @@ export function PlanView({
 }) {
   const measuredSaving = annualIncome - annualExpense;
   const measuredSavingMan = Math.round(measuredSaving / 10_000);
-  const debtTotal = debts.reduce((s, d) => s + d.balance, 0);
-  const netWorth = grossAssets - debtTotal;
   const thisYear = new Date().getFullYear();
 
   const [s, setS] = useState<PlanSettings>(initialSettings);
+  // 부동산을 넣지 않으면 집값과 집에 묶인 대출을 함께 뺀다(자산관리의 금융 순자산과 같은 기준).
+  const debts = useMemo(() => (s.includeRealEstate ? allDebts : allDebts.filter((d) => !d.realEstate)), [allDebts, s.includeRealEstate]);
+  const realEstateIn = s.includeRealEstate ? realEstateValue : 0;
+  const debtTotal = debts.reduce((sum, d) => sum + d.balance, 0);
+  const netWorth = grossAssets + realEstateIn - debtTotal;
   const [savedJson, setSavedJson] = useState(() => JSON.stringify(initialSettings));
   const [saveMessage, setSaveMessage] = useState<string | null>(savedAt ? `${new Date(savedAt).toLocaleDateString("ko-KR")}에 저장한 계획이에요` : null);
   const [saving, startSaving] = useTransition();
@@ -156,6 +161,7 @@ export function PlanView({
       events: s.events.map((e) => ({ yearOffset: e.year - thisYear, amount: e.amountMan * 10_000 })),
       retireAfterYear: retireOffset,
       annualSpend,
+      separateAssets: realEstateIn > 0 ? [{ value: realEstateIn, growthPct: s.realEstateGrowthPct }] : [],
     };
     return {
       points: projectNetWorth({ ...base, returnPct: effectiveReturn }),
@@ -163,7 +169,7 @@ export function PlanView({
       high: projectNetWorth({ ...base, returnPct: effectiveReturn + 2 }),
       noRetire: projectNetWorth({ ...base, returnPct: effectiveReturn, retireAfterYear: null }),
     };
-  }, [debts, s, grossAssets, savingMan, horizon, thisYear, retireOffset, annualSpend, effectiveReturn]);
+  }, [debts, s, grossAssets, savingMan, horizon, thisYear, retireOffset, annualSpend, effectiveReturn, realEstateIn]);
 
   const pick = (p: { nominal: number; real: number }) => (view === "real" ? p.real : p.nominal);
   const deflate = (won: number, year: number) => (view === "real" ? won / (1 + s.inflationPct / 100) ** year : won);
@@ -240,7 +246,7 @@ export function PlanView({
         </div>
         <p className="mt-3 border-t-[0.8px] border-hairline pt-2.5 text-[12px] text-ink-muted">
           {monthCount > 0
-            ? `최근 ${monthCount}개월 수입 ${formatEok(annualIncome)} - 지출 ${formatEok(annualExpense)}${monthCount < 12 ? "(1년으로 환산)" : ""} 기준이에요. 순자산은 자산 ${formatEok(grossAssets)} - 부채 ${formatEok(debtTotal)}예요.`
+            ? `최근 ${monthCount}개월 수입 ${formatEok(annualIncome)} - 지출 ${formatEok(annualExpense)}${monthCount < 12 ? "(1년으로 환산)" : ""} 기준이에요. 순자산은 금융자산 ${formatEok(grossAssets)}${realEstateIn > 0 ? ` + 부동산 ${formatEok(realEstateIn)}` : ""} - 부채 ${formatEok(debtTotal)}예요.`
             : "아직 거래 내역이 없어서 연 저축액을 직접 넣어 주세요."}
         </p>
       </section>
@@ -305,6 +311,19 @@ export function PlanView({
             )}
           </Group>
 
+          <Group title="부동산" summary={s.includeRealEstate ? `포함 · 연 ${s.realEstateGrowthPct}%` : "빼고 보기"}>
+            <label className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+              <input type="checkbox" checked={s.includeRealEstate} onChange={(e) => patch({ includeRealEstate: e.target.checked })} />
+              부동산과 집 대출도 순자산에 넣기
+            </label>
+            <p className="text-[12px] text-ink-muted">
+              {realEstateValue > 0
+                ? `등록한 시세 ${formatEok(realEstateValue)}, 집에 묶인 대출 ${formatEok(allDebts.filter((d) => d.realEstate).reduce((sum, d) => sum + d.balance, 0))}`
+                : "자산관리의 부동산 카드에서 시세를 넣으면 반영돼요."}
+            </p>
+            {s.includeRealEstate && <NumberField compact label="집값 상승률" suffix="%/년" step={0.5} value={s.realEstateGrowthPct} onChange={(v) => patch({ realEstateGrowthPct: v })} />}
+          </Group>
+
           <Group title="큰 지출·수입" summary={s.events.length ? `${s.events.length}개` : "없음"}>
             {s.events.map((e, idx) => (
               <div key={e.id} className="rounded-r2 bg-bg-neutral-weak p-2.5">
@@ -352,7 +371,7 @@ export function PlanView({
               return (
                 <div key={d.key} className="rounded-r2 bg-bg-neutral-weak p-2.5">
                   <p className="flex justify-between gap-2 text-[13px]">
-                    <span className="min-w-0 truncate font-semibold text-ink">{d.name}</span>
+                    <span className="min-w-0 truncate font-semibold text-ink">{d.name}{d.realEstate && <span className="ml-1 text-[11px] font-normal text-ink-muted">부동산</span>}</span>
                     <span className="shrink-0 tabular-nums text-ink-muted">{d.personLabel} · {formatEok(d.balance)}</span>
                   </p>
                   <div className="mt-2 grid grid-cols-2 gap-2">

@@ -8,6 +8,7 @@ export function SummaryCard({
   format = "krw",
   variant = "hero",
   className = "",
+  footnote,
 }: {
   label: string;
   value: number;
@@ -15,6 +16,8 @@ export function SummaryCard({
   format?: "krw" | "compactKrw" | "manwon" | "signedPct";
   variant?: "feature" | "hero" | "detail";
   className?: string;
+  /** 큰 숫자 아래 덧붙이는 한 줄(예: 부동산 포함 순자산) */
+  footnote?: string;
 }) {
   const isFeature = variant === "feature";
   const isHero = variant === "hero";
@@ -42,6 +45,7 @@ export function SummaryCard({
           {breakdownText}
         </p>
       )}
+      {footnote && <p className="mt-2 w-fit rounded-r2 bg-bg-neutral-weak px-2.5 py-1 text-[13px] font-semibold text-ink">{footnote}</p>}
     </div>
   );
 }

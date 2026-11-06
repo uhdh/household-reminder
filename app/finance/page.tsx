@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { assetItems, depositRates, uploads } from "@/lib/finance-db";
+import { assetItems, depositRates, realAssets, uploads } from "@/lib/finance-db";
 import { annualInterest } from "@/lib/deposit-rate";
 import { classifyInvestmentSector } from "@/lib/finance-parse/investment-sector";
 import { buildCategoryColorMap, formatManwon, formatSignedPct, heatmapReturnColor, toNumber } from "@/lib/finance-format";
@@ -15,6 +15,8 @@ import { FinanceEmptyState } from "./_components/empty-state";
 import { DemoBanner } from "./_components/demo-banner";
 import { resolveFinanceViewer } from "@/lib/require-household";
 import { isCashLikeAsset, isExcludedItem } from "@/lib/asset-scope";
+import { debtKey, summarizeRealEstate } from "@/lib/real-estate";
+import { RealEstateCard } from "./_components/real-estate-card";
 import { getHouseholdPeople, isPersonId, type PersonId } from "@/lib/spending-queries";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +78,21 @@ export default async function DashboardPage({
     ? await db.select().from(assetItems).where(and(eq(assetItems.householdId, householdId), inArray(assetItems.uploadId, activeUploadIds)))
     : [];
 
-  const assets = rawAssets.filter((item) => !isExcludedItem(item));
+  // 부동산(직접 입력 + 은행 자료의 부동산 항목)과 집에 묶인 대출은 금융자산과 따로 본다. 테이블이 없으면(42P01) 미등록으로 본다.
+  const realRows = await db
+    .select()
+    .from(realAssets)
+    .where(eq(realAssets.householdId, householdId))
+    .catch((error: unknown) => {
+      const code = (error as { code?: string; cause?: { code?: string } }).code ?? (error as { cause?: { code?: string } }).cause?.code;
+      if (code === "42P01") return [];
+      throw error;
+    });
+  const realAssetList = realRows.map((r) => ({ id: r.id, name: r.name, value: toNumber(r.value), loanKeys: r.loanKeys ?? [] }));
+  const debtItems = rawAssets.filter((i) => i.side === "debt").map((i) => ({ personId: i.personId, productName: i.productName, amount: toNumber(i.amount) }));
+  const bankRealEstate = rawAssets.filter((i) => i.side === "asset" && i.category === "부동산");
+  const realEstate = summarizeRealEstate(realAssetList, debtItems, bankRealEstate.reduce((s, i) => s + toNumber(i.amount), 0));
+  const assets = rawAssets.filter((item) => !isExcludedItem(item) && !(item.side === "debt" && realEstate.linked.has(debtKey(item))));
   // deposit_rates 마이그레이션(scripts/migrate-deposit-rates.ts) 전에 배포돼도 자산 화면이 깨지지 않게, 테이블이
   // 없을 때(42P01)만 "금리 없음"으로 본다. 다른 오류는 그대로 던진다.
   const rateRows = await db
@@ -302,6 +318,7 @@ export default async function DashboardPage({
               totalAsset={totalAsset}
               totalDebt={totalDebt}
               totalNet={totalNet}
+              netWithRealEstate={personFilter === "all" && realEstate.value > 0 ? totalNet + realEstate.equity : null}
             />
 
             <DashboardCharts
@@ -310,6 +327,17 @@ export default async function DashboardPage({
               sectorComposition={sectorComposition}
               cashAccounts={cashAccounts}
             />
+
+            {personFilter === "all" && (
+              <RealEstateCard
+                assets={realAssetList}
+                bankItems={bankRealEstate.map((i) => ({ name: i.productName ?? "부동산", value: toNumber(i.amount) }))}
+                debts={debtItems.filter((d) => d.amount > 0).map((d) => ({ key: debtKey(d), name: d.productName ?? "대출", personLabel: displayNameByPerson.get(d.personId) ?? d.personId, amount: d.amount }))}
+                linkedKeys={[...realEstate.linked]}
+                summary={{ value: realEstate.value, loan: realEstate.loan, equity: realEstate.equity, ltvPct: realEstate.ltvPct }}
+                readOnly={readOnly}
+              />
+            )}
 
             {(investmentItems.length > 0 || cashAccounts.length > 0) && (
               <InvestmentPnlCard
@@ -334,7 +362,9 @@ function HeroRow({
   totalAsset,
   totalDebt,
   totalNet,
+  netWithRealEstate,
 }: {
+  netWithRealEstate: number | null;
   personFilter: "all" | PersonId;
   summary: { personId: PersonId; label: string; hasData: boolean; totalAsset: number; totalDebt: number; net: number }[];
   totalAsset: number;
@@ -356,7 +386,7 @@ function HeroRow({
     const [first, second] = summary;
     return (
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
-        <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="우리집 자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]} />
+        <SummaryCard variant="feature" className="col-span-2 lg:col-span-1" label="우리집 자산" value={totalNet} format="manwon" breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]} footnote={netWithRealEstate === null ? undefined : `부동산 포함 순자산 ${formatManwon(netWithRealEstate)}`} />
         {[first, second].map((s) => (
           <SummaryCard key={s.personId} className="flex flex-col justify-center" label={`${s.label} 순자산`} value={s.net} format="manwon" breakdown={[{ label: "자산", value: s.totalAsset }, { label: "부채", value: s.totalDebt }]} />
         ))}
@@ -373,6 +403,7 @@ function HeroRow({
         value={totalNet}
         format="manwon"
         breakdown={[{ label: "자산", value: totalAsset }, { label: "부채", value: totalDebt }]}
+        footnote={netWithRealEstate === null ? undefined : `부동산 포함 순자산 ${formatManwon(netWithRealEstate)}`}
       />
       {summary.map((s) => (
         <SummaryCard key={s.personId} className="flex flex-col justify-center" label={`${s.label} 순자산`} value={s.net} format="manwon" breakdown={[{ label: "자산", value: s.totalAsset }, { label: "부채", value: s.totalDebt }]} />
