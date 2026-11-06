@@ -92,6 +92,16 @@ export function UploadForm({
           </span>
         </label>
 
+        <label className="mb-4 flex items-start gap-2 text-sm text-fg-neutral">
+          <input type="checkbox" name="includeCurrentMonth" className="mt-1" />
+          <span>
+            진행 중인 이번 달 거래도 함께 올리기
+            <span className="block text-xs text-ink-muted">
+              체크하지 않으면 지난달까지만 반영돼요. 이번 달 거래는 다음 달에 파일을 올릴 때 함께 들어와요.
+            </span>
+          </span>
+        </label>
+
         <FormField label="엑셀 또는 ZIP 파일" className="mb-4">
           <TextInput
             type="file"

@@ -21,6 +21,7 @@ import { getOrCreateActiveUploadId } from "@/lib/manual-upload";
 import { applyVoucherPurchaseExclusion } from "@/lib/voucher-exclusion";
 import { loadCategoryDerivationContext } from "@/lib/rederive-transactions";
 import { applyHouseholdTransferPairs } from "@/lib/household-transfer-pairs";
+import { currentMonthStartKst, trimToCompletedMonths } from "@/lib/completed-months";
 
 // neon-http는 요청 하나에 실어보낼 수 있는 페이로드 크기에 한도가 있어
 // 거래 내역이 많은 파일은 한 번에 insert하면 "value too large to transmit" 오류가 난다.
@@ -96,6 +97,14 @@ async function importFile(formData: FormData, context: HouseholdContext, file: F
   } catch (e) {
     const message = e instanceof Error ? e.message : "파일을 처리하는 중 오류가 발생했습니다.";
     redirect("/finance/upload?error=" + encodeURIComponent(message));
+  }
+
+  // 월초에 지난달 내역을 받으면 이번 달 며칠치가 섞여 들어온다. 기본은 진행 중인 이번 달을 빼고 올린다(메일 가져오기 포함).
+  let currentMonthSkipped = 0;
+  if (formData.get("includeCurrentMonth") !== "on") {
+    const trimmed = trimToCompletedMonths(parsed, currentMonthStartKst());
+    parsed = { ...parsed, transactions: trimmed.transactions, periodStart: trimmed.periodStart, periodEnd: trimmed.periodEnd };
+    currentMonthSkipped = trimmed.droppedCount;
   }
 
   if (emailId) await claimImportEmail(context, emailId);
@@ -192,7 +201,8 @@ async function importFile(formData: FormData, context: HouseholdContext, file: F
     const classifiedSuffix = classifiedCount > 0 ? `, 자동 분류 ${classifiedCount}건` : "";
     const pairSuffix = pairs > 0 ? `, 내 계좌 이동 ${pairs}쌍 제외` : "";
     const skippedSuffix = skippedCount > 0 ? `, 이미 올린 기간 거래 ${skippedCount}건은 기존 내역 유지` : "";
-    summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${newTransactions.length}건 추가${skippedSuffix}${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
+    const currentMonthSuffix = currentMonthSkipped > 0 ? `, 진행 중인 이번 달 거래 ${currentMonthSkipped}건은 다음 달에 반영` : "";
+    summary = `${displayName}님 자산 ${parsed.assetItems.length}건, 거래내역 ${newTransactions.length}건 추가${skippedSuffix}${currentMonthSuffix}${exclusionSuffix}${classifiedSuffix}${pairSuffix}`;
     if (emailId) await finishImportEmail(emailId, "imported");
   } catch (error) {
     if (emailId) await finishImportEmail(emailId, "failed");
