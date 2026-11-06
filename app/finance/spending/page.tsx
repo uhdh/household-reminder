@@ -68,6 +68,7 @@ export default async function SpendingPage({
     toastTxnType?: string;
     toastTxnId?: string;
     manual?: string;
+    hideExcluded?: string;
   }>;
 }) {
   const {
@@ -84,6 +85,7 @@ export default async function SpendingPage({
     toastTxnType,
     toastTxnId,
     manual,
+    hideExcluded,
   } = await searchParams;
   const reviewMode = review === "1";
 
@@ -118,6 +120,8 @@ export default async function SpendingPage({
   const beneficiaryFilter = isBeneficiary(beneficiary, personIds) ? beneficiary : "all";
   const categoryFilter = category === "미분류" ? "미분류" : categoryOptions.some((option) => option.name === category) ? category! : "all";
   const query = q?.trim().slice(0, 50) ?? "";
+  // "집계 제외 숨기기": 기본 목록에 함께 보이는 자산수정 등 집계 제외 행을 뺀다("집계 제외" 구분을 고르면 의미가 없어 무시).
+  const hideExcludedRows = hideExcluded === "1" && flowFilter !== "excluded";
   // 자산수정은 집계에서는 제외하지만, 사용자가 다른 카테고리로 변경할 수 있도록
   // 세부 내역 화면에는 계속 노출한다. 다만 서울페이 상품권 구매 장부용 행은 집계 제외를 위한
   // 내부 기록일 뿐이라 예외적으로 숨긴다.
@@ -148,7 +152,8 @@ export default async function SpendingPage({
     flowFilter === "excluded" ? (personFilter === "all" ? excludedTx : excludedTx.filter((t) => t.personId === personFilter)) : monthPersonTx;
   const passesBaseFilters = filterBaseTx
     .filter((t) => flowFilter === "all" || flowFilter === "excluded" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
-    .filter((t) => beneficiaryFilter === "all" || t.beneficiary === beneficiaryFilter);
+    .filter((t) => beneficiaryFilter === "all" || t.beneficiary === beneficiaryFilter)
+    .filter((t) => !hideExcludedRows || t.included);
   // 비공개 거래는 분류·검색 조건으로 내용을 유추할 수 없게 조건이 있으면 목록에서 빠진다(rowMatches* 참고).
   const filtered = passesBaseFilters
     .filter((t) => rowMatchesCategory(t, categoryFilter))
@@ -172,6 +177,7 @@ export default async function SpendingPage({
   if (beneficiaryFilter !== "all") activeFilterParams.beneficiary = beneficiaryFilter;
   if (categoryFilter !== "all") activeFilterParams.category = categoryFilter;
   if (query) activeFilterParams.q = query;
+  if (hideExcludedRows) activeFilterParams.hideExcluded = "1";
   if (reviewMode) activeFilterParams.review = "1";
   const hrefFor = (m: string, p: "all" | PersonId, includeFilters = true) => {
     const params = new URLSearchParams({ month: m, ...(includeFilters ? activeFilterParams : {}) });
@@ -362,6 +368,12 @@ export default async function SpendingPage({
           검색
           <TextInput name="q" defaultValue={query} placeholder="메모·결제수단·원본 분류 (Enter)" className="mt-1.5 min-h-11 w-full px-3 py-2 text-[14px]" />
         </label>
+        {flowFilter !== "excluded" && (
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[13px] font-medium text-ink">
+            <input type="checkbox" name="hideExcluded" value="1" defaultChecked={hideExcludedRows} className="size-4" />
+            집계 제외 숨기기
+          </label>
+        )}
         <Link href={hrefFor(month, personFilter, false)} className="seed-button seed-button-secondary min-h-11 px-4 py-2 text-[14px]">초기화</Link>
         <a
           href={exportHref}

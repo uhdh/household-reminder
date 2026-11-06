@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
   const beneficiary = searchParams.get("beneficiary");
   const category = searchParams.get("category");
   const q = searchParams.get("q");
+  const hideExcludedRows = searchParams.get("hideExcluded") === "1" && searchParams.get("flow") !== "excluded";
 
   const flowFilter = flow === "income" || flow === "expense" || flow === "excluded" ? flow : "all";
   const categoryFilter = category && category !== "all" ? category : "all";
@@ -65,6 +66,7 @@ export async function GET(request: NextRequest) {
   const filtered = (personFilter === "all" ? monthTx : monthTx.filter((t) => t.personId === personFilter))
     .filter((t) => flowFilter === "all" || flowFilter === "excluded" || (flowFilter === "income" ? flowLabel(t) === "입금" : flowLabel(t) === "지출"))
     .filter((t) => beneficiaryFilter === "all" || t.beneficiary === beneficiaryFilter)
+    .filter((t) => !hideExcludedRows || t.included)
     .filter((t) => rowMatchesCategory(t, categoryFilter))
     .filter((t) => rowMatchesQuery(t, query))
     .sort((a, b) => (a.txnDate === b.txnDate ? (b.txnTime ?? "").localeCompare(a.txnTime ?? "") : b.txnDate.localeCompare(a.txnDate)));
