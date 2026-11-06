@@ -3,6 +3,7 @@ const PUBLIC_FINANCE_PATHS = new Set([
   "/finance/spending",
   "/finance/spending/monthly",
   "/finance/spending/yearly",
+  "/finance/plan",
 ]);
 
 export function isPublicFinancePath(pathname: string): boolean {

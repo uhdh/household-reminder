@@ -8,6 +8,7 @@ import {
   IconCalendarLine,
   IconGearLine,
   IconHouseLine,
+  IconLinechartUpXaxisLine,
   IconReceiptLine,
 } from "@karrotmarket/react-monochrome-icon";
 
@@ -16,6 +17,7 @@ const tabs = [
   { label: "월별지출", href: "/finance/spending/monthly", Icon: IconCalendarLine, active: (pathname: string) => pathname.startsWith("/finance/spending/monthly") },
   { label: "세부 내역", href: "/finance/spending", Icon: IconReceiptLine, active: (pathname: string) => pathname === "/finance/spending" },
   { label: "연간 내역", href: "/finance/spending/yearly", Icon: IconBarchartSquareLine, active: (pathname: string) => pathname.startsWith("/finance/spending/yearly") },
+  { label: "미래 계획", href: "/finance/plan", Icon: IconLinechartUpXaxisLine, active: (pathname: string) => pathname.startsWith("/finance/plan") },
   { label: "설정", href: "/finance/spending/settings", Icon: IconGearLine, active: (pathname: string) => pathname.startsWith("/finance/spending/settings") || pathname === "/finance/upload" },
 ];
 
@@ -25,7 +27,7 @@ export function TopTabs() {
   // 가구가 없는 동안(온보딩·초대 수락)에는 탭을 눌러도 온보딩으로 되돌아오므로 숨긴다.
   if (pathname.startsWith("/onboarding") || pathname.startsWith("/invite") || (isApp && pathname === "/login")) return null;
   const visibleTabs = isApp
-    ? [{ ...tabs[1], label: "홈" }, tabs[0], tabs[2], tabs[3], tabs[4]]
+    ? [{ ...tabs[1], label: "홈" }, tabs[0], tabs[2], tabs[3], tabs[4], tabs[5]]
     : tabs;
   return (
     <nav

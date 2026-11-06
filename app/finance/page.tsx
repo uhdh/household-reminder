@@ -14,14 +14,10 @@ import { AppShell } from "@/components/ui";
 import { FinanceEmptyState } from "./_components/empty-state";
 import { DemoBanner } from "./_components/demo-banner";
 import { resolveFinanceViewer } from "@/lib/require-household";
+import { isExcludedItem } from "@/lib/asset-scope";
 import { getHouseholdPeople, isPersonId, type PersonId } from "@/lib/spending-queries";
 
 export const dynamic = "force-dynamic";
-
-// 부동산/차량, 전자금융/보험 자산은 순자산 계산 및 분류에서 제외하기로 함
-const EXCLUDED_ASSET_CATEGORIES = new Set(["부동산", "동산", "전자금융 자산", "보험 자산"]);
-// 기존 우리집 한정 예외 규칙(특정 대출 상품). 새 가구에는 해당 personId/상품명 조합이 없어 그냥 무시된다.
-const EXCLUDED_DEBT_ITEMS = [{ personId: "husband", productName: "분양주택입주잔금대출" }];
 
 // 뱅크샐러드 원본 카테고리를 대시보드 표시용으로 재분류: 입출금 통장은 현금, 예적금 통장은 예적금으로 묶는다
 const CATEGORY_DISPLAY_OVERRIDES: Record<string, string> = {
@@ -39,11 +35,6 @@ function isCashLikeAsset(item: { category: string; productName: string | null; s
 
   const productName = item.productName ?? "";
   return /(CMA|MMF|입출금|보통예금|요구불|파킹통장)/i.test(productName);
-}
-
-function isExcludedItem(item: { side: string; personId: string; category: string; productName: string | null }) {
-  if (item.side === "asset") return EXCLUDED_ASSET_CATEGORIES.has(item.category);
-  return EXCLUDED_DEBT_ITEMS.some((e) => e.personId === item.personId && e.productName === item.productName);
 }
 
 export default async function DashboardPage({
