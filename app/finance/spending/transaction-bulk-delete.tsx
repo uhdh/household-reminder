@@ -40,14 +40,13 @@ export function TransactionBulkDeleteForm({
         {categoryOptions && <TransactionBulkCategoryForm categoryOptions={categoryOptions} frequentCategories={frequentCategories} />}
         <form
           id={FORM_ID}
-          action={deleteTransactionsAction}
+          action={async (formData) => { await deleteTransactionsAction(formData); setSelected(new Set()); }}
           onSubmit={(event) => {
             if (selected.size === 0 || !window.confirm(`선택한 ${selected.size}건을 삭제할까요? 삭제한 거래는 되돌릴 수 없습니다.`)) {
               event.preventDefault();
             }
           }}
         >
-          <input type="hidden" name="returnTo" value={returnTo} />
           <button
             type="submit"
             disabled={selected.size === 0}
@@ -70,7 +69,7 @@ export function TransactionBulkCategoryForm({
   categoryOptions: CategoryOption[];
   frequentCategories?: string[];
 }) {
-  const { selected, returnTo } = useSelection();
+  const { selected, setSelected } = useSelection();
   const formRef = useRef<HTMLFormElement>(null);
   const stdCategoryInputRef = useRef<HTMLInputElement>(null);
   const label = `카테고리 변경 (${selected.size})`;
@@ -84,7 +83,7 @@ export function TransactionBulkCategoryForm({
   return (
     <form
       ref={formRef}
-      action={updateTransactionsCategoryAction}
+      action={async (formData) => { await updateTransactionsCategoryAction(formData); setSelected(new Set()); }}
       className="flex items-center gap-1.5"
       onSubmit={(event) => {
         if (selected.size === 0) event.preventDefault();
@@ -93,7 +92,6 @@ export function TransactionBulkCategoryForm({
       {[...selected].map((id) => (
         <input key={id} type="hidden" name="txnId" value={id} />
       ))}
-      <input type="hidden" name="returnTo" value={returnTo} />
       <input ref={stdCategoryInputRef} type="hidden" name="stdCategory" defaultValue={UNMAPPED_VALUE} />
       <CategoryPicker
         value={null}

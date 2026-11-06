@@ -9,6 +9,7 @@ import { createPrivateSchema, H, ID_PRIV_H, ID_PUB, seedPrivateHousehold } from 
 
 const mockRequireHousehold = vi.hoisted(() => vi.fn());
 
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`);

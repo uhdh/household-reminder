@@ -539,56 +539,59 @@ function InvestmentPnlCard({
   );
 }
 
-// 현금·예적금 계좌별 금액과 연 금리(직접 입력), 연 예상 이자(세전·단리).
+// 현금(입출금 통장)과 예적금을 나눠 계좌별 금액, 연 금리(직접 입력), 연 예상 이자(세전·단리)를 보여준다.
 function CashAccountsSection({ accounts, readOnly, returnTo, withDivider }: { accounts: CashAccount[]; readOnly: boolean; returnTo: string; withDivider: boolean }) {
-  const total = accounts.reduce((sum, a) => sum + a.amount, 0);
-  const interestTotal = accounts.reduce((sum, a) => sum + (annualInterest(a.amount, a.ratePct) ?? 0), 0);
+  const groups = [
+    { title: "예금 · 적금", accounts: accounts.filter((a) => a.category === "예적금") },
+    { title: "입출금 통장", accounts: accounts.filter((a) => a.category !== "예적금") },
+  ].filter((g) => g.accounts.length > 0);
   return (
     <div className={withDivider ? "mt-6 border-t-[0.8px] border-hairline pt-6" : ""}>
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-[16px] font-extrabold text-ink">현금 · 예적금</h3>
-        <span className="text-[13px] text-ink-muted">
-          합계 <span className="font-bold tabular-nums text-ink">{formatManwon(total)}</span>
-          {interestTotal > 0 && <> · 연 예상 이자 <span className="font-bold tabular-nums text-ink">{formatManwon(interestTotal)}</span></>}
-        </span>
+      <h3 className="mb-3 text-[16px] font-extrabold text-ink">현금 · 예적금</h3>
+      <div className="flex flex-col gap-4">
+        {groups.map((g) => {
+          const total = g.accounts.reduce((sum, a) => sum + a.amount, 0);
+          const interestTotal = g.accounts.reduce((sum, a) => sum + (annualInterest(a.amount, a.ratePct) ?? 0), 0);
+          return (
+            <section key={g.title} className="rounded-r3 bg-bg-neutral-weak px-4 py-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b-[0.8px] border-hairline pb-2">
+                <h4 className="text-[14px] font-bold text-ink">
+                  {g.title} <span className="font-medium text-ink-muted">{g.accounts.length}개</span>
+                </h4>
+                <span className="text-[13px] text-ink-muted">
+                  <span className="font-bold tabular-nums text-ink">{formatManwon(total)}</span>
+                  {interestTotal > 0 && <> · 연 이자 약 <span className="font-semibold tabular-nums text-ink">{formatManwon(interestTotal)}</span></>}
+                </span>
+              </div>
+              <ul className="divide-y-[0.8px] divide-hairline2">
+                {g.accounts.map((a) => {
+                  const interest = annualInterest(a.amount, a.ratePct);
+                  return (
+                    <li key={a.key} className="flex items-center justify-between gap-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-semibold text-ink">{a.productName}</p>
+                        <p className={`text-[12px] font-semibold ${a.personLabel === "남편" ? "text-husband" : a.personLabel === "아내" ? "text-wife" : "text-ink-muted"}`}>{a.personLabel}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className="text-[15px] font-bold tabular-nums text-ink">{formatManwon(a.amount)}</span>
+                        <div className="flex items-center gap-2 text-[12px] text-ink-muted">
+                          {readOnly ? (
+                            <span>{a.ratePct === null ? "금리 미입력" : `연 ${a.ratePct}%`}</span>
+                          ) : (
+                            <DepositRateInput personId={a.personId} productName={a.productName} ratePct={a.ratePct} returnTo={returnTo} />
+                          )}
+                          {interest !== null && <span className="tabular-nums">이자 {formatManwon(interest)}</span>}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          );
+        })}
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full whitespace-nowrap text-[13px]">
-          <thead>
-            <tr className="border-b-[0.8px] border-hairline text-left text-ink-muted">
-              <th className="w-8 py-2 pr-2 text-[11px] font-semibold">보유</th>
-              <th className="py-2 pr-3 text-[11px] font-semibold">계좌</th>
-              <th className="py-2 pr-3 text-right text-[11px] font-semibold">금액</th>
-              <th className="py-2 pr-3 text-right text-[11px] font-semibold">연 금리</th>
-              <th className="hidden py-2 pl-3 text-right text-[11px] font-semibold sm:table-cell">연 예상 이자</th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.map((a) => {
-              const interest = annualInterest(a.amount, a.ratePct);
-              return (
-                <tr key={a.key} className="border-b-[0.8px] border-hairline2 last:border-0">
-                  <td className={`py-2 pr-2 font-semibold ${a.personLabel === "남편" ? "text-husband" : a.personLabel === "아내" ? "text-wife" : "text-ink-muted"}`}>{a.personLabel}</td>
-                  <td className="whitespace-normal py-2 pr-3 text-ink">
-                    {a.productName}
-                    <span className="ml-1.5 text-[11px] text-ink-muted">{a.category}</span>
-                  </td>
-                  <td className="py-2 pr-3 text-right tabular-nums text-ink">{formatManwon(a.amount)}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">
-                    {readOnly ? (
-                      <span className="text-ink-muted">{a.ratePct === null ? "-" : `${a.ratePct}%`}</span>
-                    ) : (
-                      <DepositRateInput personId={a.personId} productName={a.productName} ratePct={a.ratePct} returnTo={returnTo} />
-                    )}
-                  </td>
-                  <td className="hidden py-2 pl-3 text-right tabular-nums text-ink-muted sm:table-cell">{interest === null ? "-" : formatManwon(interest)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {!readOnly && <p className="mt-2 text-[11px] text-ink-muted">금리는 직접 입력해요(Enter 또는 칸 밖을 누르면 저장). 연 예상 이자는 세전·단리 기준이에요.</p>}
+      {!readOnly && <p className="mt-2 text-[11px] text-ink-muted">금리를 입력하고 Enter를 누르거나 칸 밖을 누르면 저장돼요. 이자는 세전·단리 기준 예상치예요.</p>}
     </div>
   );
 }

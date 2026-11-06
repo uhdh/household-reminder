@@ -60,14 +60,14 @@ export function CategorySelect({
   const resolvedFrequent = frequentCategories ?? shared?.frequentCategories ?? [];
   const formRef = useRef<HTMLFormElement>(null);
   const stdCategoryInputRef = useRef<HTMLInputElement>(null);
-  const returnToInputRef = useRef<HTMLInputElement>(null);
+  const toastUrlRef = useRef<string | null>(null);
+  const router = useRouter();
 
   function handleSelect(name: string | null) {
     if (name === (value ?? null)) return; // 값이 그대로면 저장하지 않음
 
     // 같은 가맹점+같은 txnType의 다른 거래가 있으면, 저장 후 돌아온 화면에서 일괄 적용 토스트를
-    // 띄우도록 returnTo에 쿼리를 실어 보낸다(서버 액션이 redirect()로 이동하므로 클라이언트
-    // 상태로는 못 넘긴다). sameMerchantCount는 page.tsx가 findMatchingTransactionIds와 같은
+    // 띄우도록 저장 뒤 returnTo에 쿼리를 붙여 스크롤을 유지한 채 이동한다(토스트가 URL 쿼리로 렌더된다). sameMerchantCount는 page.tsx가 findMatchingTransactionIds와 같은
     // (가맹점 키, txnType) 기준으로 미리 세어 내려준 값이라, 여기서 0건이면 실제 대상도 0건이다.
     const merchantKey = suggestKeywordFromDescription(description);
     const canSuggestMerge = name !== null && sameMerchantCount > 0;
@@ -76,7 +76,7 @@ export function CategorySelect({
       : "";
 
     if (stdCategoryInputRef.current) stdCategoryInputRef.current.value = name ?? UNMAPPED_VALUE;
-    if (returnToInputRef.current) returnToInputRef.current.value = `${returnTo}${toastQuery}`;
+    toastUrlRef.current = toastQuery ? `${returnTo}${toastQuery}` : null;
     formRef.current?.requestSubmit();
   }
 
@@ -93,10 +93,16 @@ export function CategorySelect({
   }
 
   return (
-    <form ref={formRef} action={updateTransactionCategoryAction} className="inline-block">
+    <form
+      ref={formRef}
+      action={async (formData) => {
+        await updateTransactionCategoryAction(formData);
+        if (toastUrlRef.current) router.replace(toastUrlRef.current, { scroll: false });
+      }}
+      className="inline-block"
+    >
       <input type="hidden" name="txnId" value={txnId} />
       <input ref={stdCategoryInputRef} type="hidden" name="stdCategory" defaultValue={value ?? UNMAPPED_VALUE} />
-      <input ref={returnToInputRef} type="hidden" name="returnTo" defaultValue={returnTo} />
       <CategoryPicker
         value={value}
         options={resolvedOptions}
@@ -165,17 +171,16 @@ export function CategoryMergeToast({
         </button>
       </div>
       <div className="flex gap-2">
-        <form action={updateTransactionsCategoryAction} className="flex-1">
+        <form action={async (formData) => { await updateTransactionsCategoryAction(formData); close(); }} className="flex-1">
           {txnIds.map((id) => (
             <input key={id} type="hidden" name="txnId" value={id} />
           ))}
           <input type="hidden" name="stdCategory" value={category} />
-          <input type="hidden" name="returnTo" value={returnTo} />
           <ActionButton type="submit" variant="secondary" className="w-full text-[12px] py-1.5">
             모두 적용
           </ActionButton>
         </form>
-        <form action={createKeywordRuleAndApplyAction} className="flex-1">
+        <form action={async (formData) => { await createKeywordRuleAndApplyAction(formData); close(); }} className="flex-1">
           <input type="hidden" name="keyword" value={merchantKey} />
           <input type="hidden" name="stdCategory" value={category} />
           <input type="hidden" name="txnType" value={txnType} />
@@ -183,7 +188,6 @@ export function CategoryMergeToast({
           {txnIds.map((id) => (
             <input key={id} type="hidden" name="applyTxnId" value={id} />
           ))}
-          <input type="hidden" name="returnTo" value={returnTo} />
           <ActionButton type="submit" className="w-full text-[12px] py-1.5">
             앞으로도 자동
           </ActionButton>

@@ -14,6 +14,7 @@ const { HOUSEHOLD_A, HOUSEHOLD_B } = vi.hoisted(() => ({
   HOUSEHOLD_B: "00000000-0000-4000-8000-00000000000b",
 }));
 
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/require-household", () => ({
   requireHousehold: vi.fn().mockResolvedValue({ userId: "user-a", householdId: HOUSEHOLD_A, role: "owner", email: "a@example.com" }),

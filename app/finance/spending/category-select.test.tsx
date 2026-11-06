@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { CategorySelect } from "./category-select";
 
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("next/navigation", () => ({ redirect: vi.fn(), useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock("./actions", () => ({
   updateTransactionCategoryAction: vi.fn(),
   updateTransactionsCategoryAction: vi.fn(),

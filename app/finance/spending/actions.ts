@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+// 같은 화면에서 고치는 액션은 redirect 대신 refresh()로 데이터만 다시 그린다 - redirect는 화면을 맨 위로 올린다.
+import { refresh } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { categoryKeywordRules, transactions } from "@/lib/finance-db";
@@ -12,11 +14,6 @@ import { visibleToViewer } from "@/lib/spending-private";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function spendingReturnTo(value: FormDataEntryValue | null): string {
-  const path = String(value ?? "");
-  return path.startsWith("/finance/spending") ? path : "/finance/spending";
-}
 
 export async function addManualTransactionAction(formData: FormData) {
   const { householdId, personId: viewerPersonId } = await requireHousehold();
@@ -73,7 +70,6 @@ export async function updateBeneficiaryAction(formData: FormData) {
   const { householdId, personId: viewerPersonId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const beneficiary = String(formData.get("beneficiary") ?? "");
-  const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
 
   const knownIds = (await getHouseholdPeople(householdId)).map((p) => p.id);
   if (txnId && isBeneficiary(beneficiary, knownIds)) {
@@ -81,13 +77,12 @@ export async function updateBeneficiaryAction(formData: FormData) {
     await db.update(transactions).set({ beneficiary }).where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId), visibleToViewer(viewerPersonId)));
   }
 
-  redirect(returnTo);
+  refresh();
 }
 
 export async function deleteTransactionAction(formData: FormData) {
   const { householdId, personId: viewerPersonId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
-  const returnTo = spendingReturnTo(formData.get("returnTo"));
 
   if (UUID_RE.test(txnId)) {
     await getDb()
@@ -95,12 +90,11 @@ export async function deleteTransactionAction(formData: FormData) {
       .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId), visibleToViewer(viewerPersonId)));
   }
 
-  redirect(returnTo);
+  refresh();
 }
 
 export async function deleteTransactionsAction(formData: FormData) {
   const { householdId, personId: viewerPersonId } = await requireHousehold();
-  const returnTo = spendingReturnTo(formData.get("returnTo"));
   const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
 
   if (ids.length > 0) {
@@ -109,7 +103,7 @@ export async function deleteTransactionsAction(formData: FormData) {
       .where(and(inArray(transactions.id, ids), eq(transactions.householdId, householdId), visibleToViewer(viewerPersonId)));
   }
 
-  redirect(returnTo);
+  refresh();
 }
 
 // "나만 보기" 켜기/끄기. 내가 결제한 거래(person_id = 나)만 바꿀 수 있다. 계정↔프로필 연결이 없는
@@ -118,7 +112,6 @@ export async function setTransactionPrivateAction(formData: FormData) {
   const { householdId, personId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const isPrivate = formData.get("private") === "1";
-  const returnTo = spendingReturnTo(formData.get("returnTo"));
 
   if (personId && UUID_RE.test(txnId)) {
     await getDb()
@@ -127,7 +120,7 @@ export async function setTransactionPrivateAction(formData: FormData) {
       .where(and(eq(transactions.id, txnId), eq(transactions.householdId, householdId), eq(transactions.personId, personId)));
   }
 
-  redirect(returnTo);
+  refresh();
 }
 
 const UNMAPPED_VALUE = "__미분류__";
@@ -182,19 +175,17 @@ export async function updateTransactionCategoryAction(formData: FormData) {
   const { householdId, personId } = await requireHousehold();
   const txnId = String(formData.get("txnId") ?? "");
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
-  const returnTo = String(formData.get("returnTo") ?? "/finance/spending");
 
   if (txnId) {
     const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
     await applyStdCategoryToTransaction(getDb(), householdId, personId, txnId, stdCategory);
   }
 
-  redirect(returnTo);
+  refresh();
 }
 
 export async function updateTransactionsCategoryAction(formData: FormData) {
   const { householdId, personId } = await requireHousehold();
-  const returnTo = spendingReturnTo(formData.get("returnTo"));
   const ids = formData.getAll("txnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
   const stdCategoryRaw = String(formData.get("stdCategory") ?? "");
   const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
@@ -204,7 +195,7 @@ export async function updateTransactionsCategoryAction(formData: FormData) {
     await Promise.all(ids.map((id) => applyStdCategoryToTransaction(db, householdId, personId, id, stdCategory)));
   }
 
-  redirect(returnTo);
+  refresh();
 }
 
 function normalizeTxnType(txnType: string): string {
@@ -223,7 +214,6 @@ export async function createKeywordRuleAndApplyAction(formData: FormData) {
   const txnType = normalizeTxnType(String(formData.get("txnType") ?? "지출").trim());
   const applyToExisting = formData.get("applyToExisting") === "true" || formData.get("applyToExisting") === "on";
   const applyTxnIds = formData.getAll("applyTxnId").map(String).filter((id) => UUID_RE.test(id)).slice(0, 500);
-  const returnTo = spendingReturnTo(formData.get("returnTo"));
 
   const stdCategory = stdCategoryRaw === UNMAPPED_VALUE || stdCategoryRaw === "" ? null : stdCategoryRaw;
 
@@ -247,5 +237,5 @@ export async function createKeywordRuleAndApplyAction(formData: FormData) {
     }
   }
 
-  redirect(returnTo);
+  refresh();
 }

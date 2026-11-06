@@ -13,6 +13,7 @@ const MANUAL_UPLOAD_FILENAME = "수동 입력";
 const HOUSEHOLD_ID = vi.hoisted(() => "00000000-0000-4000-8000-000000000099");
 const mockParseUploadFile = vi.hoisted(() => vi.fn());
 
+vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/require-household", () => ({ requireHousehold: vi.fn().mockResolvedValue({ userId: "test-user", householdId: HOUSEHOLD_ID, role: "owner", email: "test@example.com" }) }));
 // 업로드 재연결 테스트에서는 실제 뱅크샐러드 엑셀 형식을 구성할 필요 없이, 파싱 결과만 흉내 낸다

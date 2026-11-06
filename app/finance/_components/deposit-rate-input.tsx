@@ -18,7 +18,8 @@ export function DepositRateInput({
   const formRef = useRef<HTMLFormElement>(null);
   const initial = ratePct === null ? "" : String(ratePct);
   return (
-    <form ref={formRef} action={saveDepositRateAction} className="inline-flex items-center justify-end gap-1">
+    <form ref={formRef} action={saveDepositRateAction} className="inline-flex items-center gap-1">
+      <span>연</span>
       <input type="hidden" name="personId" value={personId} />
       <input type="hidden" name="productName" value={productName} />
       <input type="hidden" name="returnTo" value={returnTo} />
@@ -26,12 +27,12 @@ export function DepositRateInput({
         name="ratePct"
         inputMode="decimal"
         defaultValue={initial}
-        placeholder="-"
+        placeholder="금리"
         aria-label={`${productName} 연 금리(%)`}
         onBlur={(event) => {
           if (event.currentTarget.value.trim() !== initial) formRef.current?.requestSubmit();
         }}
-        className="seed-input h-8 w-16 px-2 py-1 text-right text-[13px] tabular-nums"
+        className="h-7 w-14 rounded-r2 border border-stroke-neutral-subtle bg-bg-layer-default px-2 text-right text-[12px] tabular-nums text-ink placeholder:text-ink-muted focus:border-stroke-brand-solid focus:outline-none"
       />
       <span className="text-[12px] text-ink-muted">%</span>
     </form>
