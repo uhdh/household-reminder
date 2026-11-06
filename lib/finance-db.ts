@@ -9,6 +9,7 @@ import {
   boolean,
   timestamp,
   unique,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // 여러 가구(가족) 지원: docs/superpowers/specs/2026-09-24-multi-household-design.md 참고.
@@ -114,6 +115,13 @@ export const depositRates = pgTable(
   },
   (table) => [unique().on(table.householdId, table.personId, table.productName)]
 );
+
+// 미래 계획 화면의 가정값·이벤트·은퇴·대출 설정. 가구당 한 행(JSON). 형태는 lib/plan-settings.ts가 검증한다.
+export const planSettings = pgTable("plan_settings", {
+  householdId: uuid("household_id").primaryKey().references(() => households.id),
+  data: jsonb("data").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // 자산 카테고리별 목표 배분 비중(%). 사용자가 대시보드에서 직접 설정하며,
 // 뱅크샐러드 데이터와 무관하게 수기로 관리한다.

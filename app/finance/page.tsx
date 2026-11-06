@@ -14,7 +14,7 @@ import { AppShell } from "@/components/ui";
 import { FinanceEmptyState } from "./_components/empty-state";
 import { DemoBanner } from "./_components/demo-banner";
 import { resolveFinanceViewer } from "@/lib/require-household";
-import { isExcludedItem } from "@/lib/asset-scope";
+import { isCashLikeAsset, isExcludedItem } from "@/lib/asset-scope";
 import { getHouseholdPeople, isPersonId, type PersonId } from "@/lib/spending-queries";
 
 export const dynamic = "force-dynamic";
@@ -27,14 +27,6 @@ const CATEGORY_DISPLAY_OVERRIDES: Record<string, string> = {
 };
 function displayAssetCategory(category: string) {
   return CATEGORY_DISPLAY_OVERRIDES[category] ?? category;
-}
-
-function isCashLikeAsset(item: { category: string; productName: string | null; sector?: string | null }) {
-  const category = displayAssetCategory(item.category);
-  if (category === "현금" || item.sector === "현금성") return true;
-
-  const productName = item.productName ?? "";
-  return /(CMA|MMF|입출금|보통예금|요구불|파킹통장)/i.test(productName);
 }
 
 export default async function DashboardPage({

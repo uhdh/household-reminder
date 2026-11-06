@@ -28,6 +28,7 @@ export default defineConfig({
     "asset_items",
     "allocation_targets",
     "deposit_rates",
+    "plan_settings",
     "transactions",
     "category_mappings",
     "category_rules",
